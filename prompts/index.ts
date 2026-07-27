@@ -8,7 +8,7 @@
  *   export const forestBoss = {
  *     id: 'forest-boss',
  *     kind: 'image',
- *     title: '第十一号森林 — Boss',
+ *     title: 'The 11th Forest — Boss',
  *     body: 'a corrupted forest spirit, pixel art, ...',
  *     negative: 'blurry, lowres',
  *   } as const;

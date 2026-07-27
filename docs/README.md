@@ -1,4 +1,4 @@
-# Docs · 文档索引
+# Docs · Index
 
 This directory holds long-form docs for The 11th Forest. One topic per file, named in `UPPERCASE-ENGLISH.md` (e.g. `DESIGN.md`, `MECHANICS.md`).
 
