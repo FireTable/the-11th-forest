@@ -16,7 +16,7 @@ import type { AirWall, Level } from '@/lib/levels/types';
  */
 export class LoadScene extends Scene {
     constructor(
-        id: string,
+        private readonly id: string,
         private readonly level: Level,
     ) {
         super(`LoadScene:${id}`);
@@ -27,15 +27,25 @@ export class LoadScene extends Scene {
     }
 
     create(): void {
-        const { width, height } = this.scale;
-
-        const bg = this.add.image(width / 2, height / 2, 'background');
-        bg.setDisplaySize(width, height);
+        // World size === image size, so the background displays at native
+        // dimensions and air-wall coords align 1:1 with image pixel space.
+        this.add.image(0, 0, 'background').setOrigin(0, 0);
 
         for (const wall of this.level.airWalls) {
             this.renderWall(wall);
         }
 
+        // Center camera on world so the viewport shows the middle of the
+        // level when the browser window is smaller than the image.
+        this.cameras.main.centerOn(
+            this.level.imageSize.width / 2,
+            this.level.imageSize.height / 2,
+        );
+
+        // Tell the editor panel which scene this is — it listens for
+        // `level-loaded` to seed its local state with the same Level the
+        // scene is rendering.
+        EventBus.emit('level-loaded', { id: this.id, level: this.level });
         EventBus.emit('current-scene-ready', this);
     }
 

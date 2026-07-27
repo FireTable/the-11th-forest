@@ -1,4 +1,4 @@
-import { AUTO, Game } from 'phaser';
+import { AUTO, Game, Scale } from 'phaser';
 
 import { LoadScene } from '@/game/scenes/load-scene';
 import { fetchLevel, fetchLevelIndex } from '@/lib/levels';
@@ -16,20 +16,21 @@ async function resolveScene(): Promise<{ id: string; level: Awaited<ReturnType<t
     return { id, level };
 }
 
-// Canvas is 16:9 to match the AI-generated backgrounds.
-const config: Phaser.Types.Core.GameConfig = {
-    type: AUTO,
-    width: 1280,
-    height: 720,
-    parent: 'game-container',
-    backgroundColor: '#000000',
-};
-
 const StartGame = async (parent: string): Promise<Phaser.Game> => {
     const { id, level } = await resolveScene();
+    // World size matches the level's native image dimensions so air-wall
+    // coords (defined in image pixel space) align 1:1. The canvas itself
+    // is scaled down via Scale.FIT to fit the viewport.
     return new Game({
-        ...config,
+        type: AUTO,
         parent,
+        backgroundColor: '#000000',
+        scale: {
+            mode: Scale.FIT,
+            autoCenter: Scale.CENTER_BOTH,
+            width: level.imageSize.width,
+            height: level.imageSize.height,
+        },
         scene: [new LoadScene(id, level)],
     });
 };
