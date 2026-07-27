@@ -42,7 +42,7 @@ airWalls: []
         expect(level.airWalls).toEqual([]);
     });
 
-    it('parses air walls of both kinds', () => {
+    it('parses polygon air walls of both kinds', () => {
         const yamlText = `
 title: test
 background: a.png
@@ -51,28 +51,65 @@ promptFile: p.yaml
 airWalls:
   - id: w1
     kind: tall
-    x: 10
-    y: 20
-    width: 30
-    height: 40
+    points:
+      - [10, 20]
+      - [40, 20]
+      - [40, 60]
+      - [10, 60]
   - id: w2
     kind: short
-    x: 50
-    y: 60
-    width: 5
-    height: 5
+    points:
+      - [50, 60]
+      - [55, 60]
+      - [55, 65]
 `;
         const level = parseLevelYaml(yamlText, 'test');
         expect(level.airWalls).toHaveLength(2);
         expect(level.airWalls[0]).toEqual({
             id: 'w1',
             kind: 'tall',
-            x: 10,
-            y: 20,
-            width: 30,
-            height: 40,
+            points: [
+                [10, 20],
+                [40, 20],
+                [40, 60],
+                [10, 60],
+            ],
         });
         expect(level.airWalls[1].kind).toBe('short');
+    });
+
+    it('migrates legacy rect air walls to 4-vertex polygons', () => {
+        const yamlText = `
+title: test
+background: a.png
+imageSize: 100x100
+promptFile: p.yaml
+airWalls:
+  - { id: w1, kind: tall, x: 10, y: 20, width: 30, height: 40 }
+`;
+        const level = parseLevelYaml(yamlText, 'test');
+        expect(level.airWalls[0].points).toEqual([
+            [10, 20],
+            [40, 20],
+            [40, 60],
+            [10, 60],
+        ]);
+    });
+
+    it('rejects polygons with fewer than 3 vertices', () => {
+        const yamlText = `
+title: t
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls:
+  - id: w1
+    kind: tall
+    points:
+      - [0, 0]
+      - [10, 0]
+`;
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/at least 3/);
     });
 
     it('rejects invalid air wall kind', () => {
@@ -82,12 +119,17 @@ background: a.png
 imageSize: 1x1
 promptFile: p.yaml
 airWalls:
-  - { id: w1, kind: huge, x: 0, y: 0, width: 1, height: 1 }
+  - id: w1
+    kind: huge
+    points:
+      - [0, 0]
+      - [1, 0]
+      - [0, 1]
 `;
         expect(() => parseLevelYaml(yamlText, 't')).toThrow(/kind must be/);
     });
 
-    it('rejects non-positive wall dimensions', () => {
+    it('rejects non-positive legacy wall dimensions', () => {
         const yamlText = `
 title: t
 background: a.png
@@ -96,7 +138,7 @@ promptFile: p.yaml
 airWalls:
   - { id: w1, kind: tall, x: 0, y: 0, width: 0, height: 1 }
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/width/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/either/);
     });
 
     it('rejects missing required fields', () => {

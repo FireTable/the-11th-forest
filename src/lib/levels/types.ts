@@ -8,17 +8,21 @@
  * Two kinds of air wall:
  *   tall   — solid: blocks character AND bullets (red)
  *   short  — half: blocks character only, bullets pass over (blue)
+ *
+ * AirWall stores a polygon as a list of [x, y] vertices in image pixel
+ * space. The polygon is implicitly closed (last vertex connects to the
+ * first). A rectangle is just a 4-vertex polygon. The parser also
+ * accepts the legacy `x/y/width/height` form and migrates it.
  */
 export type AirWallKind = 'tall' | 'short';
+
+export type AirWallVertex = [number, number];
 
 export type AirWall = {
     id: string;
     kind: AirWallKind;
-    // Top-left in image pixel space (0..imageSize.width, 0..imageSize.height).
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+    /** Vertex list, [x, y] pairs in image pixel space. Implicitly closed. */
+    points: AirWallVertex[];
 };
 
 export type ImageSize = {

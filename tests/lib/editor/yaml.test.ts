@@ -19,12 +19,29 @@ describe('serializeLevelYaml', () => {
         expect(parseLevelYaml(text, 'sacred-forest-sanctuary')).toEqual(minimal);
     });
 
-    it('round-trips with mixed air walls', () => {
+    it('round-trips with polygon air walls', () => {
         const level: Level = {
             ...minimal,
             airWalls: [
-                { id: 'w1', kind: 'tall', x: 10, y: 20, width: 30, height: 40 },
-                { id: 'w2', kind: 'short', x: 50, y: 60, width: 5, height: 5 },
+                {
+                    id: 'w1',
+                    kind: 'tall',
+                    points: [
+                        [10, 20],
+                        [40, 20],
+                        [40, 60],
+                        [10, 60],
+                    ],
+                },
+                {
+                    id: 'w2',
+                    kind: 'short',
+                    points: [
+                        [50, 60],
+                        [55, 60],
+                        [55, 65],
+                    ],
+                },
             ],
         };
         const text = serializeLevelYaml(level);

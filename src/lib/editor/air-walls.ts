@@ -4,11 +4,15 @@
  * Pure level mutations for the air-walls editor section. All functions
  * return a new Level — input is never mutated.
  *
+ * Walls are polygons (`points: [x, y][]`). The old rect-style API
+ * (`moveWall`/`resizeWall`) is gone — use `movePoint` / `addPoint` /
+ * `removePoint` for vertex-level edits instead.
+ *
  * Coords are in image pixel space (see Level.imageSize); validation
  * against bounds lives in the renderer, not here.
  */
 
-import type { AirWall, AirWallKind, Level } from '@/lib/levels/types';
+import type { AirWall, AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 const ID_PATTERN = /^wall-(\d+)$/;
 
@@ -25,19 +29,19 @@ export function nextWallId(walls: AirWall[]): string {
     return `wall-${max + 1}`;
 }
 
-export function addWall(
-    level: Level,
-    kind: AirWallKind,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-): Level {
+/** Append a new wall with the given vertex list. Caller decides kind. */
+export function addWall(level: Level, kind: AirWallKind, points: AirWallVertex[]): Level {
     return {
         ...level,
         airWalls: [
             ...level.airWalls,
-            { id: nextWallId(level.airWalls), kind, x, y, width, height },
+            {
+                id: nextWallId(level.airWalls),
+                kind,
+                // Deep copy: `[...points]` would still share the inner tuples,
+                // so a caller mutating `points[0][0] = 999` would leak in.
+                points: points.map(([x, y]) => [x, y] as AirWallVertex),
+            },
         ],
     };
 }
@@ -49,23 +53,64 @@ export function removeWall(level: Level, id: string): Level {
     };
 }
 
-export function moveWall(level: Level, id: string, x: number, y: number): Level {
-    return {
-        ...level,
-        airWalls: level.airWalls.map((w) => (w.id === id ? { ...w, x, y } : w)),
-    };
-}
-
-export function resizeWall(level: Level, id: string, width: number, height: number): Level {
-    return {
-        ...level,
-        airWalls: level.airWalls.map((w) => (w.id === id ? { ...w, width, height } : w)),
-    };
-}
-
 export function setWallKind(level: Level, id: string, kind: AirWallKind): Level {
     return {
         ...level,
         airWalls: level.airWalls.map((w) => (w.id === id ? { ...w, kind } : w)),
+    };
+}
+
+/**
+ * Append a vertex to the named wall. Skips duplicates of the last point
+ * (clicks often produce two identical consecutive coords).
+ */
+export function addPoint(
+    level: Level,
+    id: string,
+    vertex: AirWallVertex,
+): Level {
+    return {
+        ...level,
+        airWalls: level.airWalls.map((w) => {
+            if (w.id !== id) return w;
+            const last = w.points[w.points.length - 1];
+            if (last && last[0] === vertex[0] && last[1] === vertex[1]) return w;
+            return { ...w, points: [...w.points, vertex] };
+        }),
+    };
+}
+
+/** Remove the vertex at `index` from the named wall. No-op if out of range. */
+export function removePoint(level: Level, id: string, index: number): Level {
+    return {
+        ...level,
+        airWalls: level.airWalls.map((w) => {
+            if (w.id !== id) return w;
+            if (index < 0 || index >= w.points.length) return w;
+            return { ...w, points: w.points.filter((_, i) => i !== index) };
+        }),
+    };
+}
+
+/** Move the vertex at `index` to (x, y). Coerces to integers. */
+export function movePoint(
+    level: Level,
+    id: string,
+    index: number,
+    x: number,
+    y: number,
+): Level {
+    return {
+        ...level,
+        airWalls: level.airWalls.map((w) => {
+            if (w.id !== id) return w;
+            if (index < 0 || index >= w.points.length) return w;
+            return {
+                ...w,
+                points: w.points.map((p, i) =>
+                    i === index ? [Math.round(x), Math.round(y)] as AirWallVertex : p,
+                ),
+            };
+        }),
     };
 }

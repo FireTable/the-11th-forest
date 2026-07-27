@@ -1,22 +1,101 @@
-# Runtime level data for scene `sacred-forest-sanctuary`.
-# Consumed by src/lib/level/loader.ts. Filename (sans .yaml) is the
-# canonical id — do not add an `id` field.
-
 title: The 11th Forest — Sacred Forest Sanctuary
-
-# Background asset path (relative to public/, resolved by the loader).
 background: assets/image/scenes/sacred-forest-sanctuary.png
-
-# Native pixel dimensions of the background. MUST equal the
-# imageSize in prompts/scenes/sacred-forest-sanctuary.yaml
-# (the loader asserts this — see tests/lib/level/loader.test.ts).
 imageSize: 2752x1536
-
-# Pointer to the AI prompt template. Same basename by convention.
 promptFile: prompts/scenes/sacred-forest-sanctuary.yaml
-
-# Air walls. Two kinds:
-#   tall   — solid: blocks character AND bullets (red)
-#   short  — half: blocks character only, bullets pass over (blue)
-# Coords are top-left in image pixel space (0..2752, 0..1536).
-airWalls: []
+airWalls:
+  - id: wall-1
+    kind: tall
+    points:
+      - - 8
+        - 658
+      - - 114
+        - 699
+      - - 207
+        - 805
+      - - 313
+        - 901
+      - - 397
+        - 909
+      - - 441
+        - 909
+      - - 498
+        - 920
+      - - 528
+        - 963
+      - - 536
+        - 1009
+      - - 542
+        - 1086
+      - - 542
+        - 1135
+      - - 713
+        - 1086
+      - - 732
+        - 1118
+      - - 754
+        - 1151
+      - - 792
+        - 1175
+      - - 781
+        - 1233
+      - - 743
+        - 1284
+      - - 759
+        - 1317
+      - - 695
+        - 1292
+      - - 697
+        - 1332
+      - - 765
+        - 1377
+      - - 830
+        - 1388
+      - - 893
+        - 1385
+      - - 915
+        - 1360
+      - - 945
+        - 1385
+      - - 1021
+        - 1349
+      - - 1040
+        - 1374
+      - - 1067
+        - 1412
+      - - 1096
+        - 1382
+      - - 1184
+        - 1450
+      - - 1268
+        - 1532
+      - - 5
+        - 1532
+  - id: wall-2
+    kind: short
+    points:
+      - - 2004
+        - 996
+      - - 1977
+        - 1017
+      - - 1987
+        - 1042
+      - - 2000
+        - 1067
+      - - 2009
+        - 1086
+      - - 2052
+        - 1090
+      - - 2091
+        - 1079
+      - - 2118
+        - 1073
+      - - 2110
+        - 1044
+      - - 2116
+        - 1025
+      - - 2110
+        - 990
+      - - 2054
+        - 974
+      - - 2020
+        - 982
