@@ -24,6 +24,8 @@ Quick context for working on **The 11th Forest** — a top-down, anime-styled pi
 8. **The dev server is a shared resource.** The user keeps `pnpm dev` running on port 8080. Never start a duplicate dev server and never kill the existing process on port 8080. To verify a change, `curl http://localhost:8080/...` (or whichever port the user is on) directly. If you started a stale dev server on a different port during earlier debugging, clean up only your own process — leave 8080 alone.
 9. **UI = shadcn + Tailwind + lucide.** Use shadcn/ui components from `src/components/ui/` (button, input, select, …). Style with Tailwind utility classes inline on the component — do **not** create new `.css` files for component styling. Icons come from `lucide-react`. Existing legacy CSS (e.g. `.button`) may remain but new UI should not add more.
 
+10. **We're on Phaser v4.** If an API doesn't behave like a v3 tutorial suggests, query the Phaser v4 source/docs before assuming it works — v4 changed a few APIs (e.g. how `Matter.Body.create` handles vertices, scene-level pointer events, default ESM exports). For "any-click-anywhere", bind directly on the Phaser canvas DOM rather than `scene.input`.
+
 ## Commands
 
 | Task       | Command           |
