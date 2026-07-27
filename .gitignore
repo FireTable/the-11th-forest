@@ -27,3 +27,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Local scratch / AI gen outputs (image, music, …)
+/tmp/
