@@ -3,19 +3,23 @@
  * --------------------------------------------------------------------------
  * Prompt templates for AI generation (image, music, copy, ...).
  *
- * Each template is a separate file exporting a `Prompt` object:
+ * Scenes (render order, see ./scenes.ts):
+ *   import { scenes } from './prompts';
+ *   scenes.forEach(s => ...);
  *
- *   export const forestBoss = {
- *     id: 'forest-boss',
+ * Each scene entry:
+ *   {
+ *     number: 1,                     // render order
+ *     id: 'outer-forest-scene',
  *     kind: 'image',
- *     title: 'The 11th Forest — Boss',
- *     body: 'a corrupted forest spirit, pixel art, ...',
- *     negative: 'blurry, lowres',
- *   } as const;
- *
- * Then re-export it from this barrel so consumers can do:
- *   import { prompts } from './prompts';
- *   prompts.forEach(p => ...);
+ *     size: '2752x1536',              // image prompts only
+ *     title: 'The 11th Forest — ...',
+ *     body: '...',                    // fed to the AI
+ *     negative: '...',                // fed as negative prompt
+ *   }
  */
 
-export {};
+import { scenes } from './scenes';
+
+export { scenes };
+export const prompts = scenes;

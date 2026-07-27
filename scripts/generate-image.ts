@@ -5,11 +5,18 @@
  * client). Supports text-to-image and image-to-image.
  *
  * Run:
- *   pnpm tsx scripts/generate-image.ts                                   # t2i
+ *   pnpm tsx scripts/generate-image.ts                                   # t2i, default prompt
  *   pnpm tsx scripts/generate-image.ts --prompt "red forest boss"        # t2i
  *   pnpm tsx scripts/generate-image.ts --size 1280x720                   # t2i w/ size
  *   pnpm tsx scripts/generate-image.ts --image tmp/image/bg.png          # i2i
- *   pnpm tsx scripts/generate-image.ts --image ./bg.png --prompt "neon"  # i2i + text
+ *   pnpm tsx scripts/generate-image.ts --scene 1                         # scene 1 from prompts/scenes.ts
+ *   pnpm tsx scripts/generate-image.ts --scene-id outer-forest-scene     # same, by id
+ *   pnpm tsx scripts/generate-image.ts --scene 1 --image bg.png         # i2i with scene body
+ *
+ * Resolution (highest wins):
+ *   1. explicit --prompt / --size / --image
+ *   2. scene entry (from --scene or --scene-id)
+ *   3. env / positional defaults
  *
  * Env (loaded from .env then .env.local; .env.local wins):
  *   GEMINI_ENDPOINT  e.g. http://127.0.0.1:8045/v1
@@ -21,6 +28,7 @@ import OpenAI from 'openai';
 import { config as loadEnv } from 'dotenv';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, extname } from 'node:path';
+import { scenes } from '../prompts/scenes';
 
 // Load .env first (shared defaults, committed), then .env.local (personal
 // secrets, gitignored). `override:true` makes local win on key clashes.
@@ -52,13 +60,16 @@ function parseArgs(argv: string[]): { flags: Record<string, string | boolean>; p
     return { flags, positional };
 }
 
+type Kind = 'image' | 'music';
+
 type MainOpts = {
+    kind: Kind;
     prompt: string;
     size: string;
     imagePath?: string;
 };
 
-async function main(opts: MainOpts): Promise<void> {
+async function generateImage(opts: MainOpts): Promise<void> {
     const endpoint = process.env.GEMINI_ENDPOINT ?? 'http://127.0.0.1:8045/v1';
     const apiKey = process.env.GEMINI_API_KEY ?? '';
     const model = process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-image';
@@ -84,8 +95,8 @@ async function main(opts: MainOpts): Promise<void> {
     type Choice = {
         message?: {
             content?:
-                | string
-                | Array<{ type?: string; text?: string; image_url?: { url?: string } }>;
+            | string
+            | Array<{ type?: string; text?: string; image_url?: { url?: string } }>;
         };
     };
     const content = (res.choices as Choice[])[0]?.message?.content;
@@ -134,13 +145,40 @@ function buildUserContent(opts: MainOpts): string | Array<Record<string, unknown
     ];
 }
 
+function resolveScene(flags: Record<string, string | boolean>): (typeof scenes)[number] | undefined {
+    const sceneIdx = flags.scene as string | undefined;
+    const sceneId = flags['scene-id'] as string | undefined;
+    if (sceneIdx !== undefined) {
+        const n = Number(sceneIdx);
+        const found = scenes.find((s) => s.number === n);
+        if (!found) throw new Error(`No scene with number=${n}. Available: ${scenes.map((s) => s.number).join(', ')}`);
+        return found;
+    }
+    if (sceneId !== undefined) {
+        const found = scenes.find((s) => s.id === sceneId);
+        if (!found) throw new Error(`No scene with id=${sceneId}. Available: ${scenes.map((s) => s.id).join(', ')}`);
+        return found;
+    }
+    return undefined;
+}
+
 const { flags, positional } = parseArgs(process.argv.slice(2));
 
-const prompt = (flags.prompt as string | undefined) ?? positional[0] ?? 'Draw a futuristic city';
-const size = (flags.size as string | undefined) ?? '1024x1024';
+const scene = resolveScene(flags);
+
+// Resolution: explicit flag > scene entry > default
+const kind = ((flags.kind as Kind | undefined) ?? scene?.kind ?? 'image') as Kind;
+const prompt =
+    (flags.prompt as string | undefined) ?? positional[0] ?? scene?.prompt ?? 'Draw a futuristic city';
+const size = (flags.size as string | undefined) ?? (scene && 'size' in scene ? scene.size : undefined) ?? '1024x1024';
 const imagePath = flags.image as string | undefined;
 
-main({ prompt, size, imagePath }).catch((err) => {
+if (kind === 'music') {
+    console.error('Music generation not implemented yet. Use --kind image.');
+    process.exit(2);
+}
+
+generateImage({ kind, prompt, size, imagePath }).catch((err) => {
     console.error(err);
     process.exit(1);
 });
