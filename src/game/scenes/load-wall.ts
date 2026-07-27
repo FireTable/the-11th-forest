@@ -10,6 +10,15 @@ export function wallCategory(kind: AirWallKind): number {
 }
 
 /**
+ * Collision mask for a wall: which OTHER categories it blocks. tall
+ * blocks both character and bullets; short blocks character only —
+ * bullets pass over it (the gameplay semantic).
+ */
+export function wallMask(kind: AirWallKind): number {
+    return kind === 'tall' ? CAT.CHARACTER | CAT.BULLET : CAT.CHARACTER;
+}
+
+/**
  * Triangulate a polygon into a list of triangle vertex triples.
  * Each triple is an array of 3 [x, y] points (image-space).
  *
@@ -56,12 +65,9 @@ export function createWallBodies(
 ): MatterJS.BodyType[] {
     const bodies: MatterJS.BodyType[] = [];
     for (const w of walls) {
-        const category = wallCategory(w.kind);
         const collisionFilter = {
-            category,
-            // mask: collide with all categories for now. Tighten
-            // when BULLET lands (short walls should ignore it).
-            mask: 0xffff,
+            category: wallCategory(w.kind),
+            mask: wallMask(w.kind),
         };
         for (const tri of triangulate(w.points)) {
             const [a, b, c] = tri;

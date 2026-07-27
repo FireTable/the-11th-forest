@@ -18,4 +18,5 @@ export const CAT = {
     WALL_TALL: 0x0001,
     WALL_SHORT: 0x0002,
     CHARACTER: 0x0004,
+    BULLET: 0x0008,
 } as const;

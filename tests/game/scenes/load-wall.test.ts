@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { CAT } from '@/lib/constants';
-import { triangulate, wallCategory } from '@/game/scenes/load-wall';
+import { triangulate, wallCategory, wallMask } from '@/game/scenes/load-wall';
 import type { AirWallVertex } from '@/lib/levels/types';
 
 describe('wallCategory', () => {
@@ -17,6 +17,20 @@ describe('wallCategory', () => {
         // Bitwise AND must be 0 — otherwise the categories overlap and
         // short walls would inherit tall-wall collision rules.
         expect(wallCategory('tall') & wallCategory('short')).toBe(0);
+    });
+});
+
+describe('wallMask', () => {
+    it('tall mask includes CHARACTER and BULLET bits', () => {
+        const mask = wallMask('tall');
+        expect(mask & CAT.CHARACTER).toBeTruthy();
+        expect(mask & CAT.BULLET).toBeTruthy();
+    });
+
+    it('short mask includes CHARACTER but NOT BULLET', () => {
+        const mask = wallMask('short');
+        expect(mask & CAT.CHARACTER).toBeTruthy();
+        expect(mask & CAT.BULLET).toBe(0);
     });
 });
 
