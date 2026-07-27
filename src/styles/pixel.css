@@ -1,0 +1,26 @@
+/*
+ * src/styles/pixel.css
+ * --------------------------------------------------------------------------
+ * Pixel-art skin. Loaded after src/index.css so it can override shadcn
+ * defaults. Keep this file focused on the *retro* aesthetic — the dark
+ * garden palette, chunky borders, and pixel font live here.
+ *
+ * What lives where:
+ *   src/index.css        — Tailwind + shadcn CSS variables (theme tokens)
+ *   src/styles/pixel.css — this file (aesthetic overrides)
+ *   src/editor/panel.css — editor-specific layout (legacy, will migrate)
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+@theme inline {
+    --font-pixel: 'Press Start 2P', ui-monospace, monospace;
+}
+
+@layer base {
+    canvas {
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+    }
+}

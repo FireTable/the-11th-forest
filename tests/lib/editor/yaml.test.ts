@@ -1,0 +1,54 @@
+import { describe, it, expect } from 'vitest';
+
+import { parseLevelYaml } from '@/lib/levels/parser';
+import type { Level } from '@/lib/levels/types';
+
+import { serializeLevelYaml } from '@/lib/editor/yaml';
+
+const minimal: Level = {
+    title: 'The 11th Forest — Sacred Forest Sanctuary',
+    background: 'assets/image/scenes/sacred-forest-sanctuary.png',
+    imageSize: { width: 2752, height: 1536 },
+    promptFile: 'prompts/scenes/sacred-forest-sanctuary.yaml',
+    airWalls: [],
+};
+
+describe('serializeLevelYaml', () => {
+    it('round-trips through parseLevelYaml (empty airWalls)', () => {
+        const text = serializeLevelYaml(minimal);
+        expect(parseLevelYaml(text, 'sacred-forest-sanctuary')).toEqual(minimal);
+    });
+
+    it('round-trips with mixed air walls', () => {
+        const level: Level = {
+            ...minimal,
+            airWalls: [
+                { id: 'w1', kind: 'tall', x: 10, y: 20, width: 30, height: 40 },
+                { id: 'w2', kind: 'short', x: 50, y: 60, width: 5, height: 5 },
+            ],
+        };
+        const text = serializeLevelYaml(level);
+        expect(parseLevelYaml(text, 'test')).toEqual(level);
+    });
+
+    it('emits imageSize as "WxH" string', () => {
+        const text = serializeLevelYaml(minimal);
+        expect(text).toMatch(/^imageSize: 2752x1536$/m);
+    });
+
+    it('emits empty airWalls as inline []', () => {
+        const text = serializeLevelYaml(minimal);
+        expect(text).toMatch(/^airWalls: \[\]$/m);
+    });
+
+    it('preserves key order (title, background, imageSize, promptFile, airWalls)', () => {
+        const text = serializeLevelYaml(minimal);
+        const keys = ['title', 'background', 'imageSize', 'promptFile', 'airWalls'];
+        let cursor = -1;
+        for (const key of keys) {
+            const idx = text.indexOf(`${key}:`, cursor + 1);
+            expect(idx).toBeGreaterThan(cursor);
+            cursor = idx;
+        }
+    });
+});
