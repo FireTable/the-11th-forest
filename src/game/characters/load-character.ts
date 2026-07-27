@@ -104,8 +104,8 @@ export function loadCharacter(
             y: (dy / len) * BULLET_SPEED,
         });
 
-        const bulletRect = scene.add.rectangle(origin.x, origin.y, BULLET_STREAK_W, BULLET_STREAK_H, 0xfbbf24);
-        bulletRect.setStrokeStyle(1, 0x78350f, 1);
+        const bulletRect = scene.add.rectangle(origin.x, origin.y, BULLET_STREAK_W, BULLET_STREAK_H, 0x22c55e);
+        bulletRect.setStrokeStyle(1, 0x14532d, 1);
         bulletRect.setRotation(angle);
 
         bullets.push({
@@ -219,7 +219,7 @@ export function loadCharacter(
             if (trail.length >= 2) {
                 for (let k = 1; k < trail.length; k++) {
                     const alpha = k / (trail.length - 1);
-                    trailGraphics.lineStyle(3, 0xfbbf24, alpha * 0.7);
+                    trailGraphics.lineStyle(3, 0x22c55e, alpha * 0.7);
                     trailGraphics.beginPath();
                     trailGraphics.moveTo(trail[k - 1].x, trail[k - 1].y);
                     trailGraphics.lineTo(trail[k].x, trail[k].y);

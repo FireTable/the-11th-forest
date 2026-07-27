@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { editorApiPlugin } from './plugins/editor-api.mjs'
+import { phaserFullReloadPlugin } from './plugins/phaser-full-reload.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -15,6 +16,7 @@ export default defineConfig({
         react(),
         tailwindcss(),
         editorApiPlugin(),
+        phaserFullReloadPlugin(),
     ],
     resolve: {
         alias: {

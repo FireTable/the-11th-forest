@@ -36,7 +36,7 @@ const TABS: { id: Tab; label: string }[] = [
  * the canvas for vertex drag / new wall commits.
  */
 export function EditorPanel() {
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(false);
     const [sceneId, setSceneId] = useState<string | null>(null);
     const [level, setLevel] = useState<Level | null>(null);
     const [tab, setTab] = useState<Tab>('air-walls');
