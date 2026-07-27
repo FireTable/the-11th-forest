@@ -1,0 +1,134 @@
+import { describe, it, expect } from 'vitest';
+
+import {
+    formatImageSize,
+    parseImageSize,
+} from '@/lib/levels/types';
+import { parseLevelYaml, parseLevelIndex } from '@/lib/levels/parser';
+
+describe('parseImageSize / formatImageSize', () => {
+    it('parses "WxH" into { width, height }', () => {
+        expect(parseImageSize('2752x1536')).toEqual({ width: 2752, height: 1536 });
+        expect(parseImageSize('1280x720')).toEqual({ width: 1280, height: 720 });
+    });
+
+    it('throws on bad input', () => {
+        expect(() => parseImageSize('abc')).toThrow();
+        expect(() => parseImageSize('2752')).toThrow();
+        expect(() => parseImageSize('2752x')).toThrow();
+    });
+
+    it('round-trips through formatImageSize', () => {
+        const s = { width: 1024, height: 1024 };
+        expect(parseImageSize(formatImageSize(s))).toEqual(s);
+    });
+});
+
+describe('parseLevelYaml', () => {
+    const validYaml = `
+title: The 11th Forest — Sacred Forest Sanctuary
+background: assets/image/scenes/sacred-forest-sanctuary.png
+imageSize: 2752x1536
+promptFile: prompts/scenes/sacred-forest-sanctuary.yaml
+airWalls: []
+`;
+
+    it('parses a minimal valid level', () => {
+        const level = parseLevelYaml(validYaml, 'sacred-forest-sanctuary');
+        expect(level.title).toBe('The 11th Forest — Sacred Forest Sanctuary');
+        expect(level.background).toBe('assets/image/scenes/sacred-forest-sanctuary.png');
+        expect(level.imageSize).toEqual({ width: 2752, height: 1536 });
+        expect(level.promptFile).toBe('prompts/scenes/sacred-forest-sanctuary.yaml');
+        expect(level.airWalls).toEqual([]);
+    });
+
+    it('parses air walls of both kinds', () => {
+        const yamlText = `
+title: test
+background: a.png
+imageSize: 100x100
+promptFile: p.yaml
+airWalls:
+  - id: w1
+    kind: tall
+    x: 10
+    y: 20
+    width: 30
+    height: 40
+  - id: w2
+    kind: short
+    x: 50
+    y: 60
+    width: 5
+    height: 5
+`;
+        const level = parseLevelYaml(yamlText, 'test');
+        expect(level.airWalls).toHaveLength(2);
+        expect(level.airWalls[0]).toEqual({
+            id: 'w1',
+            kind: 'tall',
+            x: 10,
+            y: 20,
+            width: 30,
+            height: 40,
+        });
+        expect(level.airWalls[1].kind).toBe('short');
+    });
+
+    it('rejects invalid air wall kind', () => {
+        const yamlText = `
+title: t
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls:
+  - { id: w1, kind: huge, x: 0, y: 0, width: 1, height: 1 }
+`;
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/kind must be/);
+    });
+
+    it('rejects non-positive wall dimensions', () => {
+        const yamlText = `
+title: t
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls:
+  - { id: w1, kind: tall, x: 0, y: 0, width: 0, height: 1 }
+`;
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/width/);
+    });
+
+    it('rejects missing required fields', () => {
+        const yamlText = `
+title: t
+background: a.png
+`;
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/imageSize/);
+    });
+});
+
+describe('parseLevelIndex', () => {
+    it('parses a single-entry manifest', () => {
+        const idx = parseLevelIndex('levels:\n  - sacred-forest-sanctuary\n');
+        expect(idx.levels).toEqual(['sacred-forest-sanctuary']);
+    });
+
+    it('preserves order across multiple entries', () => {
+        const idx = parseLevelIndex(`
+levels:
+  - aaa-first
+  - bbb-second
+  - ccc-third
+`);
+        expect(idx.levels).toEqual(['aaa-first', 'bbb-second', 'ccc-third']);
+    });
+
+    it('rejects non-array `levels`', () => {
+        expect(() => parseLevelIndex('levels: 42')).toThrow(/array/);
+    });
+
+    it('rejects non-string entries', () => {
+        expect(() => parseLevelIndex('levels:\n  - 42\n')).toThrow(/non-empty string/);
+    });
+});

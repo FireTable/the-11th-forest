@@ -1,0 +1,22 @@
+# Runtime level data for scene `sacred-forest-sanctuary`.
+# Consumed by src/lib/level/loader.ts. Filename (sans .yaml) is the
+# canonical id — do not add an `id` field.
+
+title: The 11th Forest — Sacred Forest Sanctuary
+
+# Background asset path (relative to public/, resolved by the loader).
+background: assets/image/scenes/sacred-forest-sanctuary.png
+
+# Native pixel dimensions of the background. MUST equal the
+# imageSize in prompts/scenes/sacred-forest-sanctuary.yaml
+# (the loader asserts this — see tests/lib/level/loader.test.ts).
+imageSize: 2752x1536
+
+# Pointer to the AI prompt template. Same basename by convention.
+promptFile: prompts/scenes/sacred-forest-sanctuary.yaml
+
+# Air walls. Two kinds:
+#   tall   — solid: blocks character AND bullets (red)
+#   short  — half: blocks character only, bullets pass over (blue)
+# Coords are top-left in image pixel space (0..2752, 0..1536).
+airWalls: []

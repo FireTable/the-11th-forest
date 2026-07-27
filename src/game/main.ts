@@ -1,31 +1,37 @@
-import { Boot } from '@/game/scenes/Boot';
-import { GameOver } from '@/game/scenes/GameOver';
-import { Game as MainGame } from '@/game/scenes/Game';
-import { MainMenu } from '@/game/scenes/MainMenu';
 import { AUTO, Game } from 'phaser';
-import { Preloader } from '@/game/scenes/Preloader';
 
-//  Find out more information about the Game Config at:
-//  https://docs.phaser.io/api-documentation/typedef/types-core#gameconfig
+import { LoadScene } from '@/game/scenes/load-scene';
+import { fetchLevel, fetchLevelIndex } from '@/lib/levels';
+
+// Scene id resolution: ?scene=<id> URL param wins; otherwise the first
+// entry in public/data/levels/index.yaml. Level is fetched here (NOT in
+// the scene) because Phaser's init() does not await async work — the
+// fetch would race with preload().
+async function resolveScene(): Promise<{ id: string; level: Awaited<ReturnType<typeof fetchLevel>> }> {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get('scene');
+    const id = fromUrl ?? (await fetchLevelIndex()).levels[0];
+    if (!id) throw new Error('Level index is empty — add an entry to public/data/levels/index.yaml');
+    const level = await fetchLevel(id);
+    return { id, level };
+}
+
+// Canvas is 16:9 to match the AI-generated backgrounds.
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
-    width: 1024,
-    height: 768,
+    width: 1280,
+    height: 720,
     parent: 'game-container',
-    backgroundColor: '#028af8',
-    scene: [
-        Boot,
-        Preloader,
-        MainMenu,
-        MainGame,
-        GameOver
-    ]
+    backgroundColor: '#000000',
 };
 
-const StartGame = (parent: string) => {
-
-    return new Game({ ...config, parent });
-
-}
+const StartGame = async (parent: string): Promise<Phaser.Game> => {
+    const { id, level } = await resolveScene();
+    return new Game({
+        ...config,
+        parent,
+        scene: [new LoadScene(id, level)],
+    });
+};
 
 export default StartGame;
