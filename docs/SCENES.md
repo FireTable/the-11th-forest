@@ -186,4 +186,4 @@ pnpm tsx scripts/validate-levels.ts
 - **No `number` field** — render order comes from `index.yaml`.
 - **No per-scene TS file** — `LoadScene` is generic.
 - **No level transition logic** yet — only the boot path is wired.
-- **Editor (air-walls draw, props placement)** lives behind the debug panel (`DEBUG_PANEL=1`, F2 toggle). See CLAUDE.md tasks #5–7.
+- **Editor (air-walls draw, props placement)** lives behind the editor panel (`EDITOR_PANEL=1`, F2 toggle). See CLAUDE.md tasks #5–7.

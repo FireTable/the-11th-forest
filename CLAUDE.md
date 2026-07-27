@@ -21,6 +21,8 @@ Quick context for working on **The 11th Forest** — a top-down, anime-styled pi
 5. **Docs are English.** `docs/*.md`, `CLAUDE.md`, `README.md` — all English. Only `README-CN.md` may be Chinese.
 6. **Commits use [Conventional Commits](https://www.conventionalcommits.org/).** `<type>(<optional-scope>): <subject>` — `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`, `perf`. English subject, ≤72 chars, imperative mood, no trailing period.
 7. **Resource loading goes through `handle-fetch`.** When reading project resources (level YAML, prompt YAML, any future JSON / asset), import `fetch` from [`src/lib/handle-fetch.ts`](./src/lib/handle-fetch.ts). Never use `node:fs` / `node:url` / `node:path` directly in shared code. Scripts under `scripts/` may use `node:fs` for non-`/data/*` resources (e.g. prompt YAMLs). Reason: Vite externalises `node:*` modules; bundling them into browser code breaks at runtime. The `handle-fetch` wrapper handles both runtimes via lazy dynamic import.
+8. **The dev server is a shared resource.** The user keeps `pnpm dev` running on port 8080. Never start a duplicate dev server and never kill the existing process on port 8080. To verify a change, `curl http://localhost:8080/...` (or whichever port the user is on) directly. If you started a stale dev server on a different port during earlier debugging, clean up only your own process — leave 8080 alone.
+9. **UI = shadcn + Tailwind + lucide.** Use shadcn/ui components from `src/components/ui/` (button, input, select, …). Style with Tailwind utility classes inline on the component — do **not** create new `.css` files for component styling. Icons come from `lucide-react`. Existing legacy CSS (e.g. `.button`) may remain but new UI should not add more.
 
 ## Commands
 
