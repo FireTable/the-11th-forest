@@ -101,6 +101,9 @@ class MyScene extends Phaser.Scene {
 
 Long-form design, mechanics, art, and tooling docs live in [`docs/`](./docs/), one topic per `UPPERCASE-ENGLISH.md` file. See [`docs/README.md`](./docs/README.md) for the full index.
 
+Start with:
+- [`docs/SCENES.md`](./docs/SCENES.md) — how a scene is loaded (file layout, `handle-fetch`, adding a new scene).
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).

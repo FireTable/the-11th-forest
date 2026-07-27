@@ -101,6 +101,9 @@ class MyScene extends Phaser.Scene {
 
 详细的设计、机制、美术与工具文档存放在 [`docs/`](./docs/),每个主题一个 `UPPERCASE-ENGLISH.md` 文件。完整索引见 [`docs/README.md`](./docs/README.md)。
 
+建议从这里开始:
+- [`docs/SCENES.md`](./docs/SCENES.md) — 场景如何被加载(文件结构、`handle-fetch`、如何添加新场景)。
+
 ## 许可证
 
 MIT —— 见 [LICENSE](./LICENSE)。

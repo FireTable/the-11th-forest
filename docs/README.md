@@ -6,7 +6,7 @@ This directory holds long-form docs for The 11th Forest. One topic per file, nam
 
 | Doc | Topic |
 |-----|-------|
-| _none yet_ | — |
+| [`SCENES.md`](./SCENES.md) | Scene file layout, loading flow, `handle-fetch`, how to add a new scene. |
 
 ## Convention
 
