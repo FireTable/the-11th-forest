@@ -1,0 +1,7 @@
+# Pre-commit hook for The 11th Forest
+# Runs on every `git commit`. Order: format/lint staged files, then full
+# type-check, then tests. Bypass with `git commit --no-verify` when needed.
+
+pnpm exec lint-staged
+pnpm exec tsc --noEmit
+pnpm exec vitest run --passWithNoTests
