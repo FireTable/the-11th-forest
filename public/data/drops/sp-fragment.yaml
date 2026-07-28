@@ -1,0 +1,5 @@
+name: SP Fragment
+kind: static
+effect:
+  type: instant
+  sp: 30

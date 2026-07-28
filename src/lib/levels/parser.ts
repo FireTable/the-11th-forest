@@ -29,8 +29,10 @@ import {
     type AirWall,
     type AirWallKind,
     type AirWallVertex,
+    type DropSpawn,
     type Level,
     type LevelIndex,
+    type MonsterSpawn,
 } from './types';
 
 const VALID_KINDS: ReadonlySet<AirWallKind> = new Set(['tall', 'short']);
@@ -109,6 +111,13 @@ function parseAirWall(raw: unknown, idx: number): AirWall {
 /**
  * Parse a level YAML string. `id` is supplied by the caller (filename
  * sans .yaml) — it is NOT stored in the data.
+ *
+ * Optional Phase-1+ fields:
+ *   character:  string                # character id (no extra config; just the id)
+ *   monsters:   [{ type: id, at: [x, y] }, ...]
+ *   dropSpawns: [{ type: id, at: [x, y] }, ...]
+ *
+ * Missing fields are simply absent — no default monster spawns unless listed.
  */
 export function parseLevelYaml(text: string, id: string): Level {
     const raw = parseYaml(text) as Record<string, unknown> | null;
@@ -116,7 +125,8 @@ export function parseLevelYaml(text: string, id: string): Level {
         throw new Error(`Level ${id}: empty or non-object YAML`);
     }
 
-    const { title, background, imageSize, promptFile, airWalls } = raw;
+    const { title, background, imageSize, promptFile, airWalls, character, monsters, dropSpawns } =
+        raw;
     if (typeof title !== 'string' || title.length === 0) throw new Error(`Level ${id}: title required`);
     if (typeof background !== 'string' || background.length === 0) throw new Error(`Level ${id}: background required`);
     if (typeof imageSize !== 'string') throw new Error(`Level ${id}: imageSize required (string "WxH")`);
@@ -125,7 +135,71 @@ export function parseLevelYaml(text: string, id: string): Level {
     const size = parseImageSize(imageSize);
     const walls = Array.isArray(airWalls) ? airWalls.map((w, i) => parseAirWall(w, i)) : [];
 
-    return { title, background, imageSize: size, promptFile, airWalls: walls };
+    const result: Level = {
+        title,
+        background,
+        imageSize: size,
+        promptFile,
+        airWalls: walls,
+    };
+
+    if (character !== undefined) {
+        if (typeof character !== 'string' || character.length === 0) {
+            throw new Error(`Level ${id}: character must be a non-empty string`);
+        }
+        result.character = character;
+    }
+
+    if (monsters !== undefined) {
+        if (!Array.isArray(monsters)) {
+            throw new Error(`Level ${id}: monsters must be an array`);
+        }
+        result.monsters = monsters.map((m, i) => parseMonsterSpawn(m, i, id));
+    }
+
+    if (dropSpawns !== undefined) {
+        if (!Array.isArray(dropSpawns)) {
+            throw new Error(`Level ${id}: dropSpawns must be an array`);
+        }
+        result.dropSpawns = dropSpawns.map((d, i) => parseDropSpawn(d, i, id));
+    }
+
+    return result;
+}
+
+function parsePoint(raw: unknown, label: string, idx: number, id: string): { x: number; y: number } {
+    if (!Array.isArray(raw) || raw.length !== 2) {
+        throw new Error(`Level ${id}: ${label}[${idx}].at must be [x, y]`);
+    }
+    const [x, y] = raw;
+    if (typeof x !== 'number' || typeof y !== 'number') {
+        throw new Error(`Level ${id}: ${label}[${idx}].at must be two numbers`);
+    }
+    return { x: Math.round(x), y: Math.round(y) };
+}
+
+function parseMonsterSpawn(raw: unknown, idx: number, id: string): MonsterSpawn {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(`Level ${id}: monsters[${idx}] must be an object`);
+    }
+    const m = raw as Record<string, unknown>;
+    if (typeof m.type !== 'string' || m.type.length === 0) {
+        throw new Error(`Level ${id}: monsters[${idx}].type must be a non-empty string`);
+    }
+    const at = parsePoint(m.at, 'monsters', idx, id);
+    return { type: m.type, x: at.x, y: at.y };
+}
+
+function parseDropSpawn(raw: unknown, idx: number, id: string): DropSpawn {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(`Level ${id}: dropSpawns[${idx}] must be an object`);
+    }
+    const d = raw as Record<string, unknown>;
+    if (typeof d.type !== 'string' || d.type.length === 0) {
+        throw new Error(`Level ${id}: dropSpawns[${idx}].type must be a non-empty string`);
+    }
+    const at = parsePoint(d.at, 'dropSpawns', idx, id);
+    return { type: d.type, x: at.x, y: at.y };
 }
 
 /**

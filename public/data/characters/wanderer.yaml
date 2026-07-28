@@ -1,0 +1,6 @@
+name: Wanderer
+hp: 9999
+sp: 60
+moveSpeed: 10
+dodgeSpCost: 15
+spRegenMs: 5000

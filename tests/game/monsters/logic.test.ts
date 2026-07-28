@@ -1,0 +1,87 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+    chaseVelocity,
+    decideAIState,
+    dirTo,
+    distBetween,
+    pickClosestMonster,
+} from '@/game/monsters/logic';
+
+describe('monsters/logic — decideAIState', () => {
+    it('returns attack when in range', () => {
+        expect(decideAIState(30, 36)).toBe('attack');
+        expect(decideAIState(0, 36)).toBe('attack');
+    });
+
+    it('returns chase when out of range', () => {
+        expect(decideAIState(40, 36)).toBe('chase');
+    });
+});
+
+describe('monsters/logic — distBetween', () => {
+    it('returns Euclidean distance', () => {
+        expect(distBetween({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
+        expect(distBetween({ x: 0, y: 0 }, { x: 0, y: 0 })).toBe(0);
+    });
+
+    it('is direction-agnostic', () => {
+        const d = distBetween({ x: 1, y: 2 }, { x: 4, y: 6 });
+        expect(d).toBeCloseTo(5);
+    });
+});
+
+describe('monsters/logic — dirTo', () => {
+    it('returns unit vector toward target', () => {
+        expect(dirTo({ x: 0, y: 0 }, { x: 10, y: 0 })).toEqual({ x: 1, y: 0 });
+        expect(dirTo({ x: 0, y: 0 }, { x: 0, y: -5 })).toEqual({ x: 0, y: -1 });
+    });
+
+    it('returns zero vector when points coincide', () => {
+        expect(dirTo({ x: 1, y: 1 }, { x: 1, y: 1 })).toEqual({ x: 0, y: 0 });
+    });
+
+    it('normalises diagonal inputs', () => {
+        const d = dirTo({ x: 0, y: 0 }, { x: 3, y: 4 });
+        expect(d.x).toBeCloseTo(0.6);
+        expect(d.y).toBeCloseTo(0.8);
+    });
+});
+
+describe('monsters/logic — chaseVelocity', () => {
+    it('scales direction by move speed', () => {
+        expect(chaseVelocity({ x: 1, y: 0 }, 5)).toEqual({ vx: 5, vy: 0 });
+        expect(chaseVelocity({ x: 0, y: -1 }, 3)).toEqual({ vx: 0, vy: -3 });
+    });
+});
+
+describe('monsters/logic — pickClosestMonster', () => {
+    type Stub = { dead: boolean; body: { position: { x: number; y: number } } };
+
+    const mk = (x: number, y: number, dead = false): Stub => ({
+        dead,
+        body: { position: { x, y } },
+    });
+
+    it('returns null when list is empty', () => {
+        expect(pickClosestMonster({ x: 0, y: 0 }, [], 100)).toBeNull();
+    });
+
+    it('returns null when nothing within maxDist', () => {
+        const list = [mk(500, 500)];
+        expect(pickClosestMonster({ x: 0, y: 0 }, list, 100)).toBeNull();
+    });
+
+    it('skips dead monsters', () => {
+        const list = [mk(0, 0, true)];
+        expect(pickClosestMonster({ x: 0, y: 0 }, list, 100)).toBeNull();
+    });
+
+    it('returns the nearest alive monster within range', () => {
+        const far = mk(80, 0);
+        const near = mk(10, 0);
+        const list = [far, near];
+        const r = pickClosestMonster({ x: 0, y: 0 }, list, 100);
+        expect(r).toBe(near);
+    });
+});

@@ -148,6 +148,73 @@ background: a.png
 `;
         expect(() => parseLevelYaml(yamlText, 't')).toThrow(/imageSize/);
     });
+
+    it('parses optional Phase-1+ spawn fields', () => {
+        const yamlText = `
+title: Spawny
+background: a.png
+imageSize: 100x100
+promptFile: p.yaml
+airWalls: []
+character: wanderer
+monsters:
+  - type: drone
+    at: [400, 400]
+  - type: gunner
+    at: [800, 200]
+dropSpawns:
+  - type: hp-shard
+    at: [200, 800]
+`;
+        const level = parseLevelYaml(yamlText, 'spawny');
+        expect(level.character).toBe('wanderer');
+        expect(level.monsters).toEqual([
+            { type: 'drone', x: 400, y: 400 },
+            { type: 'gunner', x: 800, y: 200 },
+        ]);
+        expect(level.dropSpawns).toEqual([{ type: 'hp-shard', x: 200, y: 800 }]);
+    });
+
+    it('omits spawn fields when absent', () => {
+        const yamlText = `
+title: Plain
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls: []
+`;
+        const level = parseLevelYaml(yamlText, 'plain');
+        expect(level.character).toBeUndefined();
+        expect(level.monsters).toBeUndefined();
+        expect(level.dropSpawns).toBeUndefined();
+    });
+
+    it('rejects malformed monster spawn (missing type)', () => {
+        const yamlText = `
+title: t
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls: []
+monsters:
+  - at: [10, 20]
+`;
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/type/);
+    });
+
+    it('rejects monster spawn with at that is not [x, y]', () => {
+        const yamlText = `
+title: t
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls: []
+monsters:
+  - type: drone
+    at: [10]
+`;
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/at/);
+    });
 });
 
 describe('parseLevelIndex', () => {

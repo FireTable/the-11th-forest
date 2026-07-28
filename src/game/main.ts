@@ -1,23 +1,79 @@
 import { AUTO, Game, Scale } from 'phaser';
 
 import { LoadScene } from '@/game/scenes/load-scene';
+import { fetchCharacter } from '@/lib/characters';
+import { fetchDrop } from '@/lib/drops';
 import { fetchLevel, fetchLevelIndex } from '@/lib/levels';
+import { fetchMonster } from '@/lib/monsters';
+import { fetchWeapon } from '@/lib/weapons';
+
+import type { CharacterSpec } from '@/lib/characters';
+import type { DropSpec } from '@/lib/drops';
+import type { MonsterSpec } from '@/lib/monsters';
+import type { WeaponSpec } from '@/lib/weapons';
+
+// ponytail: hotbar is hard-coded for the demo (3 weapons, no UI for adding
+// more). Move to characters/<id>.yaml when the runtime character owns a
+// persistent loadout; today this is a fixed player preset.
+const HOTBAR_IDS = ['pistol', 'shotgun', 'smg'] as const;
+
+/**
+ * Demo scene initialiser — Phase 1: wanderer is a single hard-coded id.
+ * Phases 3+ route the level's `character:` field through here.
+ */
+const DEFAULT_CHARACTER_ID = 'wanderer';
+
+interface ResolvedScene {
+    id: string;
+    level: Awaited<ReturnType<typeof fetchLevel>>;
+    weapons: WeaponSpec[];
+    character: CharacterSpec;
+    monsters: Map<string, MonsterSpec>;
+    drops: Map<string, DropSpec>;
+}
 
 // Scene id resolution: ?scene=<id> URL param wins; otherwise the first
 // entry in public/data/levels/index.yaml. Level is fetched here (NOT in
 // the scene) because Phaser's init() does not await async work — the
 // fetch would race with preload().
-async function resolveScene(): Promise<{ id: string; level: Awaited<ReturnType<typeof fetchLevel>> }> {
+async function resolveScene(): Promise<ResolvedScene> {
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get('scene');
     const id = fromUrl ?? (await fetchLevelIndex()).levels[0];
     if (!id) throw new Error('Level index is empty — add an entry to public/data/levels/index.yaml');
     const level = await fetchLevel(id);
-    return { id, level };
+
+    const weapons = await Promise.all(HOTBAR_IDS.map((wid) => fetchWeapon(wid)));
+
+    const character = await fetchCharacter(level.character ?? DEFAULT_CHARACTER_ID);
+
+    // Pre-load every monster type and drop type referenced by this level.
+    // This avoids runtime fetch races inside scene.create().
+    const monsterIds = new Set<string>();
+    level.monsters?.forEach((m) => monsterIds.add(m.type));
+
+    const dropIds = new Set<string>();
+    level.dropSpawns?.forEach((d) => dropIds.add(d.type));
+
+    const monsterEntries = await Promise.all(
+        [...monsterIds].map(async (mid) => [mid, await fetchMonster(mid)] as const),
+    );
+    const dropEntries = await Promise.all(
+        [...dropIds].map(async (did) => [did, await fetchDrop(did)] as const),
+    );
+
+    return {
+        id,
+        level,
+        weapons,
+        character,
+        monsters: new Map(monsterEntries),
+        drops: new Map(dropEntries),
+    };
 }
 
 const StartGame = async (parent: string): Promise<Phaser.Game> => {
-    const { id, level } = await resolveScene();
+    const scene = await resolveScene();
     // World size matches the level's native image dimensions so air-wall
     // coords (defined in image pixel space) align 1:1. The canvas itself
     // is scaled down via Scale.FIT to fit the viewport.
@@ -28,8 +84,8 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
         scale: {
             mode: Scale.FIT,
             autoCenter: Scale.CENTER_BOTH,
-            width: level.imageSize.width,
-            height: level.imageSize.height,
+            width: scene.level.imageSize.width,
+            height: scene.level.imageSize.height,
         },
         // Top-down shooter — no gravity, walls are static obstacles.
         // Debug rendering off in prod; flip on for level design.
@@ -40,7 +96,12 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
                 debug: false,
             },
         },
-        scene: [new LoadScene(id, level)],
+        scene: [new LoadScene(scene.id, scene.level, {
+            weapons: scene.weapons,
+            character: scene.character,
+            monsterSpecs: scene.monsters,
+            dropSpecs: scene.drops,
+        })],
     });
 };
 

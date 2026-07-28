@@ -1,0 +1,8 @@
+name: Shotgun
+clipSize: 2
+reloadTimeMs: 2400
+fireIntervalMs: 800
+bulletsPerShot: 5
+bullet:
+  speed: 22
+  damage: 6

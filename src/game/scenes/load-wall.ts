@@ -11,11 +11,13 @@ export function wallCategory(kind: AirWallKind): number {
 
 /**
  * Collision mask for a wall: which OTHER categories it blocks. tall
- * blocks both character and bullets; short blocks character only —
- * bullets pass over it (the gameplay semantic).
+ * blocks character, player bullets, AND monster projectiles; short
+ * blocks character only — bullets + projectiles pass over it.
  */
 export function wallMask(kind: AirWallKind): number {
-    return kind === 'tall' ? CAT.CHARACTER | CAT.BULLET : CAT.CHARACTER;
+    return kind === 'tall'
+        ? CAT.CHARACTER | CAT.BULLET | CAT.MONSTER_PROJECTILE
+        : CAT.CHARACTER;
 }
 
 /**

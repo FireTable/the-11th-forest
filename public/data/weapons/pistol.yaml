@@ -1,0 +1,8 @@
+name: Pistol
+clipSize: 12
+reloadTimeMs: 1200
+fireIntervalMs: 200
+bulletsPerShot: 1
+bullet:
+  speed: 20
+  damage: 12

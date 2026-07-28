@@ -2,6 +2,21 @@ title: The 11th Forest — Sacred Forest Sanctuary
 background: assets/image/scenes/sacred-forest-sanctuary.png
 imageSize: 2752x1536
 promptFile: prompts/scenes/sacred-forest-sanctuary.yaml
+character: wanderer
+monsters:
+  - type: drone
+    at: [600, 400]
+  - type: drone
+    at: [1100, 700]
+  - type: gunner
+    at: [1800, 500]
+dropSpawns:
+  - type: hp-shard
+    at: [800, 1100]
+  - type: sp-fragment
+    at: [1500, 1100]
+  - type: ammo-cache
+    at: [2200, 900]
 airWalls:
   - id: wall-1
     kind: tall

@@ -144,10 +144,15 @@ promptFile: string                     # path to the AI prompt YAML
 airWalls:                              # list, may be empty
   - id: string                         # unique within the level
     kind: tall | short                 # physical height, not gameplay role
-    x: number                          # top-left in image pixel space
-    y: number
-    width: number                      # > 0
-    height: number                     # > 0
+    points:                            # polygon in image pixel space (implicitly closed)
+      - [number, number]               # >=3 vertices; a rectangle is just 4 vertices
+      - [number, number]
+      - [number, number]
+
+The legacy `{ x, y, width, height }` rectangle form is still accepted by the
+parser and auto-migrated to a 4-vertex polygon — kept only so old level files
+don't break. New levels should write the `points` form directly.
+
 ```
 
 ### `public/data/levels/index.yaml` — manifest

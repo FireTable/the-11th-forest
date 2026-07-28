@@ -14,9 +14,11 @@
 export type {
     AirWall,
     AirWallKind,
+    DropSpawn,
     ImageSize,
     Level,
     LevelIndex,
+    MonsterSpawn,
 } from './types';
 
 export { parseImageSize, formatImageSize } from './types';

@@ -1,0 +1,8 @@
+name: SMG
+clipSize: 24
+reloadTimeMs: 2000
+fireIntervalMs: 90
+bulletsPerShot: 1
+bullet:
+  speed: 24
+  damage: 6

@@ -40,6 +40,24 @@ export type Level = {
     // by convention; the loader asserts imageSize equality across both.
     promptFile: string;
     airWalls: AirWall[];
+    // Optional: spawn config for entities (Phase 1+). Each field references
+    // a separate /data/<thing>/<id>.yaml by id; missing fields default sensibly.
+    character?: string; // character id from /data/characters/
+    monsters?: MonsterSpawn[];
+    dropSpawns?: DropSpawn[];
+};
+
+export type SpawnPoint = {
+    x: number;
+    y: number;
+};
+
+export type MonsterSpawn = SpawnPoint & {
+    type: string; // monster id from /data/monsters/
+};
+
+export type DropSpawn = SpawnPoint & {
+    type: string; // drop id from /data/drops/
 };
 
 /**

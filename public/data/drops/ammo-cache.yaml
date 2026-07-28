@@ -1,0 +1,5 @@
+name: Ammo Cache
+kind: static
+effect:
+  type: refill-ammo
+  ammoFraction: 0.3

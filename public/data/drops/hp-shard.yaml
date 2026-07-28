@@ -1,0 +1,5 @@
+name: HP Shard
+kind: static
+effect:
+  type: instant
+  hp: 25

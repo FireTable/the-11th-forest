@@ -1,11 +1,34 @@
 import { Scene } from 'phaser';
 
-import { loadCharacter } from '@/game/characters/load-character';
+import { loadCharacter, type CharacterRuntime } from '@/game/characters/character';
+import { DropController } from '@/game/drops/drop';
+import { MonsterController, rollDrops } from '@/game/monsters/monster';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
+import type { CharacterSpec } from '@/lib/characters';
+import type { DropSpec } from '@/lib/drops';
 import type { Level } from '@/lib/levels/types';
+import type { MonsterSpec } from '@/lib/monsters';
+import type { WeaponSpec } from '@/lib/weapons';
 
 import { createWallBodies } from './load-wall';
+
+/**
+ * Payload the Game shell hands to the scene after pre-fetching all data
+ * (level + weapons + character + monster types + drop types referenced
+ * by this level). Phaser's init() does NOT await async work, so anything
+ * async is resolved in main.ts before the Game is constructed.
+ *
+ * Maps are keyed by id for O(1) lookup during scene spawn. Drop types
+ * only need static-spawn entries; monster-death drops are resolved on
+ * demand inside the DropController callback (kept lazy until Phase 5).
+ */
+export interface SceneAssets {
+    weapons: WeaponSpec[];
+    character: CharacterSpec;
+    monsterSpecs: Map<string, MonsterSpec>;
+    dropSpecs: Map<string, DropSpec>;
+}
 
 /**
  * Generic scene loader. The Level is fetched by the caller (main.ts)
@@ -19,9 +42,14 @@ import { createWallBodies } from './load-wall';
  * here. Keeps the scene focused on what gameplay needs.
  */
 export class LoadScene extends Scene {
+    private character!: CharacterRuntime;
+    private monsterSystem!: MonsterController;
+    private dropSystem!: DropController;
+
     constructor(
         private readonly id: string,
         private readonly level: Level,
+        private readonly assets: SceneAssets,
     ) {
         super(`LoadScene:${id}`);
     }
@@ -50,14 +78,82 @@ export class LoadScene extends Scene {
         // for category / mask policy.
         createWallBodies(this.matter, this.level.airWalls);
 
-        // Spawn the WASD test character at the level center so the
-        // designer can walk into walls and verify collision bodies.
-        loadCharacter(
+        // Spawn the player character (WASD + Shift dodge + hotbar).
+        this.character = loadCharacter(this, this.level, this.assets.character, this.assets.weapons);
+
+        // Wire monster controller — self-spawns from level.monsters.
+        this.monsterSystem = new MonsterController(
             this,
-            this.level,
-            this.level.imageSize.width / 2,
-            this.level.imageSize.height / 2,
+            this.level.monsters,
+            this.character.body,
+            (id) => {
+                const spec = this.assets.monsterSpecs.get(id);
+                if (!spec) throw new Error(`Unknown monster type: ${id}`);
+                return spec;
+            },
+            {
+                onMonsterDied: (monster) => {
+                    const mp = monster.body.position;
+                    const rolled = rollDrops(monster.spec.drops, (dropId) => {
+                        const spec = this.assets.dropSpecs.get(dropId);
+                        if (!spec) {
+                            throw new Error(`Unknown drop id: ${dropId}`);
+                        }
+                        return spec;
+                    });
+                    for (const r of rolled) {
+                        this.dropSystem.spawn(r.spec, mp.x, mp.y);
+                    }
+                },
+                onPlayerHit: (damage) => this.character.heal(-damage, 0),
+            },
         );
+
+        // Wire drop controller — self-spawns from level.dropSpawns.
+        this.dropSystem = new DropController(
+            this,
+            this.character,
+            this.level.dropSpawns,
+            (id) => {
+                const spec = this.assets.dropSpecs.get(id);
+                if (!spec) throw new Error(`Unknown drop id: ${id}`);
+                return spec;
+            },
+            {
+                onWeaponPickup: (weaponId) => {
+                    // ponytail: weapon pickup isn't supported in the demo's
+                    // fixed hotbar. Acknowledge the pickup by destroying the
+                    // drop without applying — the data still parses + flows
+                    // through the system.
+                    void weaponId;
+                },
+            },
+        );
+
+        // Wire bullet → monster damage flow. Player bullet only. (Player
+        // bullet has its own destruction listener; this hook runs BEFORE
+        // WeaponController's listener to ensure damage lands first.)
+        this.matter.world.on('collisionstart', (event: any) => {
+            const pairs = event.pairs || [];
+            for (const pair of pairs) {
+                const a = pair.bodyA;
+                const b = pair.bodyB;
+                if (!a || !b) continue;
+                const bullet =
+                    a.label === 'player-bullet' ? a : b.label === 'player-bullet' ? b : null;
+                if (!bullet) continue;
+                const other = bullet === a ? b : a;
+                if (other.label !== 'monster') continue;
+                // 12 is pistol base damage; ideally pulled from the
+                // weapon spec — for the demo we read the active weapon
+                // from character.weapons.getActive() so picking up
+                // different hotbar slots rebalances damage.
+                this.monsterSystem.applyBulletDamage(
+                    this.character.weapons.getActive().bullet.damage,
+                    bullet,
+                );
+            }
+        });
 
         // Center camera on world so the viewport shows the middle of the
         // level when the browser window is smaller than the image.
@@ -65,6 +161,11 @@ export class LoadScene extends Scene {
             this.level.imageSize.width / 2,
             this.level.imageSize.height / 2,
         );
+
+        // Per-frame monster tick.
+        this.events.on('update', () => {
+            this.monsterSystem.update(this.time.now);
+        });
 
         // Tell the editor panel which scene this is. Both the EventBus
         // (for panel listeners mounted before create()) and the module-
