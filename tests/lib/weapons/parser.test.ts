@@ -11,7 +11,13 @@ range: 600
 clipSize: 12
 reloadTimeMs: 1200
 bulletsPerShot: 1
-projectileSpeed: 20
+projectile:
+  speed: 20
+  visual:
+    radius: 4
+    width: 16
+    height: 4
+    color: 0x22c55e
 `;
 
     it('parses a minimal valid ranged weapon', () => {
@@ -25,7 +31,10 @@ projectileSpeed: 20
             clipSize: 12,
             reloadTimeMs: 1200,
             bulletsPerShot: 1,
-            projectileSpeed: 20,
+            projectile: {
+                speed: 20,
+                visual: { radius: 4, width: 16, height: 4, color: 0x22c55e },
+            },
         });
     });
 
@@ -38,11 +47,17 @@ range: 400
 clipSize: 2
 reloadTimeMs: 2400
 bulletsPerShot: 5
-projectileSpeed: 22
+projectile:
+  speed: 22
+  visual:
+    radius: 4
+    width: 16
+    height: 4
+    color: 0x22c55e
 `;
         const w = parseWeaponYaml(yamlText, 'shotgun');
         expect(w.bulletsPerShot).toBe(5);
-        expect(w.projectileSpeed).toBe(22);
+        expect(w.projectile?.speed).toBe(22);
     });
 
     it('rejects negative or zero damage', () => {
@@ -58,6 +73,11 @@ projectileSpeed: 22
         expect(() =>
             parseWeaponYaml(`${validYaml.replace('name: Pistol', 'name: ""')}`, 'pistol'),
         ).toThrow(/name/);
+    });
+
+    it('rejects ranged weapon missing projectile.visual.color', () => {
+        const yamlText = validYaml.replace('color: 0x22c55e', 'color: ""');
+        expect(() => parseWeaponYaml(yamlText, 'pistol')).toThrow(/projectile.visual.color/);
     });
 });
 
@@ -86,14 +106,14 @@ hitHeight: 30
 });
 
 describe('parseWeaponYaml — kind validation', () => {
-    it('rejects weapon with neither projectileSpeed nor hitWidth', () => {
+    it('rejects weapon with neither projectile nor hitWidth', () => {
         const yamlText = `
 name: Bad
 damage: 1
 cooldownMs: 100
 range: 100
 `;
-        expect(() => parseWeaponYaml(yamlText, 'bad')).toThrow(/ranged.*projectileSpeed.*melee.*hitWidth|projectileSpeed.*hitWidth/);
+        expect(() => parseWeaponYaml(yamlText, 'bad')).toThrow(/ranged.*projectile.*melee.*hitWidth|projectile.*hitWidth/);
     });
 
     it('rejects weapon with both ranged and melee fields', () => {
@@ -102,7 +122,13 @@ name: Bad
 damage: 1
 cooldownMs: 100
 range: 100
-projectileSpeed: 10
+projectile:
+  speed: 10
+  visual:
+    radius: 4
+    width: 16
+    height: 4
+    color: 0x22c55e
 hitWidth: 30
 hitHeight: 30
 `;

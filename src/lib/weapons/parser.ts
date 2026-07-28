@@ -6,7 +6,7 @@
 
 import { load as parseYaml } from 'js-yaml';
 
-import type { WeaponIndex, WeaponSpec } from './types';
+import type { ProjectileVisual, WeaponIndex, WeaponSpec } from './types';
 
 function requirePositiveNumber(value: unknown, label: string, id: string): number {
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
@@ -26,6 +26,24 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
     return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+function parseProjectile(raw: unknown, id: string): ProjectileVisual {
+    if (!isPlainObject(raw)) {
+        throw new Error(`Weapon ${id}: projectile must be an object { speed, visual: {…} }`);
+    }
+    const speed = requirePositiveNumber(raw.speed, 'projectile.speed', id);
+    const v = raw.visual;
+    if (!isPlainObject(v)) {
+        throw new Error(`Weapon ${id}: projectile.visual must be an object { radius, width, height, color }`);
+    }
+    const radius = requirePositiveNumber(v.radius, 'projectile.visual.radius', id);
+    const width = requirePositiveNumber(v.width, 'projectile.visual.width', id);
+    const height = requirePositiveNumber(v.height, 'projectile.visual.height', id);
+    if (typeof v.color !== 'number' || !Number.isFinite(v.color)) {
+        throw new Error(`Weapon ${id}: projectile.visual.color must be a number (hex literal)`);
+    }
+    return { speed, visual: { radius, width, height, color: v.color } };
+}
+
 export function parseWeaponYaml(text: string, id: string): WeaponSpec {
     const raw = parseYaml(text) as Record<string, unknown> | null;
     if (raw === null || typeof raw !== 'object') {
@@ -40,30 +58,25 @@ export function parseWeaponYaml(text: string, id: string): WeaponSpec {
     const cooldownMs = requireNonNegativeNumber(raw.cooldownMs, 'cooldownMs', id);
     const range = requirePositiveNumber(raw.range, 'range', id);
 
-    // Kind inferred from field presence: ranged has projectileSpeed,
+    // Kind inferred from field presence: ranged has projectile,
     // melee has hitWidth + hitHeight. Exactly one must apply.
-    const isRanged = typeof raw.projectileSpeed === 'number';
+    const isRanged = raw.projectile !== undefined;
     const isMelee = typeof raw.hitWidth === 'number' || typeof raw.hitHeight === 'number';
 
     if (isRanged === isMelee) {
         throw new Error(
-            `Weapon ${id}: must be either ranged (projectileSpeed) or melee (hitWidth + hitHeight), not both or neither`,
+            `Weapon ${id}: must be either ranged (projectile) or melee (hitWidth + hitHeight), not both or neither`,
         );
     }
 
     if (isRanged) {
-        const projectileSpeed = requirePositiveNumber(
-            raw.projectileSpeed,
-            'projectileSpeed',
-            id,
-        );
         return {
             id,
             name: raw.name,
             damage,
             cooldownMs,
             range,
-            projectileSpeed,
+            projectile: parseProjectile(raw.projectile, id),
             clipSize: raw.clipSize === undefined
                 ? undefined
                 : requirePositiveNumber(raw.clipSize, 'clipSize', id),

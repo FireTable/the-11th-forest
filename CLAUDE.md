@@ -11,6 +11,7 @@ Quick context for working on **The 11th Forest** — a top-down, anime-styled pi
 | Game design / mechanics / art direction       | [`docs/README.md`](./docs/README.md) (index)                  |
 | A specific module's contract                  | its sibling `*.test.ts` under `tests/`                        |
 | Loading project resources (YAML, JSON, …)     | [`src/lib/handle-fetch.ts`](./src/lib/handle-fetch.ts)         |
+| Engine / structural constants (CAT, KEY, HUD…) | [`src/lib/constants.ts`](./src/lib/constants.ts)               |
 
 ## Hard rules
 
@@ -25,6 +26,11 @@ Quick context for working on **The 11th Forest** — a top-down, anime-styled pi
 9. **UI = shadcn + Tailwind + lucide.** Use shadcn/ui components from `src/components/ui/` (button, input, select, …). Style with Tailwind utility classes inline on the component — do **not** create new `.css` files for component styling. Icons come from `lucide-react`. Existing legacy CSS (e.g. `.button`) may remain but new UI should not add more.
 
 10. **We're on Phaser v4.** If an API doesn't behave like a v3 tutorial suggests, query the Phaser v4 source/docs before assuming it works — v4 changed a few APIs (e.g. how `Matter.Body.create` handles vertices, scene-level pointer events, default ESM exports). For "any-click-anywhere", bind directly on the Phaser canvas DOM rather than `scene.input`.
+
+11. **Constants belong to one of two homes — pick the right one.**
+    - **Module YAML** when the value is *game data* that could change per character / weapon / drop / monster (e.g. character body half-extents, dodge tuning, drop visual, weapon projectile visuals, monster HP/moveSpeed). One YAML per entity, no `id` field, validator in `src/lib/<module>/parser.ts`.
+    - **`src/lib/constants.ts`** when the value is *engine / structural* (physics category bits, keycodes, shared HUD layout + theme colours, render knobs, contact-damage cooldown, etc.). Group by module prefix (`CAT_*`, `KEY_*`, `HUD_*`, `COMBAT_*`, `RENDER_*`) and keep one prefix block per region with a `// ─── … ───` comment header.
+    - Never inline a magic constant in a game file if it belongs to either bucket above. If it's truly single-use (only ever referenced once in one block of code) — leave it inline; the test is "would another module or a future iteration need to read or change this?" If yes, it goes to YAML or `lib/constants.ts`, not the call site.
 
 ## Commands
 

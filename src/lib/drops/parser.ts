@@ -6,10 +6,24 @@
 
 import { load as parseYaml } from 'js-yaml';
 
-import type { DropEffect, DropIndex, DropKind, DropSpec, DropType } from './types';
+import type { DropEffect, DropIndex, DropKind, DropSpec, DropType, DropVisual } from './types';
 
 const VALID_TYPES: ReadonlySet<DropType> = new Set(['instant', 'refill-ammo', 'weapon']);
 const VALID_KINDS: ReadonlySet<DropKind> = new Set(['static', 'monster']);
+
+function parseVisual(raw: unknown, id: string): DropVisual {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(`Drop ${id}: visual must be an object with size, tint`);
+    }
+    const v = raw as Record<string, unknown>;
+    if (typeof v.size !== 'number' || !Number.isFinite(v.size) || v.size <= 0) {
+        throw new Error(`Drop ${id}: visual.size must be a positive finite number`);
+    }
+    if (typeof v.tint !== 'number' || !Number.isFinite(v.tint)) {
+        throw new Error(`Drop ${id}: visual.tint must be a number (hex literal like 0x22c55e)`);
+    }
+    return { size: v.size, tint: v.tint };
+}
 
 function parseEffect(raw: unknown, id: string): DropEffect {
     if (typeof raw !== 'object' || raw === null) {
@@ -52,7 +66,7 @@ export function parseDropYaml(text: string, id: string): DropSpec {
     if (raw === null || typeof raw !== 'object') {
         throw new Error(`Drop ${id}: empty or non-object YAML`);
     }
-    const { name, kind, effect } = raw;
+    const { name, kind, visual, effect } = raw;
 
     if (typeof name !== 'string' || name.length === 0) {
         throw new Error(`Drop ${id}: name required`);
@@ -65,6 +79,7 @@ export function parseDropYaml(text: string, id: string): DropSpec {
         id,
         name,
         kind: kind as DropKind,
+        visual: parseVisual(visual, id),
         effect: parseEffect(effect, id),
     };
 }

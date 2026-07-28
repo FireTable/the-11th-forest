@@ -12,21 +12,59 @@
 
 import * as Phaser from 'phaser';
 
+import {
+    HUD_BAR_BG,
+    HUD_BAR_TRACK_ALPHA,
+    HUD_FILL_ALPHA,
+    HUD_FONT_AMMO_BIG,
+    HUD_FONT_LABEL,
+    HUD_FONT_SLOT_KEY,
+    HUD_FONT_WEAPON_NAME,
+    HUD_PANEL_BG,
+    HUD_PANEL_BORDER_ALPHA,
+    HUD_PANEL_RADIUS,
+    HUD_RELOAD_FILL,
+    HUD_SLOT_ACTIVE_BORDER,
+    HUD_SLOT_ACTIVE_FILL,
+    HUD_SLOT_INACTIVE_BORDER,
+    HUD_SLOT_INACTIVE_FILL,
+    HUD_TEXT_ACTIVE,
+    HUD_TEXT_AMMO_BIG,
+    HUD_TEXT_AMMO_SMALL,
+    HUD_TEXT_DIM,
+    HUD_TEXT_LABEL,
+    HUD_TEXT_WEAPON_NAME,
+    HUD_WEAPON_AMMO_BAR_H,
+    HUD_WEAPON_AMMO_BAR_INSET,
+    HUD_WEAPON_AMMO_BAR_X,
+    HUD_WEAPON_AMMO_BAR_Y,
+    HUD_WEAPON_AMMO_BIG_OFFSET_Y,
+    HUD_WEAPON_AMMO_MAX_OFFSET_Y,
+    HUD_WEAPON_PANEL_ALPHA,
+    HUD_WEAPON_PANEL_H,
+    HUD_WEAPON_PANEL_PADDING,
+    HUD_WEAPON_PANEL_W,
+    HUD_WEAPON_SLOT_AMMO_OFFSET_X,
+    HUD_WEAPON_SLOT_AMMO_OFFSET_Y,
+    HUD_WEAPON_SLOT_BORDER_ACTIVE,
+    HUD_WEAPON_SLOT_BORDER_INACTIVE,
+    HUD_WEAPON_SLOT_BOTTOM_GAP,
+    HUD_WEAPON_SLOT_GAP,
+    HUD_WEAPON_SLOT_KEY_OFFSET_X,
+    HUD_WEAPON_SLOT_KEY_OFFSET_Y,
+    HUD_WEAPON_SLOT_LABEL_OFFSET_Y,
+    HUD_WEAPON_SLOT_OFFSET_X,
+    HUD_WEAPON_SLOT_SIZE,
+    HUD_WEAPON_TEXT_PAD_X,
+    HUD_WEAPON_TEXT_PAD_Y_TOP,
+} from '@/lib/constants';
 import type { WeaponSpec } from '@/lib/weapons';
 
 import type { WeaponController } from '@/game/weapons/logic';
 
 import { BaseHud } from './base-hub';
 
-const PADDING = 14;
-const PANEL_W = 244;
-const PANEL_H = 116;
-const SLOT_SIZE = 56;
-const SLOT_GAP = 8;
-const SLOT_Y = PANEL_H - SLOT_SIZE - 8;
-const SLOT_OFFSET_X = 12;
-const AMMO_BAR_Y = 32;
-const AMMO_BAR_H = 6;
+const SLOT_Y = HUD_WEAPON_PANEL_H - HUD_WEAPON_SLOT_SIZE - HUD_WEAPON_SLOT_BOTTOM_GAP;
 
 interface SlotVisual {
     bg: Phaser.GameObjects.Graphics;
@@ -53,38 +91,47 @@ export class WeaponHud extends BaseHud {
     constructor(scene: Phaser.Scene, weapons: WeaponController) {
         const displayW = scene.scale.displaySize.width;
         const displayH = scene.scale.displaySize.height;
-        super(scene, displayW - PANEL_W - PADDING, displayH - PANEL_H - PADDING);
+        super(
+            scene,
+            displayW - HUD_WEAPON_PANEL_W - HUD_WEAPON_PANEL_PADDING,
+            displayH - HUD_WEAPON_PANEL_H - HUD_WEAPON_PANEL_PADDING,
+        );
 
         // Background panel
         this.panel = scene.add.graphics();
-        this.panel.fillStyle(0x000000, 0.55);
-        this.panel.fillRoundedRect(0, 0, PANEL_W, PANEL_H, 8);
-        this.panel.lineStyle(1, 0x1f2937, 0.9);
-        this.panel.strokeRoundedRect(0, 0, PANEL_W, PANEL_H, 8);
+        this.panel.fillStyle(HUD_PANEL_BG, HUD_WEAPON_PANEL_ALPHA);
+        this.panel.fillRoundedRect(0, 0, HUD_WEAPON_PANEL_W, HUD_WEAPON_PANEL_H, HUD_PANEL_RADIUS);
+        this.panel.lineStyle(1, HUD_BAR_BG, HUD_PANEL_BORDER_ALPHA);
+        this.panel.strokeRoundedRect(0, 0, HUD_WEAPON_PANEL_W, HUD_WEAPON_PANEL_H, HUD_PANEL_RADIUS);
         this.root.add(this.panel);
 
         // Weapon name (top-left of panel)
-        this.weaponName = scene.add.text(12, 8, '', {
+        this.weaponName = scene.add.text(HUD_WEAPON_TEXT_PAD_X, HUD_WEAPON_TEXT_PAD_Y_TOP, '', {
             fontFamily: 'monospace',
-            fontSize: '13px',
-            color: '#fde68a',
+            fontSize: HUD_FONT_WEAPON_NAME,
+            color: HUD_TEXT_WEAPON_NAME,
         });
         this.root.add(this.weaponName);
 
         // Ammo counter (top-right of panel)
         this.ammoBig = scene.add
-            .text(PANEL_W - 12, 6, '00', {
+            .text(HUD_WEAPON_PANEL_W - HUD_WEAPON_TEXT_PAD_X, HUD_WEAPON_AMMO_BIG_OFFSET_Y, '00', {
                 fontFamily: 'monospace',
-                fontSize: '22px',
-                color: '#fef3c7',
+                fontSize: HUD_FONT_AMMO_BIG,
+                color: HUD_TEXT_AMMO_BIG,
                 fontStyle: 'bold',
             })
             .setOrigin(1, 0);
-        this.ammoMax = scene.add.text(PANEL_W - 12, 32, '/ 00', {
-            fontFamily: 'monospace',
-            fontSize: '11px',
-            color: '#94a3b8',
-        });
+        this.ammoMax = scene.add.text(
+            HUD_WEAPON_PANEL_W - HUD_WEAPON_TEXT_PAD_X,
+            HUD_WEAPON_AMMO_MAX_OFFSET_Y,
+            '/ 00',
+            {
+                fontFamily: 'monospace',
+                fontSize: HUD_FONT_SLOT_KEY,
+                color: HUD_TEXT_DIM,
+            },
+        );
         this.ammoMax.setOrigin(1, 0);
         this.root.add(this.ammoBig);
         this.root.add(this.ammoMax);
@@ -102,18 +149,18 @@ export class WeaponHud extends BaseHud {
             const border = scene.add.graphics();
             const key = scene.add.text(0, 0, String(i + 1), {
                 fontFamily: 'monospace',
-                fontSize: '11px',
-                color: '#94a3b8',
+                fontSize: HUD_FONT_SLOT_KEY,
+                color: HUD_TEXT_DIM,
             });
             const ammo = scene.add.text(0, 0, '', {
                 fontFamily: 'monospace',
-                fontSize: '11px',
-                color: '#e2e8f0',
+                fontSize: HUD_FONT_SLOT_KEY,
+                color: HUD_TEXT_AMMO_SMALL,
             });
             const label = scene.add.text(0, 0, '', {
                 fontFamily: 'monospace',
-                fontSize: '10px',
-                color: '#cbd5e1',
+                fontSize: HUD_FONT_LABEL,
+                color: HUD_TEXT_LABEL,
             });
             this.root.add([bg, border, key, ammo, label]);
             this.slots.push({ bg, border, label, ammo, key });
@@ -138,10 +185,20 @@ export class WeaponHud extends BaseHud {
         const reloading = weapons.isReloading();
         if (reloading) {
             const frac = weapons.getReloadProgress(time);
-            this.reloadBg.fillStyle(0x1f2937, 0.85);
-            this.reloadBg.fillRect(12, AMMO_BAR_Y, PANEL_W - 24, AMMO_BAR_H);
-            this.reloadFill.fillStyle(0xfbbf24, 0.95);
-            this.reloadFill.fillRect(12, AMMO_BAR_Y, (PANEL_W - 24) * frac, AMMO_BAR_H);
+            this.reloadBg.fillStyle(HUD_BAR_BG, HUD_BAR_TRACK_ALPHA);
+            this.reloadBg.fillRect(
+                HUD_WEAPON_AMMO_BAR_X,
+                HUD_WEAPON_AMMO_BAR_Y,
+                HUD_WEAPON_PANEL_W - HUD_WEAPON_AMMO_BAR_INSET,
+                HUD_WEAPON_AMMO_BAR_H,
+            );
+            this.reloadFill.fillStyle(HUD_RELOAD_FILL, HUD_FILL_ALPHA);
+            this.reloadFill.fillRect(
+                HUD_WEAPON_AMMO_BAR_X,
+                HUD_WEAPON_AMMO_BAR_Y,
+                (HUD_WEAPON_PANEL_W - HUD_WEAPON_AMMO_BAR_INSET) * frac,
+                HUD_WEAPON_AMMO_BAR_H,
+            );
         }
 
         // Slots
@@ -149,25 +206,43 @@ export class WeaponHud extends BaseHud {
             const slot = this.slots[i];
             const state: SlotState = weapons.getSlot(i);
             const isActive = i === activeIdx;
-            const slotX = SLOT_OFFSET_X + i * (SLOT_SIZE + SLOT_GAP);
+            const slotX =
+                HUD_WEAPON_SLOT_OFFSET_X +
+                i * (HUD_WEAPON_SLOT_SIZE + HUD_WEAPON_SLOT_GAP);
 
             slot.bg.clear();
-            slot.bg.fillStyle(isActive ? 0xfde68a : 0x1e293b, 0.95);
-            slot.bg.fillRect(slotX, SLOT_Y, SLOT_SIZE, SLOT_SIZE);
+            slot.bg.fillStyle(
+                isActive ? HUD_SLOT_ACTIVE_FILL : HUD_SLOT_INACTIVE_FILL,
+                HUD_FILL_ALPHA,
+            );
+            slot.bg.fillRect(slotX, SLOT_Y, HUD_WEAPON_SLOT_SIZE, HUD_WEAPON_SLOT_SIZE);
 
             slot.border.clear();
-            slot.border.lineStyle(isActive ? 2 : 1, isActive ? 0x92400e : 0x334155, 1);
-            slot.border.strokeRect(slotX, SLOT_Y, SLOT_SIZE, SLOT_SIZE);
+            slot.border.lineStyle(
+                isActive ? HUD_WEAPON_SLOT_BORDER_ACTIVE : HUD_WEAPON_SLOT_BORDER_INACTIVE,
+                isActive ? HUD_SLOT_ACTIVE_BORDER : HUD_SLOT_INACTIVE_BORDER,
+                1,
+            );
+            slot.border.strokeRect(slotX, SLOT_Y, HUD_WEAPON_SLOT_SIZE, HUD_WEAPON_SLOT_SIZE);
 
-            slot.key.setPosition(slotX + 4, SLOT_Y + 2);
-            slot.key.setColor(isActive ? '#92400e' : '#94a3b8');
+            slot.key.setPosition(
+                slotX + HUD_WEAPON_SLOT_KEY_OFFSET_X,
+                SLOT_Y + HUD_WEAPON_SLOT_KEY_OFFSET_Y,
+            );
+            slot.key.setColor(isActive ? HUD_TEXT_ACTIVE : HUD_TEXT_DIM);
 
             slot.label.setText(state.spec.name.slice(0, 4));
-            slot.label.setPosition(slotX + SLOT_SIZE / 2, SLOT_Y + SLOT_SIZE / 2 - 4);
+            slot.label.setPosition(
+                slotX + HUD_WEAPON_SLOT_SIZE / 2,
+                SLOT_Y + HUD_WEAPON_SLOT_SIZE / 2 + HUD_WEAPON_SLOT_LABEL_OFFSET_Y,
+            );
 
             slot.ammo.setText(`${state.ammo}/${state.spec.clipSize}`);
             slot.ammo.setOrigin(1, 0);
-            slot.ammo.setPosition(slotX + SLOT_SIZE - 4, SLOT_Y + SLOT_SIZE - 14);
+            slot.ammo.setPosition(
+                slotX + HUD_WEAPON_SLOT_SIZE + HUD_WEAPON_SLOT_AMMO_OFFSET_X,
+                SLOT_Y + HUD_WEAPON_SLOT_SIZE + HUD_WEAPON_SLOT_AMMO_OFFSET_Y,
+            );
         }
     }
 }

@@ -19,6 +19,17 @@
 
 import type * as Phaser from 'phaser';
 
+import {
+    KEY_A,
+    KEY_D,
+    KEY_ONE,
+    KEY_R,
+    KEY_S,
+    KEY_SHIFT,
+    KEY_THREE,
+    KEY_TWO,
+    KEY_W,
+} from '@/lib/constants';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 
@@ -100,25 +111,11 @@ export function clampToBounds(
 
 // ─── Controller ──────────────────────────────────────────────────────────
 
-const HALF_W = 16;
-const HALF_H = 24;
-/** Px / physics step — kept below the thinnest wall triangle so the body
- *  can't tunnel past a wall edge in one Matter step. */
-const DODGE_SPEED = 14;
-const DODGE_DURATION_MS = 220;
-const DODGE_COOLDOWN_MS = 600;
-
-// Hardcoded keycodes (replaces Phaser.Input.Keyboard.KeyCodes.X). Keeping
-// logic.ts runtime-Phaser-free: this file uses `import type` only.
-const KEY_W = 87;
-const KEY_A = 65;
-const KEY_S = 83;
-const KEY_D = 68;
-const KEY_SHIFT = 16;
-const KEY_ONE = 49;
-const KEY_TWO = 50;
-const KEY_THREE = 51;
-const KEY_R = 82;
+// Body size + dodge params come from CharacterSpec (loaded from YAML).
+// Keycodes come from `@/lib/constants` — Phaser's runtime reads browser
+// globals at module load and crashes in Node tests, so the player keymap
+// lives as plain numbers in shared constants rather than importing
+// `Input.Keyboard.KeyCodes`.
 
 /** Structural shape the controller needs from the WeaponSystem. */
 export interface WeaponsLike {
@@ -251,19 +248,19 @@ export class CharacterController {
             shiftDown,
             intent,
             this.sp,
-            this.spec.dodgeSpCost,
-            DODGE_COOLDOWN_MS,
+            this.spec.dodge.spCost,
+            this.spec.dodge.cooldownMs,
             this.lastDodgeEndAt,
             this.dodgeActiveUntil,
-            DODGE_SPEED,
+            this.spec.dodge.speed,
             now,
         );
         if (dodge) {
-            this.sp -= this.spec.dodgeSpCost;
+            this.sp -= this.spec.dodge.spCost;
             this.dodgeVx = dodge.vx;
             this.dodgeVy = dodge.vy;
-            this.dodgeActiveUntil = now + DODGE_DURATION_MS;
-            this.lastDodgeEndAt = now + DODGE_DURATION_MS;
+            this.dodgeActiveUntil = now + this.spec.dodge.durationMs;
+            this.lastDodgeEndAt = now + this.spec.dodge.durationMs;
         }
 
         // ── Velocity resolution ─────────────────────────────────────
@@ -281,8 +278,8 @@ export class CharacterController {
         // ── World-bounds clamp ──────────────────────────────────────
         const clamped = clampToBounds(
             this.parts.body.position,
-            HALF_W,
-            HALF_H,
+            this.spec.body.halfW,
+            this.spec.body.halfH,
             this.level.imageSize.width,
             this.level.imageSize.height,
         );
@@ -312,13 +309,17 @@ export class CharacterController {
             this.targetX,
             this.targetY,
             this.firing && now >= this.dodgeActiveUntil,
-            HALF_H,
+            this.spec.body.halfH,
         );
 
         // ── HUD ─────────────────────────────────────────────────────
         this.parts.hud.update(this.spec, this.hp, this.sp);
         this.parts.weaponHud.draw(this.parts.weapons, now);
-        this.parts.statusHud.update(this.parts.weapons.getActiveSlotState(), now, HALF_H);
+        this.parts.statusHud.update(
+            this.parts.weapons.getActiveSlotState(),
+            now,
+            this.spec.body.halfH,
+        );
     }
 
     // ─── Internals ──────────────────────────────────────────────────────

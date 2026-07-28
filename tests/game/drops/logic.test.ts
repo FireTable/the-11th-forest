@@ -17,6 +17,7 @@ describe('drops/logic — planDropEffect', () => {
             id: 'hp-shard',
             name: 'HP Shard',
             kind: 'static',
+            visual: { size: 18, tint: 0x22c55e },
             effect: { type: 'instant', hp: 25 },
         };
         planDropEffect(spec, sinks);
@@ -31,6 +32,7 @@ describe('drops/logic — planDropEffect', () => {
             id: 'sp-fragment',
             name: 'SP',
             kind: 'static',
+            visual: { size: 18, tint: 0x22c55e },
             effect: { type: 'instant', sp: 30 },
         };
         planDropEffect(spec, sinks);
@@ -43,6 +45,7 @@ describe('drops/logic — planDropEffect', () => {
             id: 'ammo-cache',
             name: 'Ammo',
             kind: 'static',
+            visual: { size: 18, tint: 0xfacc15 },
             effect: { type: 'refill-ammo', ammoFraction: 0.3 },
         };
         planDropEffect(spec, sinks);
@@ -55,6 +58,7 @@ describe('drops/logic — planDropEffect', () => {
             id: 'shotgun-pickup',
             name: 'Shotgun',
             kind: 'static',
+            visual: { size: 18, tint: 0x60a5fa },
             effect: { type: 'weapon', weaponId: 'shotgun' },
         };
         const result = planDropEffect(spec, sinks);

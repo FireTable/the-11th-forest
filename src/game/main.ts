@@ -1,7 +1,7 @@
 import { AUTO, Game, Scale } from 'phaser';
 
 import { LoadScene } from '@/game/scenes/scene';
-import { fetchCharacter } from '@/lib/characters';
+import { fetchCharacter, fetchCharacterIndex } from '@/lib/characters';
 import { fetchDrop } from '@/lib/drops';
 import { fetchLevel, fetchLevelIndex } from '@/lib/levels';
 import { fetchMonster } from '@/lib/monsters';
@@ -12,21 +12,10 @@ import type { DropSpec } from '@/lib/drops';
 import type { MonsterSpec } from '@/lib/monsters';
 import type { WeaponSpec } from '@/lib/weapons';
 
-// ponytail: hotbar is hard-coded for the demo (3 weapons, no UI for adding
-// more). Move to characters/<id>.yaml when the runtime character owns a
-// persistent loadout; today this is a fixed player preset.
-const HOTBAR_IDS = ['pistol', 'shotgun', 'smg'] as const;
-
-/**
- * Demo scene initialiser — Phase 1: wanderer is a single hard-coded id.
- * Phases 3+ route the level's `character:` field through here.
- */
-const DEFAULT_CHARACTER_ID = 'wanderer';
-
 interface ResolvedScene {
     id: string;
     level: Awaited<ReturnType<typeof fetchLevel>>;
-    /** Player hotbar (3 weapons, in display order). */
+    /** Player hotbar (read from character.hotbar, in display order). */
     weapons: WeaponSpec[];
     /** All weapons keyed by id (player hotbar + monster weapons). */
     weaponsById: Map<string, WeaponSpec>;
@@ -37,7 +26,7 @@ interface ResolvedScene {
 
 // Scene id resolution: ?scene=<id> URL param wins; otherwise the first
 // entry in public/data/levels/index.yaml. Level is fetched here (NOT in
-// the scene) because Phaser's init() does not await async work — the
+// the scene) because Phaser's init() does NOT await async work — the
 // fetch would race with preload().
 async function resolveScene(): Promise<ResolvedScene> {
     const params = new URLSearchParams(window.location.search);
@@ -46,7 +35,14 @@ async function resolveScene(): Promise<ResolvedScene> {
     if (!id) throw new Error('Level index is empty — add an entry to public/data/levels/index.yaml');
     const level = await fetchLevel(id);
 
-    const character = await fetchCharacter(level.character ?? DEFAULT_CHARACTER_ID);
+    // If the level doesn't pin a character, fall back to the first entry
+    // in characters/index.yaml. No hard-coded id anywhere.
+    const characterId = level.character
+        ?? (await fetchCharacterIndex()).characters[0];
+    if (!characterId) {
+        throw new Error('No character available — add one to public/data/characters/index.yaml');
+    }
+    const character = await fetchCharacter(characterId);
 
     // Pre-load every monster spec + the weapon each monster uses, plus
     // every drop type referenced by this level. Avoids runtime fetch
@@ -69,13 +65,17 @@ async function resolveScene(): Promise<ResolvedScene> {
         [...dropIds].map(async (did) => [did, await fetchDrop(did)] as const),
     );
 
-    // Fetch all weapons: player's hotbar + monsters' weapons
-    const allWeaponIds = new Set<string>([...HOTBAR_IDS, ...monsterWeaponIds]);
+    // Fetch all weapons: player's hotbar (from character) + monsters' weapons.
+    // Hotbar is the source of truth for which weapons the player starts with;
+    // the runtime controller can mutate it later via pickups.
+    const allWeaponIds = new Set<string>([...character.hotbar, ...monsterWeaponIds]);
     const allWeaponEntries = await Promise.all(
         [...allWeaponIds].map(async (wid) => [wid, await fetchWeapon(wid)] as const),
     );
     const weaponsById = new Map<string, WeaponSpec>(allWeaponEntries);
-    const weapons = HOTBAR_IDS.map((wid) => weaponsById.get(wid)!).filter(Boolean);
+    const weapons = character.hotbar
+        .map((wid) => weaponsById.get(wid)!)
+        .filter(Boolean);
 
     return {
         id,

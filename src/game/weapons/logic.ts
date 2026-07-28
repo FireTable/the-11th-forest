@@ -27,18 +27,12 @@ import {
     type BulletRecord,
 } from './weapon';
 
-import { CAT } from '@/lib/constants';
+import {
+    CAT,
+    PROJECTILE_PLAYER_MASK,
+} from '@/lib/constants';
 
 // ─── Pure helpers ────────────────────────────────────────────────────────
-
-/** Player bullets collide with everything; walls decide whether to fire. */
-export const PLAYER_BULLET_MASK = 0xffff;
-
-/**
- * Mask for ranged-monster projectiles — CHARACTER (player) + WALL_TALL
- * only. Symmetric to player bullets: tall walls block, short walls don't.
- */
-export const MONSTER_PROJECTILE_MASK = CAT.CHARACTER | CAT.WALL_TALL;
 
 /** Whether a body label identifies a player-fired bullet. */
 export function isPlayerBullet(body: { label?: string }): boolean {
@@ -277,15 +271,16 @@ export class WeaponController {
         const angle = Math.atan2(dy, dx);
 
         const n = slot.spec.bulletsPerShot ?? 1;
-        const speed = slot.spec.projectileSpeed ?? 0;
-        if (speed === 0) return; // ranged weapon without speed can't fire
+        const projectile = slot.spec.projectile;
+        if (!projectile) return; // melee-only weapons don't fire
+        const { speed, visual: size } = projectile;
         // Spread only when n > 1 (shotgun-style). Single-shot weapons fire straight.
         const spreadDeg = n > 1 ? 16 : 0;
         for (let i = 0; i < n; i++) {
             const t = n === 1 ? 0 : (i - (n - 1) / 2) * (spreadDeg / Math.max(1, n - 1));
             const a = angle + (t * Math.PI) / 180;
             const v = bulletVelocity(a, speed);
-            const visual = spawnProjectile(
+            const bullet = spawnProjectile(
                 this.scene,
                 this.matter,
                 { x: origin.x, y: origin.y },
@@ -293,13 +288,13 @@ export class WeaponController {
                 {
                     label: 'player-bullet',
                     category: CAT.BULLET,
-                    mask: PLAYER_BULLET_MASK,
+                    mask: PROJECTILE_PLAYER_MASK,
                     speed,
                     damage: slot.spec.damage,
-                    size: { width: 16, height: 4, color: 0x22c55e },
+                    size,
                 },
             );
-            this.bullets.push(visual);
+            this.bullets.push(bullet);
         }
 
         slot.ammo = Math.max(0, slot.ammo - 1);

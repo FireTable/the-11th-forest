@@ -6,12 +6,12 @@
  * A weapon is the unified attack primitive used by both player and
  * monsters. The kind is inferred from which fields are present:
  *
- *   Ranged (projectileSpeed present, hitWidth absent):
+ *   Ranged (projectile present, hitWidth absent):
  *     - Player fires on click; cooldown between shots = cooldownMs
  *     - Monster fires when player in range; cooldown = cooldownMs
  *     - clipSize / reloadTimeMs / bulletsPerShot are player-only (magazine)
  *
- *   Melee (hitWidth + hitHeight present, projectileSpeed absent):
+ *   Melee (hitWidth + hitHeight present, projectile absent):
  *     - Currently only monsters; click-to-melee for player is future
  *     - range = hit radius for contact damage
  *
@@ -20,6 +20,23 @@
  *   cooldownMs  — time between attacks
  *   range       — effective combat range (AI decision + bullet distance)
  */
+
+/** Ranged-projectile visual + physics. Body radius (for collisions)
+ *  plus the rect drawn over it (width/height — bullets are usually wider
+ *  than their collision radius). */
+export type ProjectileVisual = {
+    speed: number;
+    visual: {
+        /** Matter body radius. Defaults to min(width, height) / 2. */
+        radius: number;
+        /** Rectangle drawn over the body (px). */
+        width: number;
+        /** Rectangle drawn over the body (px). */
+        height: number;
+        /** Fill colour, hex literal e.g. 0x22c55e. */
+        color: number;
+    };
+};
 
 export type WeaponSpec = {
     id: string;
@@ -37,8 +54,8 @@ export type WeaponSpec = {
     reloadTimeMs?: number;
     /** Bullets per trigger pull. Shotguns = 5+. Player only. */
     bulletsPerShot?: number;
-    /** Bullet speed in px / sec. Required for ranged weapons. */
-    projectileSpeed?: number;
+    /** Projectile visual + speed. Required for ranged weapons. */
+    projectile?: ProjectileVisual;
     // ── Melee fields ───────────────────────────────────────────────
     /** Hit-area width. Required for melee weapons. */
     hitWidth?: number;

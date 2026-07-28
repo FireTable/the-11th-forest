@@ -20,13 +20,6 @@ import { planDropEffect } from './logic';
 
 // ─── Entity ──────────────────────────────────────────────────────────────
 
-const SIZE = 18;
-const SENSOR_TINT: Record<DropSpec['effect']['type'], number> = {
-    instant: 0x22c55e, // green for HP/SP
-    'refill-ammo': 0xfacc15, // yellow for ammo
-    weapon: 0x60a5fa, // blue for weapon pickup
-};
-
 export class DropInstance {
     readonly spec: DropSpec;
     readonly body: MatterJS.BodyType;
@@ -36,11 +29,11 @@ export class DropInstance {
     constructor(scene: Phaser.Scene, spec: DropSpec, x: number, y: number) {
         this.spec = spec;
 
-        this.body = scene.matter.add.circle(x, y, SIZE / 2, {
+        this.body = scene.matter.add.circle(x, y, spec.visual.size / 2, {
             label: 'drop',
             isSensor: true,
             collisionFilter: {
-                category: CAT.DROP_PICKUP_MASK, // reusing the bit as a category
+                category: CAT.CHARACTER, // reusing the category bit (sensor, no physics)
                 mask: CAT.CHARACTER,
             },
         });
@@ -48,9 +41,9 @@ export class DropInstance {
         this.rect = scene.add.rectangle(
             x,
             y,
-            SIZE,
-            SIZE,
-            SENSOR_TINT[spec.effect.type],
+            spec.visual.size,
+            spec.visual.size,
+            spec.visual.tint,
             0.9,
         );
         this.rect.setStrokeStyle(2, 0x111827, 1);

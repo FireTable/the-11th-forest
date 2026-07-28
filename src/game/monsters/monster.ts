@@ -20,10 +20,9 @@
 
 import * as Phaser from 'phaser';
 
-import { CAT } from '@/lib/constants';
+import { CAT, PROJECTILE_MONSTER_MASK, COMBAT_PLAYER_DAMAGE_COOLDOWN_MS } from '@/lib/constants';
 import type { WeaponSpec } from '@/lib/weapons';
 import { spawnProjectile } from '@/game/weapons/weapon';
-import { MONSTER_PROJECTILE_MASK } from '@/game/weapons/logic';
 import type { DropRef, MonsterSpec } from '@/lib/monsters';
 
 import {
@@ -33,12 +32,6 @@ import {
     distBetween,
     pickClosestMonster,
 } from './logic';
-
-const ATTACK_COOLDOWN_MS = 100; // minimum gap between consecutive damage events
-const PROJECTILE_RADIUS = 4;
-const PROJECTILE_W = 14;
-const PROJECTILE_H = 4;
-const PROJECTILE_COLOR = 0xef4444;
 
 // ─── Entity ──────────────────────────────────────────────────────────────
 
@@ -73,11 +66,11 @@ export class Monster {
                 // +BULLET so player bullets trigger collisionstart — the
                 // symmetric mask check fails otherwise and monsters never
                 // take damage. Walls stay in the mask so monsters still bump.
-                mask: CAT.CHARACTER | CAT.BULLET | CAT.WALL_PLAYER_MASK,
+                mask: CAT.CHARACTER | CAT.BULLET | (CAT.WALL_TALL | CAT.WALL_SHORT),
             },
         });
 
-        const tint = weapon.projectileSpeed !== undefined
+        const tint = weapon.projectile !== undefined
             ? Monster.TINT_RANGED
             : Monster.TINT_MELEE;
         this.rect = scene.add.rectangle(x, y, w, h, tint, 0.85);
@@ -248,15 +241,15 @@ export class MonsterController {
         const weapon = m.weapon;
         // Melee: contact damage via collisionstart (handled in bindCollisions).
         // No projectile to spawn — just return.
-        if (weapon.projectileSpeed === undefined) return;
+        if (weapon.projectile === undefined) return;
 
         // Ranged: fire a projectile from the monster center toward the
         // player's CURRENT position. Don't lead — player dodge makes that
         // less rewarding than reaction aim.
         const len = Math.hypot(dirToPlayer.x, dirToPlayer.y);
         if (len === 0) return;
-        const speed = weapon.projectileSpeed;
-        const visual = spawnProjectile(
+        const { speed, visual: size } = weapon.projectile;
+        const bullet = spawnProjectile(
             this.scene,
             this.matter,
             { x: m.body.position.x, y: m.body.position.y },
@@ -264,18 +257,13 @@ export class MonsterController {
             {
                 label: 'monster-projectile',
                 category: CAT.MONSTER_PROJECTILE,
-                mask: MONSTER_PROJECTILE_MASK,
+                mask: PROJECTILE_MONSTER_MASK,
                 speed,
                 damage: weapon.damage,
-                size: {
-                    radius: PROJECTILE_RADIUS,
-                    width: PROJECTILE_W,
-                    height: PROJECTILE_H,
-                    color: PROJECTILE_COLOR,
-                },
+                size,
             },
         );
-        this.projectiles.push({ ...visual, monster: m });
+        this.projectiles.push({ ...bullet, monster: m });
     }
 
     private kill(m: Monster): void {
@@ -335,7 +323,7 @@ export class MonsterController {
         // ponytail: contact damage respects a short cooldown so brush-by
         // contact doesn't stack to death in 1 frame. Projectiles themselves
         // always destroy on contact.
-        if (now - this.lastDamageAt < ATTACK_COOLDOWN_MS) {
+        if (now - this.lastDamageAt < COMBAT_PLAYER_DAMAGE_COOLDOWN_MS) {
             this.destroyProjectile(proj);
             return;
         }
@@ -346,10 +334,10 @@ export class MonsterController {
 
     private damagePlayerFromContact(): void {
         const now = this.scene.time.now;
-        if (now - this.lastDamageAt < ATTACK_COOLDOWN_MS) return;
+        if (now - this.lastDamageAt < COMBAT_PLAYER_DAMAGE_COOLDOWN_MS) return;
         // Find which melee monster is overlapping the player; pick nearest.
         const meleeMonsters = this.monsters.filter(
-            (m) => !m.dead && m.weapon.projectileSpeed === undefined,
+            (m) => !m.dead && m.weapon.projectile === undefined,
         );
         const best = pickClosestMonster(this.playerBody.position, meleeMonsters, Infinity);
         if (!best) return;

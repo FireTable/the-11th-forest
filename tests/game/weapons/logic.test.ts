@@ -1,21 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { CAT } from '@/lib/constants';
-
 import {
-    isPlayerBullet,
-    isWall,
-    MONSTER_PROJECTILE_MASK,
-    PLAYER_BULLET_MASK,
-} from '@/game/weapons/logic';
+    CAT,
+    PROJECTILE_MONSTER_MASK,
+    PROJECTILE_PLAYER_MASK,
+} from '@/lib/constants';
+
+import { isPlayerBullet, isWall } from '@/game/weapons/logic';
 
 describe('weapons/logic — masks', () => {
-    it('PLAYER_BULLET_MASK hits every category (Matter checks other body)', () => {
-        expect(PLAYER_BULLET_MASK).toBe(0xffff);
+    it('PROJECTILE_PLAYER_MASK hits every category (Matter checks other body)', () => {
+        expect(PROJECTILE_PLAYER_MASK).toBe(0xffff);
     });
 
-    it('MONSTER_PROJECTILE_MASK collides with character + tall walls only', () => {
-        expect(MONSTER_PROJECTILE_MASK).toBe(CAT.CHARACTER | CAT.WALL_TALL);
+    it('PROJECTILE_MONSTER_MASK collides with character + tall walls only', () => {
+        expect(PROJECTILE_MONSTER_MASK).toBe(CAT.CHARACTER | CAT.WALL_TALL);
     });
 });
 

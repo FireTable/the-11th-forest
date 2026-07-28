@@ -1,5 +1,8 @@
 name: Ammo Cache
 kind: static
+visual:
+  size: 18
+  tint: 0xfacc15
 effect:
   type: refill-ammo
   ammoFraction: 0.3

@@ -23,8 +23,7 @@ import { WeaponController } from '@/game/weapons/logic';
 
 import { CharacterController } from './logic';
 
-const HALF_W = 16;
-const HALF_H = 24;
+// Body halfW / halfH come from CharacterSpec (loaded from YAML).
 
 export interface CharacterRuntime {
     body: MatterJS.BodyType;
@@ -56,17 +55,30 @@ export function loadCharacter(
     const spawnX = level.imageSize.width / 2;
     const spawnY = level.imageSize.height / 2;
 
-    const body = scene.matter.add.rectangle(spawnX, spawnY, HALF_W * 2, HALF_H * 2, {
-        label: 'character',
-        collisionFilter: {
-            category: CAT.CHARACTER,
-            // Mask all EXCEPT bullets — player bullets spawn from inside
-            // the body so they must not self-collide.
-            mask: 0xffff & ~CAT.BULLET,
+    const body = scene.matter.add.rectangle(
+        spawnX,
+        spawnY,
+        spec.body.halfW * 2,
+        spec.body.halfH * 2,
+        {
+            label: 'character',
+            collisionFilter: {
+                category: CAT.CHARACTER,
+                // Mask all EXCEPT bullets — player bullets spawn from inside
+                // the body so they must not self-collide.
+                mask: 0xffff & ~CAT.BULLET,
+            },
         },
-    });
+    );
 
-    const rect = scene.add.rectangle(spawnX, spawnY, HALF_W * 2, HALF_H * 2, 0x22c55e, 0.85);
+    const rect = scene.add.rectangle(
+        spawnX,
+        spawnY,
+        spec.body.halfW * 2,
+        spec.body.halfH * 2,
+        0x22c55e,
+        0.85,
+    );
     rect.setStrokeStyle(2, 0x052e16, 1);
 
     const matter = (Phaser as any).Physics.Matter.Matter;

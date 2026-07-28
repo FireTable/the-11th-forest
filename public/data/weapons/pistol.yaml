@@ -5,4 +5,10 @@ range: 600
 clipSize: 12
 reloadTimeMs: 1200
 bulletsPerShot: 1
-projectileSpeed: 20
+projectile:
+  speed: 20
+  visual:
+    radius: 4
+    width: 16
+    height: 4
+    color: 0x22c55e

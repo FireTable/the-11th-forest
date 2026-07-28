@@ -25,7 +25,14 @@ export type DropSpec = {
     name: string;
     /** Default kind: 'static' for scene-placed, 'monster' for killed-by drops. */
     kind: DropKind;
+    visual: DropVisual;
     effect: DropEffect;
+};
+
+/** Sensor rect size + tint (hex, e.g. 0x22c55e). One tint per drop. */
+export type DropVisual = {
+    size: number;
+    tint: number;
 };
 
 /** Ordered manifest of all drops. */

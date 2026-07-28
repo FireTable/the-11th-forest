@@ -13,14 +13,21 @@
 
 import * as Phaser from 'phaser';
 
-import { BaseHud } from './base-hub';
+import {
+    HUD_COMPLETED_FLASH_MS,
+    HUD_FILL_ALPHA,
+    HUD_FONT_LABEL,
+    HUD_STATUS_BAR_BG,
+    HUD_STATUS_BAR_FILL,
+    HUD_STATUS_BAR_H,
+    HUD_STATUS_BAR_W,
+    HUD_STATUS_LABEL_COLOR,
+    HUD_STATUS_LABEL_OFFSET_Y,
+    HUD_STATUS_OFFSET_Y,
+    HUD_BG_ALPHA,
+} from '@/lib/constants';
 
-// 2× the previous dimensions — small indicators were hard to read.
-const BAR_W = 72;
-const BAR_H = 8;
-const OFFSET_Y = -34; // above character center
-const COMPLETED_FLASH_MS = 600;
-const LABEL_COLOR = '#bbf7d0';
+import { BaseHud } from './base-hub';
 
 /** Subset of weapon-slot state the indicator needs to render. */
 export interface StatusHudState {
@@ -43,11 +50,11 @@ export class StatusHud extends BaseHud {
         this.body = body;
 
         this.bg = scene.add.graphics();
-        this.bg.fillStyle(0x052e16, 0.85);
+        this.bg.fillStyle(HUD_STATUS_BAR_BG, HUD_BG_ALPHA);
         // Bar is centered horizontally on the body, drawn at cy (set
         // per frame). Use a local-x range so the container's
         // setPosition alone puts it where we want.
-        this.bg.fillRect(-BAR_W / 2, 0, BAR_W, BAR_H);
+        this.bg.fillRect(-HUD_STATUS_BAR_W / 2, 0, HUD_STATUS_BAR_W, HUD_STATUS_BAR_H);
         this.root.add(this.bg);
 
         this.fill = scene.add.graphics();
@@ -56,8 +63,8 @@ export class StatusHud extends BaseHud {
         this.label = scene.add
             .text(0, 0, '', {
                 fontFamily: 'monospace',
-                fontSize: '10px',
-                color: LABEL_COLOR,
+                fontSize: HUD_FONT_LABEL,
+                color: HUD_STATUS_LABEL_COLOR,
             })
             .setOrigin(0.5, 1);
         this.root.add(this.label);
@@ -69,7 +76,7 @@ export class StatusHud extends BaseHud {
      */
     update(state: StatusHudState, time: number, halfH: number): void {
         const pos = this.body.position;
-        this.root.setPosition(pos.x, pos.y - halfH + OFFSET_Y);
+        this.root.setPosition(pos.x, pos.y - halfH + HUD_STATUS_OFFSET_Y);
 
         const cx = 0;
         const cy = 0;
@@ -79,8 +86,8 @@ export class StatusHud extends BaseHud {
         if (showReloading || showCompleted) {
             this.bg.setVisible(true);
             this.bg.clear();
-            this.bg.fillStyle(0x052e16, 0.85);
-            this.bg.fillRect(cx - BAR_W / 2, cy, BAR_W, BAR_H);
+            this.bg.fillStyle(HUD_STATUS_BAR_BG, HUD_BG_ALPHA);
+            this.bg.fillRect(cx - HUD_STATUS_BAR_W / 2, cy, HUD_STATUS_BAR_W, HUD_STATUS_BAR_H);
         } else {
             this.bg.setVisible(false);
         }
@@ -89,17 +96,22 @@ export class StatusHud extends BaseHud {
         if (showReloading) {
             const elapsed = time - state.reloadStartedAt;
             const frac = Math.max(0, Math.min(1, elapsed / state.reloadTimeMs));
-            this.fill.fillStyle(0xbbf7d0, 0.95);
-            this.fill.fillRect(cx - BAR_W / 2, cy, BAR_W * frac, BAR_H);
+            this.fill.fillStyle(HUD_STATUS_BAR_FILL, HUD_FILL_ALPHA);
+            this.fill.fillRect(
+                cx - HUD_STATUS_BAR_W / 2,
+                cy,
+                HUD_STATUS_BAR_W * frac,
+                HUD_STATUS_BAR_H,
+            );
             this.label.setText('Reloading…');
-            this.label.setPosition(cx, cy - 2);
+            this.label.setPosition(cx, cy + HUD_STATUS_LABEL_OFFSET_Y);
         } else if (showCompleted) {
             const since = time - state.justCompletedAt;
-            const alpha = 1 - since / COMPLETED_FLASH_MS;
-            this.fill.fillStyle(0xbbf7d0, alpha);
-            this.fill.fillRect(cx - BAR_W / 2, cy, BAR_W, BAR_H);
+            const alpha = 1 - since / HUD_COMPLETED_FLASH_MS;
+            this.fill.fillStyle(HUD_STATUS_BAR_FILL, alpha);
+            this.fill.fillRect(cx - HUD_STATUS_BAR_W / 2, cy, HUD_STATUS_BAR_W, HUD_STATUS_BAR_H);
             this.label.setText('Full');
-            this.label.setPosition(cx, cy - 2);
+            this.label.setPosition(cx, cy + HUD_STATUS_LABEL_OFFSET_Y);
             this.label.setAlpha(alpha);
         } else {
             this.label.setText('');

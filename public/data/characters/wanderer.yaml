@@ -1,6 +1,18 @@
+id: wanderer
 name: Wanderer
 hp: 9999
 sp: 60
 moveSpeed: 10
-dodgeSpCost: 15
 spRegenMs: 5000
+body:
+  halfW: 16
+  halfH: 24
+dodge:
+  spCost: 15
+  speed: 14
+  durationMs: 220
+  cooldownMs: 600
+hotbar:
+  - pistol
+  - shotgun
+  - smg

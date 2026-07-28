@@ -1,5 +1,8 @@
 name: HP Shard
 kind: static
+visual:
+  size: 18
+  tint: 0x22c55e
 effect:
   type: instant
   hp: 25

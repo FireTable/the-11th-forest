@@ -8,12 +8,16 @@ describe('parseDropYaml — instant', () => {
             `
 name: HP Shard
 kind: static
+visual:
+  size: 18
+  tint: 0x22c55e
 effect:
   type: instant
   hp: 25
 `,
             'hp-shard',
         );
+        expect(d.visual).toEqual({ size: 18, tint: 0x22c55e });
         expect(d.effect).toEqual({ type: 'instant', hp: 25, sp: 0 });
     });
 
@@ -22,6 +26,9 @@ effect:
             `
 name: SP Fragment
 kind: static
+visual:
+  size: 18
+  tint: 0x22c55e
 effect:
   type: instant
   sp: 20
@@ -37,6 +44,9 @@ effect:
                 `
 name: Bad
 kind: static
+visual:
+  size: 18
+  tint: 0xffffff
 effect:
   type: instant
 `,
@@ -52,6 +62,9 @@ describe('parseDropYaml — refill-ammo', () => {
             `
 name: Ammo Cache
 kind: static
+visual:
+  size: 18
+  tint: 0xfacc15
 effect:
   type: refill-ammo
   ammoFraction: 0.3
@@ -67,6 +80,9 @@ effect:
                 `
 name: Bad
 kind: static
+visual:
+  size: 18
+  tint: 0xffffff
 effect:
   type: refill-ammo
   ammoFraction: 1.5
@@ -79,6 +95,9 @@ effect:
                 `
 name: Bad
 kind: static
+visual:
+  size: 18
+  tint: 0xffffff
 effect:
   type: refill-ammo
   ammoFraction: 0
@@ -95,6 +114,9 @@ describe('parseDropYaml — weapon', () => {
             `
 name: Pistol Pickup
 kind: static
+visual:
+  size: 18
+  tint: 0x60a5fa
 effect:
   type: weapon
   weaponId: pistol
@@ -110,6 +132,9 @@ effect:
                 `
 name: Bad
 kind: static
+visual:
+  size: 18
+  tint: 0xffffff
 effect:
   type: weapon
 `,
@@ -126,6 +151,9 @@ describe('parseDropYaml — common', () => {
                 `
 name: x
 kind: floating
+visual:
+  size: 18
+  tint: 0xffffff
 effect:
   type: instant
   hp: 1
@@ -141,12 +169,48 @@ effect:
                 `
 name: x
 kind: static
+visual:
+  size: 18
+  tint: 0xffffff
 effect:
   type: explode
 `,
                 'x',
             ),
         ).toThrow(/effect.type/);
+    });
+
+    it('rejects missing visual', () => {
+        expect(() =>
+            parseDropYaml(
+                `
+name: x
+kind: static
+effect:
+  type: instant
+  hp: 1
+`,
+                'x',
+            ),
+        ).toThrow(/visual/);
+    });
+
+    it('rejects non-positive visual.size', () => {
+        expect(() =>
+            parseDropYaml(
+                `
+name: x
+kind: static
+visual:
+  size: 0
+  tint: 0xffffff
+effect:
+  type: instant
+  hp: 1
+`,
+                'x',
+            ),
+        ).toThrow(/visual.size/);
     });
 });
 

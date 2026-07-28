@@ -12,25 +12,33 @@
 
 import * as Phaser from 'phaser';
 
+import {
+    HUD_BAR_BG,
+    HUD_BG_PAD,
+    HUD_BG_ALPHA,
+    HUD_BOTTOM_GAP,
+    HUD_FILL_ALPHA,
+    HUD_FONT_NAME,
+    HUD_HP_BAR_GAP,
+    HUD_HP_BAR_H,
+    HUD_HP_BAR_W,
+    HUD_HP_FILL,
+    HUD_HP_NAME_OFFSET_Y,
+    HUD_HP_PANEL_PADDING_X,
+    HUD_PANEL_BG,
+    HUD_PANEL_BG_ALPHA,
+    HUD_SP_FILL,
+    HUD_TEXT_NAME,
+} from '@/lib/constants';
 import type { CharacterSpec } from '@/lib/characters';
 
 import { BaseHud } from './base-hub';
 
-// Distance from screen bottom for both character-hub + weapon-hud.
-// Change in one place to keep them aligned.
-const BOTTOM_GAP = 14;
-
-const PADDING_X = 12;
-const BG_PAD = 4;
-const BAR_W = 220;
-const BAR_H = 14;
-const BAR_GAP = 6;
-const NAME_OFFSET_Y = 4;
-
 // Total HUD height = top BG_PAD + label area + HP + gap + SP + bottom BG_PAD.
 // label area = NAME_OFFSET_Y + ~12px font (rounded up to 14 for safe padding).
-const LABEL_AREA = NAME_OFFSET_Y + 14;
-const HUD_HEIGHT = BG_PAD + LABEL_AREA + BAR_H + BAR_GAP + BAR_H + BG_PAD;
+const LABEL_AREA = HUD_HP_NAME_OFFSET_Y + 14;
+const HUD_HEIGHT =
+    HUD_BG_PAD + LABEL_AREA + HUD_HP_BAR_H + HUD_HP_BAR_GAP + HUD_HP_BAR_H + HUD_BG_PAD;
 
 export class CharacterHud extends BaseHud {
     private readonly bg: Phaser.GameObjects.Graphics;
@@ -40,17 +48,22 @@ export class CharacterHud extends BaseHud {
 
     constructor(scene: Phaser.Scene, spec: CharacterSpec) {
         const displayH = scene.scale.displaySize.height;
-        super(scene, PADDING_X, displayH - HUD_HEIGHT - BOTTOM_GAP);
+        super(scene, HUD_HP_PANEL_PADDING_X, displayH - HUD_HEIGHT - HUD_BOTTOM_GAP);
 
         this.bg = scene.add.graphics();
-        this.bg.fillStyle(0x000000, 0.5);
-        this.bg.fillRect(-BG_PAD, -BG_PAD, BAR_W + BG_PAD * 2, HUD_HEIGHT);
+        this.bg.fillStyle(HUD_PANEL_BG, HUD_PANEL_BG_ALPHA);
+        this.bg.fillRect(
+            -HUD_BG_PAD,
+            -HUD_BG_PAD,
+            HUD_HP_BAR_W + HUD_BG_PAD * 2,
+            HUD_HEIGHT,
+        );
         this.root.add(this.bg);
 
-        this.label = scene.add.text(0, NAME_OFFSET_Y, spec.name, {
+        this.label = scene.add.text(0, HUD_HP_NAME_OFFSET_Y, spec.name, {
             fontFamily: 'monospace',
-            fontSize: '12px',
-            color: '#86efac',
+            fontSize: HUD_FONT_NAME,
+            color: HUD_TEXT_NAME,
         });
         this.root.add(this.label);
 
@@ -70,21 +83,21 @@ export class CharacterHud extends BaseHud {
         // Position bars inside the bg:
         //   bg top at y=0, label at y=NAME_OFFSET_Y
         //   HP bar starts just below label
-        const hpY = LABEL_AREA + BG_PAD;
-        const spY = hpY + BAR_H + BAR_GAP;
+        const hpY = LABEL_AREA + HUD_BG_PAD;
+        const spY = hpY + HUD_HP_BAR_H + HUD_HP_BAR_GAP;
 
         this.hpFill.clear();
-        this.hpFill.fillStyle(0x1f2937, 0.85);
-        this.hpFill.fillRect(0, hpY, BAR_W, BAR_H);
-        this.hpFill.fillStyle(0x22c55e, 0.95);
+        this.hpFill.fillStyle(HUD_BAR_BG, HUD_BG_ALPHA);
+        this.hpFill.fillRect(0, hpY, HUD_HP_BAR_W, HUD_HP_BAR_H);
+        this.hpFill.fillStyle(HUD_HP_FILL, HUD_FILL_ALPHA);
         const hpFrac = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
-        this.hpFill.fillRect(0, hpY, BAR_W * hpFrac, BAR_H);
+        this.hpFill.fillRect(0, hpY, HUD_HP_BAR_W * hpFrac, HUD_HP_BAR_H);
 
         this.spFill.clear();
-        this.spFill.fillStyle(0x1f2937, 0.85);
-        this.spFill.fillRect(0, spY, BAR_W, BAR_H);
-        this.spFill.fillStyle(0x38bdf8, 0.95);
+        this.spFill.fillStyle(HUD_BAR_BG, HUD_BG_ALPHA);
+        this.spFill.fillRect(0, spY, HUD_HP_BAR_W, HUD_HP_BAR_H);
+        this.spFill.fillStyle(HUD_SP_FILL, HUD_FILL_ALPHA);
         const spFrac = maxSp > 0 ? Math.max(0, Math.min(1, sp / maxSp)) : 0;
-        this.spFill.fillRect(0, spY, BAR_W * spFrac, BAR_H);
+        this.spFill.fillRect(0, spY, HUD_HP_BAR_W * spFrac, HUD_HP_BAR_H);
     }
 }
