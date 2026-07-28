@@ -117,6 +117,94 @@ hotbar:
         const c = parseCharacterYaml(yamlText, 'wanderer');
         expect(c.dodge.spCost).toBe(0);
     });
+
+    it('parses optional sprite block', () => {
+        const spriteYaml = `
+sprite:
+  texture: assets/image/characters/wanderer.png
+  frameWidth: 512
+  frameHeight: 512
+  scale: 0.3
+`;
+        const yamlText = validYaml + spriteYaml;
+        const c = parseCharacterYaml(yamlText, 'wanderer');
+        expect(c.sprite).toEqual({
+            texture: 'assets/image/characters/wanderer.png',
+            frameWidth: 512,
+            frameHeight: 512,
+            scale: 0.3,
+        });
+    });
+
+    it('rejects sprite with non-positive scale', () => {
+        const yamlText =
+            validYaml +
+            'sprite:\n  texture: a.png\n  frameWidth: 64\n  frameHeight: 64\n  scale: 0\n';
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/sprite\.scale/);
+    });
+
+    it('parses optional anims block with multiple tracks', () => {
+        const animsYaml = `
+anims:
+  idle:
+    frames: [0, 4]
+    frameRate: 6
+    repeat: -1
+  run:
+    frames: [5, 9]
+    frameRate: 12
+    repeat: -1
+  run-stop:
+    frames: [10, 14]
+    frameRate: 10
+    repeat: 0
+`;
+        const yamlText = validYaml + animsYaml;
+        const c = parseCharacterYaml(yamlText, 'wanderer');
+        expect(c.anims).toEqual({
+            idle: { frames: [0, 4], frameRate: 6, repeat: -1 },
+            run: { frames: [5, 9], frameRate: 12, repeat: -1 },
+            'run-stop': { frames: [10, 14], frameRate: 10, repeat: 0 },
+        });
+    });
+
+    it('rejects sprite missing texture', () => {
+        const yamlText = validYaml + 'sprite:\n  frameWidth: 64\n  frameHeight: 64\n';
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/sprite\.texture/);
+    });
+
+    it('rejects sprite with non-positive frameWidth', () => {
+        const yamlText =
+            validYaml +
+            'sprite:\n  texture: a.png\n  frameWidth: 0\n  frameHeight: 64\n';
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(
+            /sprite\.frameWidth/,
+        );
+    });
+
+    it('rejects anims with malformed frames tuple', () => {
+        const yamlText =
+            validYaml + 'anims:\n  idle:\n    frames: [0]\n    frameRate: 6\n    repeat: -1\n';
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/anims\.idle\.frames/);
+    });
+
+    it('rejects anims with reversed frame range', () => {
+        const yamlText =
+            validYaml + 'anims:\n  idle:\n    frames: [5, 1]\n    frameRate: 6\n    repeat: -1\n';
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/frames\[0\].*<=.*frames\[1\]/);
+    });
+
+    it('rejects anims with non-positive frameRate', () => {
+        const yamlText =
+            validYaml + 'anims:\n  idle:\n    frames: [0, 4]\n    frameRate: 0\n    repeat: -1\n';
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/anims\.idle\.frameRate/);
+    });
+
+    it('omits sprite/anims when not provided', () => {
+        const c = parseCharacterYaml(validYaml, 'wanderer');
+        expect(c.sprite).toBeUndefined();
+        expect(c.anims).toBeUndefined();
+    });
 });
 
 describe('parseCharacterIndex', () => {

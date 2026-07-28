@@ -1,6 +1,11 @@
 import { Scene } from 'phaser';
 
-import { loadCharacter, type CharacterRuntime } from '@/game/characters/character';
+import {
+    createCharacterAnims,
+    loadCharacter,
+    loadCharacterAssets,
+    type CharacterRuntime,
+} from '@/game/characters/character';
 import { DropController } from '@/game/drops/drop';
 import { MonsterController, rollDrops } from '@/game/monsters/monster';
 import { EventBus } from '@/lib/events/bus';
@@ -59,6 +64,9 @@ export class LoadScene extends Scene {
 
     preload(): void {
         this.load.image('background', this.level.background);
+        // The character module owns its own asset loading + animation
+        // registration; we just delegate here.
+        loadCharacterAssets(this, this.assets.character);
     }
 
     create(): void {
@@ -80,6 +88,11 @@ export class LoadScene extends Scene {
         // Build static Matter bodies for every air wall — see load-wall.ts
         // for category / mask policy.
         createWallBodies(this.matter, this.level.airWalls);
+
+        // Register character anims once the sprite sheet has finished
+        // loading. Must run before `loadCharacter()` since the controller's
+        // `animationcomplete` listener expects these keys to exist.
+        createCharacterAnims(this, this.assets.character);
 
         // Spawn the player character (WASD + Shift dodge + hotbar).
         this.character = loadCharacter(this, this.level, this.assets.character, this.assets.weapons);

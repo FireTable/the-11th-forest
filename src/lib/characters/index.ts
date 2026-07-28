@@ -7,6 +7,6 @@
  *   import { fetchCharacter } from '@/lib/characters';
  */
 
-export type { CharacterSpec, CharacterIndex } from './types';
+export type { AnimSpec, CharacterIndex, CharacterSpec, SpriteSpec } from './types';
 export { parseCharacterIndex, parseCharacterYaml } from './parser';
 export { fetchCharacter, fetchCharacterIndex } from './loader';

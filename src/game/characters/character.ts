@@ -1,18 +1,23 @@
 /**
  * src/game/characters/character.ts
  * --------------------------------------------------------------------------
- * Spawn a player Character. Pure wiring — constructs the Matter body +
- * visual + HUDs + weapon controller, then instantiates a CharacterController
- * (in `./logic`) which owns all input binding + per-frame behavior.
+ * Player character module — owns *every* concern for the character:
  *
- * The runtime returned is the public API: external code (LoadScene, drops)
- * uses `heal / refillAmmo / pickUpWeapon` and reads `body / weapons / hud`.
+ *   1. Phaser resource loading      → loadCharacterAssets()
+ *   2. Animation registration       → createCharacterAnims()
+ *   3. Sprite + Matter body spawn   → loadCharacter()
+ *   4. Per-frame input + behaviour  → CharacterController (./logic.ts)
+ *   5. Key derivation               → textureKey() / animKey()
+ *
+ * The scene delegates here from its `preload()` / `create()` phases but
+ * doesn't reach into the sprite / anims internals (per CLAUDE.md rule
+ * 12: each module owns its own concerns).
  */
 
 import * as Phaser from 'phaser';
 
 import { CAT } from '@/lib/constants';
-import type { CharacterSpec } from '@/lib/characters';
+import type { AnimSpec, CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 import type { WeaponSpec } from '@/lib/weapons';
 
@@ -22,12 +27,13 @@ import { WeaponHud } from '@/game/hubs/weapon-hud';
 import { WeaponController } from '@/game/weapons/logic';
 
 import { CharacterController } from './logic';
+import { animKey, textureKey } from './keys';
 
-// Body halfW / halfH come from CharacterSpec (loaded from YAML).
+// ─── Public API ──────────────────────────────────────────────────────────
 
 export interface CharacterRuntime {
     body: MatterJS.BodyType;
-    rect: Phaser.GameObjects.Rectangle;
+    sprite: Phaser.GameObjects.Sprite;
     weapons: WeaponController;
     hud: CharacterHud;
     weaponHud: WeaponHud;
@@ -40,6 +46,64 @@ export interface CharacterRuntime {
     pickUpWeapon(weaponId: string): boolean;
     update(time: number): void;
     destroy(): void;
+}
+
+/**
+ * Queue the sprite-sheet texture load on the scene's loader. Caller MUST
+ * invoke this from `preload()` — Phaser waits for queued loads to flush
+ * before `create()` runs, which is what keeps `add.sprite(key, ...)`
+ * safe to call from `create()`.
+ *
+ * No-op when the spec lacks a `sprite` block (debug-rectangle fallback).
+ */
+export function loadCharacterAssets(
+    scene: Pick<Phaser.Scene, 'load'>,
+    spec: CharacterSpec,
+): void {
+    if (!spec.sprite) return;
+    scene.load.spritesheet(textureKey(spec), spec.sprite.texture, {
+        frameWidth: spec.sprite.frameWidth,
+        frameHeight: spec.sprite.frameHeight,
+    });
+}
+
+/**
+ * Register every named animation track on the scene's animation manager.
+ * Skipped when the spec has no `anims` block. Existing registrations
+ * with the same key are removed first (HMR can leave a stale manager).
+ */
+export function createCharacterAnims(
+    scene: Pick<Phaser.Scene, 'anims'>,
+    spec: CharacterSpec,
+): void {
+    if (!spec.anims) return;
+    for (const [name, anim] of Object.entries(spec.anims)) {
+        registerAnim(scene, spec, name, anim);
+    }
+}
+
+function registerAnim(
+    scene: Pick<Phaser.Scene, 'anims'>,
+    spec: CharacterSpec,
+    name: string,
+    anim: AnimSpec,
+): void {
+    const key = animKey(spec, name);
+    if (scene.anims.exists(key)) scene.anims.remove(key);
+    // Phaser 4 expects each AnimationFrame to carry a texture `key` and a
+    // `frame` index. We resolve the texture key here once so the per-frame
+    // records stay compact.
+    const texture = textureKey(spec);
+    const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+    for (let i = anim.frames[0]; i <= anim.frames[1]; i++) {
+        frames.push({ key: texture, frame: i });
+    }
+    scene.anims.create({
+        key,
+        frames,
+        frameRate: anim.frameRate,
+        repeat: anim.repeat,
+    });
 }
 
 /**
@@ -56,8 +120,11 @@ export function loadCharacter(
     const spawnY = level.imageSize.height / 2;
 
     const body = scene.matter.add.rectangle(
+        // Body center sits halfH above the spawn point so the body's
+        // bottom edge lands exactly on the sprite's feet — top-down
+        // characters collide at their feet, not their geometric centre.
         spawnX,
-        spawnY,
+        spawnY - spec.body.halfH,
         spec.body.halfW * 2,
         spec.body.halfH * 2,
         {
@@ -71,15 +138,13 @@ export function loadCharacter(
         },
     );
 
-    const rect = scene.add.rectangle(
-        spawnX,
-        spawnY,
-        spec.body.halfW * 2,
-        spec.body.halfH * 2,
-        0x22c55e,
-        0.85,
-    );
-    rect.setStrokeStyle(2, 0x052e16, 1);
+    // Visual: sprite-sheet frame from the character's loaded texture.
+    // The matter body controls collisions; the sprite is purely visual.
+    // Anchor at (0.5, 1.0) so `sprite.position` represents the FEET,
+    // matching the body's bottom edge.
+    const sprite = scene.add.sprite(spawnX, spawnY, textureKey(spec));
+    sprite.setOrigin(0.5, 1.0);
+    if (spec.sprite) sprite.setScale(spec.sprite.scale);
 
     const matter = (Phaser as any).Physics.Matter.Matter;
     const weaponsSys = new WeaponController(scene, matter, body, weapons);
@@ -89,7 +154,7 @@ export function loadCharacter(
 
     const controller = new CharacterController(scene, level, spec, {
         body,
-        rect,
+        sprite,
         matter,
         weapons: weaponsSys,
         hud,
@@ -97,9 +162,17 @@ export function loadCharacter(
         statusHud,
     });
 
+    // Kick off the default (idle) animation if any was declared and
+    // registered by createCharacterAnims(). The controller's update loop
+    // will keep the right anim playing as movement state changes.
+    if (spec.anims) {
+        const idleKey = animKey(spec, 'idle');
+        if (scene.anims.exists(idleKey)) sprite.anims.play(idleKey, true);
+    }
+
     return {
         body,
-        rect,
+        sprite,
         weapons: weaponsSys,
         hud,
         weaponHud,

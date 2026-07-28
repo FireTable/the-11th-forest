@@ -2,17 +2,35 @@ id: wanderer
 name: Wanderer
 hp: 9999
 sp: 60
-moveSpeed: 10
+moveSpeed: 8
 spRegenMs: 5000
 body:
-  halfW: 16
-  halfH: 24
+    halfW: 16
+    halfH: 24
 dodge:
-  spCost: 15
-  speed: 14
-  durationMs: 220
-  cooldownMs: 600
+    spCost: 15
+    speed: 14
+    durationMs: 220
+    cooldownMs: 600
 hotbar:
-  - pistol
-  - shotgun
-  - smg
+    - pistol
+    - shotgun
+    - smg
+sprite:
+    texture: assets/image/characters/wanderer.png
+    frameWidth: 512
+    frameHeight: 512
+    scale: 0.2
+anims:
+    idle:
+        frames: [0, 3]
+        frameRate: 6
+        repeat: -1
+    run:
+        frames: [5, 8]
+        frameRate: 12
+        repeat: -1
+    run-stop:
+        frames: [10, 14]
+        frameRate: 10
+        repeat: 0

@@ -39,6 +39,39 @@ export type CharacterSpec = {
     };
     /** Weapon IDs the character starts with, in hotbar display order. */
     hotbar: string[];
+    /** Optional sprite-sheet rendering. Absent → fall back to debug rect. */
+    sprite?: SpriteSpec;
+    /** Named animation tracks; each key maps to a frame range + timing. */
+    anims?: Record<string, AnimSpec>;
+};
+
+/**
+ * Sprite-sheet metadata. The texture path is relative to /public so it
+ * resolves under the Vite dev server and the built bundle identically.
+ * Phaser is invoked with `frameWidth` × `frameHeight` cell slicing; the
+ * actual sprite dimensions in pixels come from the sheet itself.
+ *
+ * `scale` is the Phaser display multiplier on the cell (1.0 = native).
+ * The matter body controls collisions, so `scale` is purely visual and
+ * can be tuned per character without touching gameplay.
+ */
+export type SpriteSpec = {
+    texture: string;
+    frameWidth: number;
+    frameHeight: number;
+    scale: number;
+};
+
+/**
+ * One Phaser animation track. `frames` is an inclusive [start, end]
+ * range over the slice order used by `load.spritesheet` (top-left,
+ * left-to-right, top-to-bottom). `repeat = -1` loops; `0` plays once
+ * and freezes on the last frame.
+ */
+export type AnimSpec = {
+    frames: [number, number];
+    frameRate: number;
+    repeat: number;
 };
 
 /** Ordered manifest of all characters. */

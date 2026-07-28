@@ -6,7 +6,7 @@
 
 import { load as parseYaml } from 'js-yaml';
 
-import type { CharacterIndex, CharacterSpec } from './types';
+import type { AnimSpec, CharacterIndex, CharacterSpec, SpriteSpec } from './types';
 
 function requireNonNegativeFinite(value: unknown, label: string, id: string): number {
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
@@ -53,7 +53,19 @@ export function parseCharacterYaml(text: string, id: string): CharacterSpec {
     if (raw === null || typeof raw !== 'object') {
         throw new Error(`Character ${id}: empty or non-object YAML`);
     }
-    const { id: yamlId, name, hp, sp, moveSpeed, spRegenMs, body, dodge, hotbar } = raw;
+    const {
+        id: yamlId,
+        name,
+        hp,
+        sp,
+        moveSpeed,
+        spRegenMs,
+        body,
+        dodge,
+        hotbar,
+        sprite,
+        anims,
+    } = raw;
 
     if (typeof name !== 'string' || name.length === 0) {
         throw new Error(`Character ${id}: name required`);
@@ -64,7 +76,7 @@ export function parseCharacterYaml(text: string, id: string): CharacterSpec {
         );
     }
 
-    return {
+    const spec: CharacterSpec = {
         id,
         name,
         hp: requireNonNegativeFinite(hp, 'hp', id),
@@ -74,6 +86,72 @@ export function parseCharacterYaml(text: string, id: string): CharacterSpec {
         body: parseBody(body, id),
         dodge: parseDodge(dodge, id),
         hotbar: parseHotbar(hotbar, id),
+    };
+    if (sprite !== undefined) spec.sprite = parseSprite(sprite, id);
+    if (anims !== undefined) spec.anims = parseAnims(anims, id);
+    return spec;
+}
+
+function parseSprite(raw: unknown, id: string): SpriteSpec {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(
+            `Character ${id}: sprite must be an object with texture, frameWidth, frameHeight`,
+        );
+    }
+    const s = raw as Record<string, unknown>;
+    if (typeof s.texture !== 'string' || s.texture.length === 0) {
+        throw new Error(`Character ${id}: sprite.texture must be a non-empty string`);
+    }
+    return {
+        texture: s.texture,
+        frameWidth: requirePositiveFinite(s.frameWidth, 'sprite.frameWidth', id),
+        frameHeight: requirePositiveFinite(s.frameHeight, 'sprite.frameHeight', id),
+        scale: requirePositiveFinite(s.scale, 'sprite.scale', id),
+    };
+}
+
+function parseAnims(raw: unknown, id: string): Record<string, AnimSpec> {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(`Character ${id}: anims must be an object`);
+    }
+    const r = raw as Record<string, unknown>;
+    const out: Record<string, AnimSpec> = {};
+    for (const [key, value] of Object.entries(r)) {
+        out[key] = parseAnimSpec(value, key, id);
+    }
+    return out;
+}
+
+function parseAnimSpec(raw: unknown, key: string, id: string): AnimSpec {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(`Character ${id}: anims.${key} must be an object`);
+    }
+    const a = raw as Record<string, unknown>;
+    if (!Array.isArray(a.frames) || a.frames.length !== 2) {
+        throw new Error(`Character ${id}: anims.${key}.frames must be a tuple [start, end]`);
+    }
+    const [start, end] = a.frames;
+    if (
+        typeof start !== 'number' ||
+        typeof end !== 'number' ||
+        !Number.isInteger(start) ||
+        !Number.isInteger(end) ||
+        start < 0 ||
+        end < start
+    ) {
+        throw new Error(
+            `Character ${id}: anims.${key}.frames[0] (${start}) must be >= 0 and <= frames[1] (${end})`,
+        );
+    }
+    if (typeof a.repeat !== 'number' || !Number.isInteger(a.repeat)) {
+        throw new Error(
+            `Character ${id}: anims.${key}.repeat must be an integer (-1 = loop, 0 = once)`,
+        );
+    }
+    return {
+        frames: [start, end],
+        frameRate: requirePositiveFinite(a.frameRate, `anims.${key}.frameRate`, id),
+        repeat: a.repeat,
     };
 }
 

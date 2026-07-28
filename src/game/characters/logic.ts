@@ -33,6 +33,8 @@ import {
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 
+import { animKey } from './keys';
+
 // ─── Pure helpers ────────────────────────────────────────────────────────
 
 export interface MoveIntent {
@@ -155,7 +157,7 @@ export interface StatusHudState {
 export interface CharacterRuntimeParts {
     /** Matter body — typed as `any` to avoid pulling in matter-js types. */
     body: any;
-    rect: Phaser.GameObjects.Rectangle;
+    sprite: Phaser.GameObjects.Sprite;
     /** Matter library reference (for Body.setVelocity / setPosition). */
     matter: any;
     weapons: WeaponsLike;
@@ -180,6 +182,10 @@ export class CharacterController {
     private firing = false;
     private targetX = 0;
     private targetY = 0;
+    /** Tracks last frame's movement intent so we can play run-stop on
+     * the transition run → idle without retriggering every frame the
+     * player just stands still. */
+    private prevMoving = false;
 
     private readonly cleanupFns: Array<() => void> = [];
 
@@ -200,6 +206,12 @@ export class CharacterController {
 
         this.bindKeyboard();
         this.bindPointer();
+
+        // Chain the run-stop -> idle transition. Bound once in the
+        // constructor so we don't leak listeners on every stop event.
+        const onAnimDone = () => this.onAnimComplete();
+        this.parts.sprite.on('animationcomplete', onAnimDone);
+        this.cleanupFns.push(() => this.parts.sprite.off('animationcomplete', onAnimDone));
 
         const tick = () => this.update(scene.time.now);
         scene.events.on('update', tick);
@@ -228,7 +240,7 @@ export class CharacterController {
     destroy(): void {
         for (const fn of this.cleanupFns) fn();
         this.cleanupFns.length = 0;
-        this.parts.rect.destroy();
+        this.parts.sprite.destroy();
         this.scene.matter.world.remove(this.parts.body);
     }
 
@@ -289,11 +301,19 @@ export class CharacterController {
         }
 
         // ── Visual sync ─────────────────────────────────────────────
+        const sprite = this.parts.sprite;
         const pos = this.parts.body.position;
-        this.parts.rect.setPosition(pos.x, pos.y);
-        if (Math.abs(finalVx) + Math.abs(finalVy) > 0.1) {
-            this.parts.rect.setRotation(Math.atan2(finalVy, finalVx));
-        }
+        // Body center is halfH above the feet anchor; sprite origin is
+        // (0.5, 1.0), so we shift down by halfH to keep feet aligned
+        // with the body's bottom edge as it moves.
+        sprite.setPosition(pos.x, pos.y + this.spec.body.halfH);
+        // Sprite faces the cursor (mouse-aimed top-down shooter). The
+        // controller already maintains `targetX` / `targetY` from pointer
+        // events, so the weapon aim and the sprite facing stay aligned.
+        sprite.setFlipX(this.targetX < pos.x);
+
+        // ── Animation state machine ─────────────────────────────────
+        this.driveAnims(intent.vx !== 0 || intent.vy !== 0, now < this.dodgeActiveUntil);
 
         // ── SP regen ────────────────────────────────────────────────
         if (now >= this.dodgeActiveUntil && this.sp < this.spec.sp) {
@@ -323,6 +343,53 @@ export class CharacterController {
     }
 
     // ─── Internals ──────────────────────────────────────────────────────
+
+    /**
+     * State machine: idle ↔ run ↔ run-stop. Dodge velocity also counts
+     * as "moving" so the character stays in `run` while dashing. Each
+     * anim is gated on `scene.anims.exists(key)` so a character without
+     * declared anims falls through silently (debug fallback).
+     */
+    private driveAnims(isMovingInput: boolean, isDodging: boolean): void {
+        if (!this.spec.anims) return;
+        const sprite = this.parts.sprite;
+        const runKey = animKey(this.spec, 'run');
+        const stopKey = animKey(this.spec, 'run-stop');
+        const idleKey = animKey(this.spec, 'idle');
+        const cur = sprite.anims.currentAnim?.key ?? null;
+        const moving = isMovingInput || isDodging;
+
+        if (moving) {
+            if (cur !== runKey && this.scene.anims.exists(runKey)) {
+                sprite.anims.play(runKey, true);
+            }
+        } else if (this.prevMoving && cur === runKey) {
+            // Just released keys (or dodge ended) while running — kick off
+            // the skid animation. The constructor-bound animationcomplete
+            // listener chains back to idle.
+            if (this.scene.anims.exists(stopKey)) sprite.anims.play(stopKey, true);
+        } else if (!moving && !this.prevMoving && cur !== idleKey && cur !== stopKey) {
+            // Sitting still with no run-stop in flight — clamp to idle.
+            if (this.scene.anims.exists(idleKey)) sprite.anims.play(idleKey, true);
+        }
+        this.prevMoving = moving;
+    }
+
+    /**
+     * Hooked on `sprite.on('animationcomplete', ...)` in the constructor.
+     * When run-stop finishes, transition to idle. Other animation ends
+     * are no-ops so this stays safe to bind once and forget.
+     */
+    private onAnimComplete(): void {
+        if (!this.spec.anims) return;
+        const sprite = this.parts.sprite;
+        const cur = sprite.anims.currentAnim?.key;
+        const idleKey = animKey(this.spec, 'idle');
+        const stopKey = animKey(this.spec, 'run-stop');
+        if (cur === stopKey && this.scene.anims.exists(idleKey)) {
+            sprite.anims.play(idleKey, true);
+        }
+    }
 
     private bindKeyboard(): void {
         const kb = this.scene.input.keyboard!;
@@ -355,7 +422,10 @@ export class CharacterController {
             this.firing = true;
         };
         const onMove = (e: PointerEvent) => {
-            if (this.firing) updateTarget(e);
+            // Always track the cursor, not just while firing — the sprite
+            // should face the mouse at all times so weapon aim and
+            // visual facing stay aligned.
+            updateTarget(e);
         };
         const stop = () => {
             this.firing = false;

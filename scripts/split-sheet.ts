@@ -98,6 +98,45 @@ function isMagentaLeaning(r: number, g: number, b: number): boolean {
 }
 
 /**
+ * Sub-threshold magenta-axis predicate for the residual fringe. Catches
+ * AA pixels the main keyer dropped because their r/b fall below `r > 80`
+ * (e.g. rgb(74, 0, 72)). Near-zero green + r≈b is the safe discriminator:
+ * real sprite shadows (skin, clothes) always have non-trivial green.
+ */
+function isResidualMagenta(r: number, g: number, b: number): boolean {
+    return g < 30 && Math.abs(r - b) < 30;
+}
+
+/**
+ * Edge cleanup: paint black on silhouette-boundary pixels that are
+ * magenta-leaning but weren't cleared by `keyOut` — the residual 1px
+ * purple ring. Real outline pixels (already near-black) pass through;
+ * non-magenta sprite pixels fail `isResidualMagenta` and are skipped.
+ */
+function blackenMagentaFringe(png: PNG): void {
+    const { data, width: w, height: h } = png;
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const i = (w * y + x) << 2;
+            if (data[i + 3] === 0) continue;
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            if (r === 0 && g === 0 && b === 0) continue;
+            const onEdge =
+                (x > 0 && data[((w * y + x - 1) << 2) + 3] === 0) ||
+                (x < w - 1 && data[((w * y + x + 1) << 2) + 3] === 0) ||
+                (y > 0 && data[((w * (y - 1) + x) << 2) + 3] === 0) ||
+                (y < h - 1 && data[((w * (y + 1) + x) << 2) + 3] === 0);
+            if (!onEdge) continue;
+            if (!isResidualMagenta(r, g, b)) continue;
+            data[i] = 0;
+            data[i + 1] = 0;
+            data[i + 2] = 0;
+            data[i + 3] = 255;
+        }
+    }
+}
+
+/**
  * Zero the alpha of every magenta background pixel, in place.
  *
  * Two passes:
@@ -112,7 +151,7 @@ function isMagentaLeaning(r: number, g: number, b: number): boolean {
  *
  * Falls back to a global scan if no corner is magenta.
  */
-export function keyOut(png: PNG): void {
+export function keyOut(png: PNG, opts: { blackFringe?: boolean } = {}): void {
     const { data, width: w, height: h } = png;
     const seed = findKeySeed(png);
     if (!seed) {
@@ -165,6 +204,7 @@ export function keyOut(png: PNG): void {
     }
 
     stripEdgeHalo(png);
+    if (opts.blackFringe) blackenMagentaFringe(png);
 }
 
 /**
@@ -259,7 +299,7 @@ function main(): void {
     const [src, outDir, ...flags] = process.argv.slice(2);
     if (!src || !outDir) {
         console.error(
-            'usage: tsx scripts/split-sheet.ts <sheet.png> <outDir> [--pad=2]\n' +
+            'usage: tsx scripts/split-sheet.ts <sheet.png> <outDir> [--pad=2] [--no-black-fringe]\n' +
                 '                                       [--rows=N --cols=M] [--no-recompose]\n' +
                 '       tsx scripts/split-sheet.ts --recompose <outDir> <orig.png> ' +
                 '--rows=N --cols=M [<out.png>]',
@@ -289,9 +329,10 @@ function main(): void {
         return;
     }
     const pad = Number(flags.find((f) => f.startsWith('--pad='))?.slice(6) ?? 2);
+    const blackFringe = !flags.includes('--no-black-fringe');
 
     const png = PNG.sync.read(readFileSync(src));
-    keyOut(png);
+    keyOut(png, { blackFringe });
     const frames = findFrames(png);
 
     mkdirSync(outDir, { recursive: true });
