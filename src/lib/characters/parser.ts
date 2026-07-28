@@ -95,7 +95,7 @@ export function parseCharacterYaml(text: string, id: string): CharacterSpec {
 function parseSprite(raw: unknown, id: string): SpriteSpec {
     if (typeof raw !== 'object' || raw === null) {
         throw new Error(
-            `Character ${id}: sprite must be an object with texture, frameWidth, frameHeight`,
+            `Character ${id}: sprite must be an object with texture, grid, scale`,
         );
     }
     const s = raw as Record<string, unknown>;
@@ -104,9 +104,21 @@ function parseSprite(raw: unknown, id: string): SpriteSpec {
     }
     return {
         texture: s.texture,
-        frameWidth: requirePositiveFinite(s.frameWidth, 'sprite.frameWidth', id),
-        frameHeight: requirePositiveFinite(s.frameHeight, 'sprite.frameHeight', id),
+        grid: parseSpriteGrid(s.grid, id),
         scale: requirePositiveFinite(s.scale, 'sprite.scale', id),
+    };
+}
+
+function parseSpriteGrid(raw: unknown, id: string): SpriteSpec['grid'] {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(
+            `Character ${id}: sprite.grid required ({rows, cols} of the sheet)`,
+        );
+    }
+    const g = raw as Record<string, unknown>;
+    return {
+        rows: requirePositiveFinite(g.rows, 'sprite.grid.rows', id),
+        cols: requirePositiveFinite(g.cols, 'sprite.grid.cols', id),
     };
 }
 

@@ -275,6 +275,136 @@ export function findFrames(png: PNG, minRun = 8, minArea = 2000): Box[] {
     return out;
 }
 
+/**
+ * Alpha-weighted box-average downsample. Each target pixel averages the
+ * RGB of source pixels in its region, weighted by source alpha so the
+ * chroma-keyed transparent borders don't bleed into the sprite body.
+ * Output alpha is the mean source alpha, rounded.
+ *
+ * Target regions fully outside the sprite (all-transparent) stay
+ * transparent — keeps the outline sharp rather than smearing the
+ * background into a halo.
+ */
+export function downsample(src: PNG, targetW: number, targetH: number): PNG {
+    const out = new PNG({ width: targetW, height: targetH });
+    out.data.fill(0);
+    const sx = src.width / targetW;
+    const sy = src.height / targetH;
+    for (let ty = 0; ty < targetH; ty++) {
+        for (let tx = 0; tx < targetW; tx++) {
+            const x0 = Math.floor(tx * sx);
+            const x1 = Math.min(src.width, Math.max(x0 + 1, Math.floor((tx + 1) * sx)));
+            const y0 = Math.floor(ty * sy);
+            const y1 = Math.min(src.height, Math.max(y0 + 1, Math.floor((ty + 1) * sy)));
+            let r = 0, g = 0, b = 0, wSum = 0, count = 0;
+            for (let y = y0; y < y1; y++) {
+                for (let x = x0; x < x1; x++) {
+                    const i = (src.width * y + x) << 2;
+                    const sa = src.data[i + 3];
+                    if (sa === 0) continue;
+                    r += src.data[i] * sa;
+                    g += src.data[i + 1] * sa;
+                    b += src.data[i + 2] * sa;
+                    wSum += sa;
+                    count++;
+                }
+            }
+            if (count === 0) continue;
+            const oi = (targetW * ty + tx) << 2;
+            out.data[oi] = Math.round(r / wSum);
+            out.data[oi + 1] = Math.round(g / wSum);
+            out.data[oi + 2] = Math.round(b / wSum);
+            out.data[oi + 3] = Math.min(255, Math.round(wSum / count));
+        }
+    }
+    return out;
+}
+
+/**
+ * Median-cut color quantizer. Splits the longest RGB axis of the
+ * largest bucket, recursively, until we have `nColors` buckets. Each
+ * bucket's mean becomes a centroid; every opaque pixel snaps to the
+ * nearest centroid. Transparent pixels are passed through untouched.
+ *
+ * Standard palette-reduction alg for true pixel-art output — GIMP,
+ * Aseprite, etc. all use median-cut or k-means under the hood.
+ */
+export function quantize(png: PNG, nColors: number): void {
+    const opaque: Array<[number, number, number]> = [];
+    for (let i = 0; i < png.data.length; i += 4) {
+        if (png.data[i + 3] === 0) continue;
+        opaque.push([png.data[i], png.data[i + 1], png.data[i + 2]]);
+    }
+    if (opaque.length === 0) return;
+    const buckets: Array<Array<[number, number, number]>> = [opaque];
+    while (buckets.length < nColors) {
+        let bestIdx = -1;
+        let bestRange = 0;
+        let bestAxis = 0;
+        for (let i = 0; i < buckets.length; i++) {
+            const b = buckets[i];
+            if (b.length < 2) continue;
+            let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
+            for (const px of b) {
+                if (px[0] < rMin) rMin = px[0];
+                if (px[0] > rMax) rMax = px[0];
+                if (px[1] < gMin) gMin = px[1];
+                if (px[1] > gMax) gMax = px[1];
+                if (px[2] < bMin) bMin = px[2];
+                if (px[2] > bMax) bMax = px[2];
+            }
+            const rR = rMax - rMin;
+            const gR = gMax - gMin;
+            const bR = bMax - bMin;
+            const maxR = Math.max(rR, gR, bR);
+            if (maxR > bestRange) {
+                bestRange = maxR;
+                bestIdx = i;
+                bestAxis = maxR === rR ? 0 : maxR === gR ? 1 : 2;
+            }
+        }
+        if (bestIdx < 0 || bestRange === 0) break;
+        const bucket = buckets.splice(bestIdx, 1)[0];
+        bucket.sort((p, q) => p[bestAxis] - q[bestAxis]);
+        const mid = bucket.length >> 1;
+        buckets.push(bucket.slice(0, mid));
+        buckets.push(bucket.slice(mid));
+    }
+    const centroids: Array<[number, number, number]> = buckets.map((b) => {
+        let r = 0, g = 0, bb = 0;
+        for (const px of b) {
+            r += px[0];
+            g += px[1];
+            bb += px[2];
+        }
+        const n = b.length || 1;
+        return [Math.round(r / n), Math.round(g / n), Math.round(bb / n)];
+    });
+    for (let i = 0; i < png.data.length; i += 4) {
+        if (png.data[i + 3] === 0) continue;
+        const r = png.data[i];
+        const g = png.data[i + 1];
+        const b = png.data[i + 2];
+        let best = Infinity;
+        let bestIdx = 0;
+        for (let c = 0; c < centroids.length; c++) {
+            const [cr, cg, cb] = centroids[c];
+            const dr = r - cr;
+            const dg = g - cg;
+            const db = b - cb;
+            const d = dr * dr + dg * dg + db * db;
+            if (d < best) {
+                best = d;
+                bestIdx = c;
+            }
+        }
+        const [nr, ng, nb] = centroids[bestIdx];
+        png.data[i] = nr;
+        png.data[i + 1] = ng;
+        png.data[i + 2] = nb;
+    }
+}
+
 /** Copy a box out of `src` into a new PNG, with transparent padding. */
 export function crop(src: PNG, box: Box, pad: number): PNG {
     const out = new PNG({ width: box.w + pad * 2, height: box.h + pad * 2 });
@@ -300,7 +430,7 @@ function main(): void {
     if (!src || !outDir) {
         console.error(
             'usage: tsx scripts/split-sheet.ts <sheet.png> <outDir> [--pad=2] [--no-black-fringe]\n' +
-                '                                       [--rows=N --cols=M] [--no-recompose]\n' +
+                '                                       [--pixelize[=WxH]] [--colors=N] [--rows=N --cols=M] [--no-recompose]\n' +
                 '       tsx scripts/split-sheet.ts --recompose <outDir> <orig.png> ' +
                 '--rows=N --cols=M [<out.png>]',
         );
@@ -330,10 +460,46 @@ function main(): void {
     }
     const pad = Number(flags.find((f) => f.startsWith('--pad='))?.slice(6) ?? 2);
     const blackFringe = !flags.includes('--no-black-fringe');
+    // `--pixelize[=N]` enables the pixel-art pipeline. `N` is a scale
+    // factor (sheet downsampled by N). Default 4 takes a 2048 sheet to
+    // 512. `--colors=N` picks palette size (default 64).
+    const pixelizeArg = flags.find(
+        (f) => f === '--pixelize' || f.startsWith('--pixelize='),
+    );
+    const pixelize = !!pixelizeArg;
+    const pixelizeScale = pixelizeArg && pixelizeArg.includes('=')
+        ? Number(pixelizeArg.slice('--pixelize='.length))
+        : 4;
+    const colors = Number(
+        flags.find((f) => f.startsWith('--colors='))?.slice(9) ?? 64,
+    );
 
     const png = PNG.sync.read(readFileSync(src));
     keyOut(png, { blackFringe });
-    const frames = findFrames(png);
+
+    // Pixelize at the sheet level so every layer (sheet, cells, frame
+    // content) scales by the same factor — frame centers stay aligned
+    // to the same grid positions, just smaller. Quantize the whole
+    // sheet at once for a single global palette (true pixel-art look).
+    let workPng: PNG = png;
+    if (pixelize) {
+        if (!Number.isFinite(pixelizeScale) || pixelizeScale < 2) {
+            throw new Error(
+                `--pixelize requires scale >= 2 (sheet is downsampled by this factor)`,
+            );
+        }
+        const smallerW = Math.max(1, Math.floor(png.width / pixelizeScale));
+        const smallerH = Math.max(1, Math.floor(png.height / pixelizeScale));
+        workPng = downsample(png, smallerW, smallerH);
+        quantize(workPng, colors);
+    }
+    // Area threshold scales as 1/scale²: frames shrink with the sheet,
+    // so a 2000 px threshold on the 1× sheet is ~31 px at 8×, which
+    // would drop every frame. Floor at 100 to avoid catching speckle.
+    const minArea = pixelize
+        ? Math.max(100, Math.floor(2000 / (pixelizeScale * pixelizeScale)))
+        : 2000;
+    const frames = findFrames(workPng, 8, minArea);
 
     mkdirSync(outDir, { recursive: true });
     // ponytail: wipe old frame-*.png so a re-run with different tuning
@@ -343,15 +509,20 @@ function main(): void {
     }
     frames.forEach((box, i) => {
         const name = `frame-${String(i).padStart(2, '0')}.png`;
-        writeFileSync(join(outDir, name), PNG.sync.write(crop(png, box, pad)));
-        console.log(`${name}  ${box.w}x${box.h}  @ ${box.x},${box.y}`);
+        const frame = crop(workPng, box, pad);
+        writeFileSync(join(outDir, name), PNG.sync.write(frame));
+        console.log(`${name}  ${frame.width}x${frame.height}  @ ${box.x},${box.y}`);
     });
     console.log(`\n${frames.length} frames → ${outDir}`);
+    if (pixelize) {
+        console.log(
+            `  pixelize: sheet → ${workPng.width}x${workPng.height} (scale ${pixelizeScale}), palette: ${colors} colors`,
+        );
+    }
 
-    // Auto-recompose using the original sheet's grid. The grid is
-    // detected from frame bounding box positions so the user doesn't
-    // need to count rows/cols manually. --rows / --cols override
-    // the detection; --no-recompose skips.
+    // Auto-recompose using the source grid. The grid is detected from
+    // frame bounding box positions so the user doesn't need to count
+    // rows/cols manually. --rows / --cols override; --no-recompose skips.
     if (!flags.includes('--no-recompose')) {
         const rowsArg = Number(flags.find((f) => f.startsWith('--rows='))?.slice(7));
         const colsArg = Number(flags.find((f) => f.startsWith('--cols='))?.slice(7));
@@ -360,7 +531,7 @@ function main(): void {
                 ? { rows: rowsArg, cols: colsArg }
                 : detectGrid(frames);
         const outFile = join(outDir, 'recomposed.png');
-        recompose(outDir, src, grid.rows, grid.cols, outFile);
+        recompose(outDir, src, grid.rows, grid.cols, outFile, workPng);
     }
 }
 
@@ -413,20 +584,24 @@ export function recompose(
     rows: number,
     cols: number,
     outFile: string,
+    sourcePng?: PNG,
 ): void {
-    const orig = PNG.sync.read(readFileSync(origPath));
-    const canvas = new PNG({ width: orig.width, height: orig.height });
+    // Sheet dimensions come from the pixelize-pass output when present
+    // (smaller sheet after sheet-level downsample), otherwise from the
+    // original file. Cell size is `sheet.width / cols` either way.
+    const sheet = sourcePng ?? PNG.sync.read(readFileSync(origPath));
+    const cw = sheet.width / cols;
+    const ch = sheet.height / rows;
+    const canvas = new PNG({ width: sheet.width, height: sheet.height });
     canvas.data.fill(0);
-    const cellW = orig.width / cols;
-    const cellH = orig.height / rows;
     const names = readdirSync(outDir)
         .filter((f) => /^frame-\d+\.png$/.test(f))
         .sort();
     for (let i = 0; i < names.length; i++) {
         const row = Math.floor(i / cols);
         const col = i % cols;
-        const cx = col * cellW + cellW / 2;
-        const cy = row * cellH + cellH / 2;
+        const cx = col * cw + cw / 2;
+        const cy = row * ch + ch / 2;
         const frame = PNG.sync.read(readFileSync(join(outDir, names[i])));
         const startX = Math.round(cx - frame.width / 2);
         const startY = Math.round(cy - frame.height / 2);

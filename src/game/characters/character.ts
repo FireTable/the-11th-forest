@@ -54,16 +54,23 @@ export interface CharacterRuntime {
  * before `create()` runs, which is what keeps `add.sprite(key, ...)`
  * safe to call from `create()`.
  *
+ * `cellWidth` / `cellHeight` are derived from the texture's natural
+ * size and the spec's grid layout by the caller (main.ts pre-fetches
+ * the PNG header). This keeps the YAML free of resolution-coupled
+ * frame dimensions.
+ *
  * No-op when the spec lacks a `sprite` block (debug-rectangle fallback).
  */
 export function loadCharacterAssets(
     scene: Pick<Phaser.Scene, 'load'>,
     spec: CharacterSpec,
+    cellWidth: number,
+    cellHeight: number,
 ): void {
     if (!spec.sprite) return;
     scene.load.spritesheet(textureKey(spec), spec.sprite.texture, {
-        frameWidth: spec.sprite.frameWidth,
-        frameHeight: spec.sprite.frameHeight,
+        frameWidth: cellWidth,
+        frameHeight: cellHeight,
     });
 }
 

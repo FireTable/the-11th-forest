@@ -20,6 +20,8 @@ interface ResolvedScene {
     /** All weapons keyed by id (player hotbar + monster weapons). */
     weaponsById: Map<string, WeaponSpec>;
     character: CharacterSpec;
+    /** Computed cell size for the character sprite sheet (naturalSize / grid). */
+    spriteCell: { width: number; height: number };
     monsters: Map<string, MonsterSpec>;
     drops: Map<string, DropSpec>;
 }
@@ -77,14 +79,47 @@ async function resolveScene(): Promise<ResolvedScene> {
         .map((wid) => weaponsById.get(wid)!)
         .filter(Boolean);
 
+    // Compute sprite-sheet cell dims by reading the texture's natural
+    // size and dividing by the spec's grid layout. Browsers expose this
+    // via Image() — no extra deps. Skipped when the spec has no sprite.
+    const spriteCell = await getSpriteCellDims(character);
+
     return {
         id,
         level,
         weapons,
         weaponsById,
         character,
+        spriteCell,
         monsters: monsterSpecMap,
         drops: new Map(dropEntries),
+    };
+}
+
+/**
+ * Read a sprite-sheet texture's natural pixel dimensions and divide by
+ * its grid layout to get cell size. Resolves to a placeholder when the
+ * character has no sprite block (debug-rectangle fallback).
+ */
+async function getSpriteCellDims(
+    character: CharacterSpec,
+): Promise<{ width: number; height: number }> {
+    if (!character.sprite) return { width: 0, height: 0 };
+    const url = character.sprite.texture.startsWith('/')
+        ? character.sprite.texture
+        : `/${character.sprite.texture}`;
+    const natural = await new Promise<{ width: number; height: number }>(
+        (resolve, reject) => {
+            const img = new Image();
+            img.onload = () =>
+                resolve({ width: img.naturalWidth, height: img.naturalHeight });
+            img.onerror = () => reject(new Error(`Failed to load ${url}`));
+            img.src = url;
+        },
+    );
+    return {
+        width: Math.floor(natural.width / character.sprite.grid.cols),
+        height: Math.floor(natural.height / character.sprite.grid.rows),
     };
 }
 
@@ -116,6 +151,7 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
             weapons: scene.weapons,
             weaponsById: scene.weaponsById,
             character: scene.character,
+            spriteCell: scene.spriteCell,
             monsterSpecs: scene.monsters,
             dropSpecs: scene.drops,
         })],

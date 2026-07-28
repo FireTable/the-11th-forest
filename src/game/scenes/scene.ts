@@ -34,6 +34,8 @@ export interface SceneAssets {
     /** Player hotbar (subset of weaponsById, in order). */
     weapons: WeaponSpec[];
     character: CharacterSpec;
+    /** Computed cell size for the character sprite sheet. */
+    spriteCell: { width: number; height: number };
     monsterSpecs: Map<string, MonsterSpec>;
     dropSpecs: Map<string, DropSpec>;
 }
@@ -65,8 +67,14 @@ export class LoadScene extends Scene {
     preload(): void {
         this.load.image('background', this.level.background);
         // The character module owns its own asset loading + animation
-        // registration; we just delegate here.
-        loadCharacterAssets(this, this.assets.character);
+        // registration; we just delegate here, with cell dims derived
+        // in main.ts from the texture's natural size + grid.
+        loadCharacterAssets(
+            this,
+            this.assets.character,
+            this.assets.spriteCell.width,
+            this.assets.spriteCell.height,
+        );
     }
 
     create(): void {

@@ -122,16 +122,14 @@ hotbar:
         const spriteYaml = `
 sprite:
   texture: assets/image/characters/wanderer.png
-  frameWidth: 512
-  frameHeight: 512
+  grid: { rows: 4, cols: 4 }
   scale: 0.3
 `;
         const yamlText = validYaml + spriteYaml;
         const c = parseCharacterYaml(yamlText, 'wanderer');
         expect(c.sprite).toEqual({
             texture: 'assets/image/characters/wanderer.png',
-            frameWidth: 512,
-            frameHeight: 512,
+            grid: { rows: 4, cols: 4 },
             scale: 0.3,
         });
     });
@@ -139,7 +137,7 @@ sprite:
     it('rejects sprite with non-positive scale', () => {
         const yamlText =
             validYaml +
-            'sprite:\n  texture: a.png\n  frameWidth: 64\n  frameHeight: 64\n  scale: 0\n';
+            'sprite:\n  texture: a.png\n  grid: { rows: 4, cols: 4 }\n  scale: 0\n';
         expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/sprite\.scale/);
     });
 
@@ -171,15 +169,6 @@ anims:
     it('rejects sprite missing texture', () => {
         const yamlText = validYaml + 'sprite:\n  frameWidth: 64\n  frameHeight: 64\n';
         expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/sprite\.texture/);
-    });
-
-    it('rejects sprite with non-positive frameWidth', () => {
-        const yamlText =
-            validYaml +
-            'sprite:\n  texture: a.png\n  frameWidth: 0\n  frameHeight: 64\n';
-        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(
-            /sprite\.frameWidth/,
-        );
     });
 
     it('rejects anims with malformed frames tuple', () => {

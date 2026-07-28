@@ -18,16 +18,15 @@ hotbar:
     - smg
 sprite:
     texture: assets/image/characters/wanderer.png
-    frameWidth: 512
-    frameHeight: 512
-    scale: 0.2
+    grid: { rows: 4, cols: 4 }
+    scale: 2
 anims:
     idle:
         frames: [0, 3]
         frameRate: 6
         repeat: -1
     run:
-        frames: [5, 8]
+        frames: [5, 7]
         frameRate: 12
         repeat: -1
     run-stop:
