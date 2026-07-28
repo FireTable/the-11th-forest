@@ -61,6 +61,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@types/pngjs": "6.0.5",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
@@ -74,6 +75,7 @@
     "js-yaml": "^5.2.2",
     "lint-staged": "^15.2.10",
     "openai": "^6.49.0",
+    "pngjs": "7.0.0",
     "prettier": "^3.3.0",
     "terser": "^5.28.1",
     "tsx": "^4.23.1",
