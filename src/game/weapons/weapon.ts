@@ -12,14 +12,6 @@
 
 import type * as Phaser from 'phaser';
 
-import { CAT } from '@/lib/constants';
-
-const BULLET_RADIUS = 4;
-const BULLET_W = 16;
-const BULLET_H = 4;
-const BULLET_COLOR = 0x22c55e;
-const BULLET_STROKE = 0x14532d;
-
 const TRAIL_LENGTH = 6;
 const INDICATOR_W = 36;
 const INDICATOR_H = 4;
@@ -29,35 +21,70 @@ const INDICATOR_LABEL_COLOR = '#bbf7d0';
 
 // ─── Bullets ─────────────────────────────────────────────────────────────
 
-export interface BulletVisual {
+export interface BulletRecord {
     body: MatterJS.BodyType;
     rect: Phaser.GameObjects.Rectangle;
+    damage: number;
+    trail: { x: number; y: number }[];
 }
 
-/** Spawn a single bullet body + placeholder rectangle at origin, fired along `angle`. */
-export function spawnBulletVisual(
+export interface ProjectileSpawnOptions {
+    label: 'player-bullet' | 'monster-projectile';
+    category: number;
+    mask: number;
+    speed: number;
+    damage: number;
+    size?: { radius?: number; width?: number; height?: number; color?: number };
+}
+
+const DEFAULT_BULLET_COLOR = 0x22c55e;
+const DEFAULT_BULLET_STROKE = 0x14532d;
+
+/**
+ * Spawn a single projectile body + placeholder rectangle at origin, fired
+ * along `direction`. Used by both player's WeaponController and monsters'
+ * performAttack (so all ranged attacks share the same physics).
+ */
+export function spawnProjectile(
     scene: Phaser.Scene,
-    originX: number,
-    originY: number,
-    angle: number,
-): BulletVisual {
-    const body = scene.matter.add.circle(originX, originY, BULLET_RADIUS, {
-        label: 'player-bullet',
+    matter: any,
+    origin: { x: number; y: number },
+    direction: { x: number; y: number },
+    opts: ProjectileSpawnOptions,
+): BulletRecord {
+    const len = Math.hypot(direction.x, direction.y);
+    if (len === 0) throw new Error('spawnProjectile: zero-length direction');
+    const radius = opts.size?.radius ?? 4;
+    const width = opts.size?.width ?? 16;
+    const height = opts.size?.height ?? 4;
+    const color = opts.size?.color ?? DEFAULT_BULLET_COLOR;
+
+    const body = scene.matter.add.circle(origin.x, origin.y, radius, {
+        label: opts.label,
         collisionFilter: {
-            category: CAT.BULLET,
-            mask: 0xffff,
+            category: opts.category,
+            mask: opts.mask,
         },
     });
+    matter.Body.setVelocity(body, {
+        x: (direction.x / len) * opts.speed,
+        y: (direction.y / len) * opts.speed,
+    });
 
-    const rect = scene.add.rectangle(originX, originY, BULLET_W, BULLET_H, BULLET_COLOR);
-    rect.setStrokeStyle(1, BULLET_STROKE, 1);
-    rect.setRotation(angle);
+    const rect = scene.add.rectangle(origin.x, origin.y, width, height, color);
+    rect.setStrokeStyle(1, DEFAULT_BULLET_STROKE, 1);
+    rect.setRotation(Math.atan2(direction.y, direction.x));
 
-    return { body, rect };
+    return { body, rect, damage: opts.damage, trail: [] };
 }
 
-/** Compute velocity { x, y } for a bullet fired at `angle` with given `speed`.
- *  Returns Matter-compatible shape (not {vx,vy}) so setVelocity picks it up. */
+/** Destroy a bullet's body + visual. */
+export function destroyBulletVisual(scene: Phaser.Scene, bullet: BulletRecord): void {
+    bullet.rect.destroy();
+    scene.matter.world.remove(bullet.body);
+}
+
+/** Compute velocity { x, y } for a bullet fired at `angle` with given `speed`. */
 export function bulletVelocity(
     angle: number,
     speed: number,
@@ -66,11 +93,6 @@ export function bulletVelocity(
         x: Math.cos(angle) * speed,
         y: Math.sin(angle) * speed,
     };
-}
-
-export function destroyBulletVisual(scene: Phaser.Scene, bullet: BulletVisual): void {
-    bullet.rect.destroy();
-    scene.matter.world.remove(bullet.body);
 }
 
 // ─── Head reload indicator ───────────────────────────────────────────────
@@ -154,7 +176,7 @@ export function createBulletTrail(scene: Phaser.Scene): Phaser.GameObjects.Graph
 }
 
 /** Push the current body position onto this bullet's trail and trim to max length. */
-export function pushBulletTrail(bullet: BulletVisual, trail: BulletTrail): void {
+export function pushBulletTrail(bullet: BulletRecord, trail: BulletTrail): void {
     const p = bullet.body.position;
     trail.positions.push({ x: p.x, y: p.y });
     if (trail.positions.length > TRAIL_LENGTH) trail.positions.shift();
@@ -163,11 +185,11 @@ export function pushBulletTrail(bullet: BulletVisual, trail: BulletTrail): void 
 /** Draw all bullet trails onto the shared graphics, then clear. */
 export function renderBulletTrails(
     graphics: Phaser.GameObjects.Graphics,
-    bullets: readonly BulletVisual[],
+    bullets: readonly BulletRecord[],
 ): void {
     graphics.clear();
     for (const b of bullets) {
-        const trail = (b as any).__trail as { x: number; y: number }[] | undefined;
+        const trail = b.trail;
         if (!trail || trail.length < 2) continue;
         for (let k = 1; k < trail.length; k++) {
             const alpha = k / (trail.length - 1);

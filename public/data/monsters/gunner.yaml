@@ -1,12 +1,7 @@
 name: Gunner
 hp: 20
 moveSpeed: 3
-kind: ranged
-attackRange: 280
-attackIntervalMs: 1500
-projectile:
-  speed: 14
-  damage: 6
+weaponId: gunner-blast
 drops:
   - dropId: ammo-cache
     chance: 0.5

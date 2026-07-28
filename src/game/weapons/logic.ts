@@ -18,18 +18,16 @@ import type * as Phaser from 'phaser';
 import type { WeaponSpec } from '@/lib/weapons';
 
 import {
-    BulletTrail,
     bulletVelocity,
     createBulletTrail,
-    createWeaponIndicator,
     destroyBulletVisual,
-    drawWeaponIndicator,
     pushBulletTrail,
     renderBulletTrails,
-    spawnBulletVisual,
-    type BulletVisual,
-    type WeaponIndicator,
+    spawnProjectile,
+    type BulletRecord,
 } from './weapon';
+
+import { CAT } from '@/lib/constants';
 
 // ─── Pure helpers ────────────────────────────────────────────────────────
 
@@ -40,7 +38,7 @@ export const PLAYER_BULLET_MASK = 0xffff;
  * Mask for ranged-monster projectiles — CHARACTER (player) + WALL_TALL
  * only. Symmetric to player bullets: tall walls block, short walls don't.
  */
-export const MONSTER_PROJECTILE_MASK = (1 /* WALL_TALL */) | (1 << 2 /* CHARACTER */);
+export const MONSTER_PROJECTILE_MASK = CAT.CHARACTER | CAT.WALL_TALL;
 
 /** Whether a body label identifies a player-fired bullet. */
 export function isPlayerBullet(body: { label?: string }): boolean {
@@ -63,10 +61,6 @@ interface SlotState {
     justCompletedAt: number; // >0 while "Full" is fading out
 }
 
-interface BulletRecord extends BulletVisual {
-    trail: BulletTrail['positions'];
-}
-
 export class WeaponController {
     private readonly scene: Phaser.Scene;
     private readonly body: MatterJS.BodyType;
@@ -75,7 +69,6 @@ export class WeaponController {
     private currentIndex = 0;
     private readonly bullets: BulletRecord[] = [];
     private readonly trailGraphics: Phaser.GameObjects.Graphics;
-    private readonly indicator: WeaponIndicator;
 
     constructor(
         scene: Phaser.Scene,
@@ -87,17 +80,19 @@ export class WeaponController {
         this.scene = scene;
         this.matter = matter;
         this.body = body;
-        this.slots = weapons.map((spec) => ({
-            spec,
-            ammo: spec.clipSize,
-            lastFireAt: 0,
-            reloading: false,
-            reloadStartedAt: 0,
-            justCompletedAt: 0,
-        }));
+        this.slots = weapons.map((spec) => {
+            const clipSize = spec.clipSize ?? 1;
+            return {
+                spec,
+                ammo: clipSize,
+                lastFireAt: 0,
+                reloading: false,
+                reloadStartedAt: 0,
+                justCompletedAt: 0,
+            };
+        });
 
         this.trailGraphics = createBulletTrail(scene);
-        this.indicator = createWeaponIndicator(scene);
 
         // Bullets die on contact with any wall (WALL_TALL or WALL_SHORT).
         scene.matter.world.on('collisionstart', (event: any) => {
@@ -134,7 +129,8 @@ export class WeaponController {
     manualReload(): void {
         const slot = this.slots[this.currentIndex];
         if (slot.reloading) return;
-        if (slot.ammo >= slot.spec.clipSize) return;
+        const clipSize = slot.spec.clipSize ?? 1;
+        if (slot.ammo >= clipSize) return;
         slot.reloading = true;
         slot.reloadStartedAt = this.scene.time.now;
     }
@@ -142,8 +138,9 @@ export class WeaponController {
     /** Drop ammo into the current slot — caps at clipSize. */
     refillActiveAmmo(fraction: number): void {
         const slot = this.slots[this.currentIndex];
-        const add = Math.round(slot.spec.clipSize * fraction);
-        slot.ammo = Math.min(slot.spec.clipSize, slot.ammo + add);
+        const clipSize = slot.spec.clipSize ?? 1;
+        const add = Math.round(clipSize * fraction);
+        slot.ammo = Math.min(clipSize, slot.ammo + add);
     }
 
     /** Switch to a named weapon if it's already in the hotbar. */
@@ -158,12 +155,28 @@ export class WeaponController {
         return this.slots[this.currentIndex].spec;
     }
 
+    /** Full slot state (reloading flag + timestamps) for the active weapon. */
+    getActiveSlotState(): {
+        reloading: boolean;
+        reloadStartedAt: number;
+        reloadTimeMs: number;
+        justCompletedAt: number;
+    } {
+        const s = this.slots[this.currentIndex];
+        return {
+            reloading: s.reloading,
+            reloadStartedAt: s.reloadStartedAt,
+            reloadTimeMs: s.spec.reloadTimeMs ?? 0,
+            justCompletedAt: s.justCompletedAt,
+        };
+    }
+
     getAmmo(): number {
         return this.slots[this.currentIndex].ammo;
     }
 
     getMaxAmmo(): number {
-        return this.slots[this.currentIndex].spec.clipSize;
+        return this.slots[this.currentIndex].spec.clipSize ?? 1;
     }
 
     getActiveIndex(): number {
@@ -186,21 +199,24 @@ export class WeaponController {
     getReloadProgress(time: number): number {
         const s = this.slots[this.currentIndex];
         if (!s.reloading) return 0;
+        const reloadTimeMs = s.spec.reloadTimeMs ?? 0;
+        if (reloadTimeMs === 0) return 0;
         const elapsed = time - s.reloadStartedAt;
-        return Math.max(0, Math.min(1, elapsed / s.spec.reloadTimeMs));
+        return Math.max(0, Math.min(1, elapsed / reloadTimeMs));
     }
 
     /**
      * Per-frame: tick reload, spawn bullets on fire, sync visuals.
      */
-    update(time: number, tx: number, ty: number, fire: boolean, halfH: number): void {
+    update(time: number, tx: number, ty: number, fire: boolean, _halfH: number): void {
         // 1. Reload tick — every slot ticks independently.
         for (let i = 0; i < this.slots.length; i++) {
             const slot = this.slots[i];
-            if (slot.reloading) {
+            const reloadTimeMs = slot.spec.reloadTimeMs ?? 0;
+            if (slot.reloading && reloadTimeMs > 0) {
                 const elapsed = time - slot.reloadStartedAt;
-                if (elapsed >= slot.spec.reloadTimeMs) {
-                    slot.ammo = slot.spec.clipSize;
+                if (elapsed >= reloadTimeMs) {
+                    slot.ammo = slot.spec.clipSize ?? 1;
                     slot.reloading = false;
                     slot.justCompletedAt = time;
                 }
@@ -222,7 +238,7 @@ export class WeaponController {
 
         // 3. Fire — gated by reload state and ammo.
         if (fire && !active.reloading && active.ammo > 0) {
-            if (time - active.lastFireAt >= active.spec.fireIntervalMs) {
+            if (time - active.lastFireAt >= active.spec.cooldownMs) {
                 this.fire(tx, ty);
                 active.lastFireAt = time;
             }
@@ -237,26 +253,12 @@ export class WeaponController {
             pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
         }
 
-        // 5. Head indicator.
-        drawWeaponIndicator(
-            this.indicator,
-            {
-                reloading: active.reloading,
-                reloadStartedAt: active.reloadStartedAt,
-                reloadTimeMs: active.spec.reloadTimeMs,
-                justCompletedAt: active.justCompletedAt,
-            },
-            time,
-            this.body.position,
-            halfH,
-        );
+        // 5. Head indicator is drawn by StatusHud — character.ts wires it
+        // and reads the slot state via WeaponController's getters.
     }
 
     destroy(): void {
         this.trailGraphics.destroy();
-        this.indicator.bg.destroy();
-        this.indicator.fill.destroy();
-        this.indicator.label.destroy();
         for (const b of this.bullets) {
             destroyBulletVisual(this.scene, b);
         }
@@ -274,16 +276,30 @@ export class WeaponController {
         if (len === 0) return;
         const angle = Math.atan2(dy, dx);
 
-        const n = slot.spec.bulletsPerShot;
+        const n = slot.spec.bulletsPerShot ?? 1;
+        const speed = slot.spec.projectileSpeed ?? 0;
+        if (speed === 0) return; // ranged weapon without speed can't fire
         // Spread only when n > 1 (shotgun-style). Single-shot weapons fire straight.
         const spreadDeg = n > 1 ? 16 : 0;
         for (let i = 0; i < n; i++) {
             const t = n === 1 ? 0 : (i - (n - 1) / 2) * (spreadDeg / Math.max(1, n - 1));
             const a = angle + (t * Math.PI) / 180;
-            const visual = spawnBulletVisual(this.scene, origin.x, origin.y, a);
-            const v = bulletVelocity(a, slot.spec.bullet.speed);
-            this.matter.Body.setVelocity(visual.body, { x: v.x, y: v.y });
-            this.bullets.push({ ...visual, trail: [] });
+            const v = bulletVelocity(a, speed);
+            const visual = spawnProjectile(
+                this.scene,
+                this.matter,
+                { x: origin.x, y: origin.y },
+                { x: v.x, y: v.y },
+                {
+                    label: 'player-bullet',
+                    category: CAT.BULLET,
+                    mask: PLAYER_BULLET_MASK,
+                    speed,
+                    damage: slot.spec.damage,
+                    size: { width: 16, height: 4, color: 0x22c55e },
+                },
+            );
+            this.bullets.push(visual);
         }
 
         slot.ammo = Math.max(0, slot.ammo - 1);

@@ -3,28 +3,36 @@
  * --------------------------------------------------------------------------
  * Bottom-left HUD: name label + HP bar + SP bar.
  *
- * Passive view — load-character pulls current hp/sp each frame and calls
+ * Passive view — character.ts pulls current hp/sp each frame and calls
  * update(). Nothing in the HUD writes back.
  *
- * Anchored in screen-pixel space via `makeScreenAnchoredContainer` — see
- * hud-base.ts for the FIT-scale trick.
+ * Anchored in screen-pixel space via `BaseHud`. Bottom-aligned with
+ * weapon-hud.ts via shared `BOTTOM_GAP` constant.
  */
 
 import * as Phaser from 'phaser';
 
 import type { CharacterSpec } from '@/lib/characters';
 
-import { makeScreenAnchoredContainer } from './base-hub';
+import { BaseHud } from './base-hub';
 
-const PADDING = 12;
+// Distance from screen bottom for both character-hub + weapon-hud.
+// Change in one place to keep them aligned.
+const BOTTOM_GAP = 14;
+
+const PADDING_X = 12;
+const BG_PAD = 4;
 const BAR_W = 220;
 const BAR_H = 14;
 const BAR_GAP = 6;
-const BG_PAD = 4;
-const NAME_OFFSET = 4;
+const NAME_OFFSET_Y = 4;
 
-export class CharacterHud {
-    private readonly root: Phaser.GameObjects.Container;
+// Total HUD height = top BG_PAD + label area + HP + gap + SP + bottom BG_PAD.
+// label area = NAME_OFFSET_Y + ~12px font (rounded up to 14 for safe padding).
+const LABEL_AREA = NAME_OFFSET_Y + 14;
+const HUD_HEIGHT = BG_PAD + LABEL_AREA + BAR_H + BAR_GAP + BAR_H + BG_PAD;
+
+export class CharacterHud extends BaseHud {
     private readonly bg: Phaser.GameObjects.Graphics;
     private readonly hpFill: Phaser.GameObjects.Graphics;
     private readonly spFill: Phaser.GameObjects.Graphics;
@@ -32,17 +40,14 @@ export class CharacterHud {
 
     constructor(scene: Phaser.Scene, spec: CharacterSpec) {
         const displayH = scene.scale.displaySize.height;
-        const screenX = PADDING;
-        const screenY = displayH - BAR_H * 2 - PADDING - 16;
-        const { container } = makeScreenAnchoredContainer(scene, screenX, screenY);
-        this.root = container;
+        super(scene, PADDING_X, displayH - HUD_HEIGHT - BOTTOM_GAP);
 
         this.bg = scene.add.graphics();
         this.bg.fillStyle(0x000000, 0.5);
-        this.bg.fillRect(-BG_PAD, -BG_PAD, BAR_W + BG_PAD * 2, BAR_H * 2 + BAR_GAP + 14 + BG_PAD);
+        this.bg.fillRect(-BG_PAD, -BG_PAD, BAR_W + BG_PAD * 2, HUD_HEIGHT);
         this.root.add(this.bg);
 
-        this.label = scene.add.text(0, NAME_OFFSET, spec.name, {
+        this.label = scene.add.text(0, NAME_OFFSET_Y, spec.name, {
             fontFamily: 'monospace',
             fontSize: '12px',
             color: '#86efac',
@@ -61,12 +66,11 @@ export class CharacterHud {
         this.draw(hp, spec.hp, sp, spec.sp);
     }
 
-    destroy(): void {
-        this.root.destroy();
-    }
-
     private draw(hp: number, maxHp: number, sp: number, maxSp: number): void {
-        const hpY = 18;
+        // Position bars inside the bg:
+        //   bg top at y=0, label at y=NAME_OFFSET_Y
+        //   HP bar starts just below label
+        const hpY = LABEL_AREA + BG_PAD;
         const spY = hpY + BAR_H + BAR_GAP;
 
         this.hpFill.clear();

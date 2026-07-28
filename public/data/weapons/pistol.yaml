@@ -1,8 +1,8 @@
 name: Pistol
+damage: 12
+cooldownMs: 200
+range: 600
 clipSize: 12
 reloadTimeMs: 1200
-fireIntervalMs: 200
 bulletsPerShot: 1
-bullet:
-  speed: 20
-  damage: 12
+projectileSpeed: 20

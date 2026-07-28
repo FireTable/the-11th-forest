@@ -17,6 +17,7 @@ import type { Level } from '@/lib/levels/types';
 import type { WeaponSpec } from '@/lib/weapons';
 
 import { CharacterHud } from '@/game/hubs/character-hub';
+import { StatusHud } from '@/game/hubs/status-hud';
 import { WeaponHud } from '@/game/hubs/weapon-hud';
 import { WeaponController } from '@/game/weapons/logic';
 
@@ -31,6 +32,7 @@ export interface CharacterRuntime {
     weapons: WeaponController;
     hud: CharacterHud;
     weaponHud: WeaponHud;
+    statusHud: StatusHud;
     /** Apply HP/SP healing (clamped to [0, max]). Negative values damage. */
     heal(hpDelta: number, spDelta: number): void;
     /** Add `fraction * currentWeaponClipSize` bullets to the active weapon. */
@@ -71,6 +73,7 @@ export function loadCharacter(
     const weaponsSys = new WeaponController(scene, matter, body, weapons);
     const hud = new CharacterHud(scene, spec);
     const weaponHud = new WeaponHud(scene, weaponsSys);
+    const statusHud = new StatusHud(scene, body);
 
     const controller = new CharacterController(scene, level, spec, {
         body,
@@ -79,6 +82,7 @@ export function loadCharacter(
         weapons: weaponsSys,
         hud,
         weaponHud,
+        statusHud,
     });
 
     return {
@@ -87,6 +91,7 @@ export function loadCharacter(
         weapons: weaponsSys,
         hud,
         weaponHud,
+        statusHud,
         heal: (hp, sp) => controller.heal(hp, sp),
         refillAmmo: (f) => controller.refillAmmo(f),
         pickUpWeapon: (id) => controller.pickUpWeapon(id),

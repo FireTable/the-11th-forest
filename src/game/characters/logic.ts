@@ -127,6 +127,7 @@ export interface WeaponsLike {
     manualReload(): void;
     refillActiveAmmo(fraction: number): void;
     swapToWeapon(weaponId: string): boolean;
+    getActiveSlotState(): StatusHudState;
 }
 
 /** Structural shape the controller needs from the character HUD. */
@@ -139,6 +140,20 @@ export interface WeaponHudLike {
     draw(weapons: WeaponsLike, time: number): void;
 }
 
+/** Structural shape the controller needs from the floating status HUD
+ *  (above the character's head — currently shows reload progress). */
+export interface StatusHudLike {
+    update(state: StatusHudState, time: number, halfH: number): void;
+}
+
+/** Subset of weapon-slot state StatusHud needs. */
+export interface StatusHudState {
+    reloading: boolean;
+    reloadStartedAt: number;
+    reloadTimeMs: number;
+    justCompletedAt: number;
+}
+
 /** Everything the controller needs from outside — passed in by load-character. */
 export interface CharacterRuntimeParts {
     /** Matter body — typed as `any` to avoid pulling in matter-js types. */
@@ -149,6 +164,7 @@ export interface CharacterRuntimeParts {
     weapons: WeaponsLike;
     hud: HudLike;
     weaponHud: WeaponHudLike;
+    statusHud: StatusHudLike;
 }
 
 export class CharacterController {
@@ -302,6 +318,7 @@ export class CharacterController {
         // ── HUD ─────────────────────────────────────────────────────
         this.parts.hud.update(this.spec, this.hp, this.sp);
         this.parts.weaponHud.draw(this.parts.weapons, now);
+        this.parts.statusHud.update(this.parts.weapons.getActiveSlotState(), now, HALF_H);
     }
 
     // ─── Internals ──────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 name: SMG
+damage: 6
+cooldownMs: 90
+range: 500
 clipSize: 24
 reloadTimeMs: 2000
-fireIntervalMs: 90
 bulletsPerShot: 1
-bullet:
-  speed: 24
-  damage: 6
+projectileSpeed: 24

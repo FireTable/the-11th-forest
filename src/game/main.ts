@@ -1,6 +1,6 @@
 import { AUTO, Game, Scale } from 'phaser';
 
-import { LoadScene } from '@/game/scenes/load-scene';
+import { LoadScene } from '@/game/scenes/scene';
 import { fetchCharacter } from '@/lib/characters';
 import { fetchDrop } from '@/lib/drops';
 import { fetchLevel, fetchLevelIndex } from '@/lib/levels';
@@ -26,7 +26,10 @@ const DEFAULT_CHARACTER_ID = 'wanderer';
 interface ResolvedScene {
     id: string;
     level: Awaited<ReturnType<typeof fetchLevel>>;
+    /** Player hotbar (3 weapons, in display order). */
     weapons: WeaponSpec[];
+    /** All weapons keyed by id (player hotbar + monster weapons). */
+    weaponsById: Map<string, WeaponSpec>;
     character: CharacterSpec;
     monsters: Map<string, MonsterSpec>;
     drops: Map<string, DropSpec>;
@@ -43,31 +46,44 @@ async function resolveScene(): Promise<ResolvedScene> {
     if (!id) throw new Error('Level index is empty — add an entry to public/data/levels/index.yaml');
     const level = await fetchLevel(id);
 
-    const weapons = await Promise.all(HOTBAR_IDS.map((wid) => fetchWeapon(wid)));
-
     const character = await fetchCharacter(level.character ?? DEFAULT_CHARACTER_ID);
 
-    // Pre-load every monster type and drop type referenced by this level.
-    // This avoids runtime fetch races inside scene.create().
-    const monsterIds = new Set<string>();
-    level.monsters?.forEach((m) => monsterIds.add(m.type));
+    // Pre-load every monster spec + the weapon each monster uses, plus
+    // every drop type referenced by this level. Avoids runtime fetch
+    // races inside scene.create().
+    const monsterSpecMap = new Map<string, MonsterSpec>();
+    const monsterWeaponIds = new Set<string>();
+    if (level.monsters && level.monsters.length > 0) {
+        const uniqueMonsterIds = Array.from(new Set(level.monsters.map((m) => m.type)));
+        const specs = await Promise.all(uniqueMonsterIds.map((mid) => fetchMonster(mid)));
+        for (let i = 0; i < uniqueMonsterIds.length; i++) {
+            monsterSpecMap.set(uniqueMonsterIds[i], specs[i]);
+            monsterWeaponIds.add(specs[i].weaponId);
+        }
+    }
 
     const dropIds = new Set<string>();
     level.dropSpawns?.forEach((d) => dropIds.add(d.type));
 
-    const monsterEntries = await Promise.all(
-        [...monsterIds].map(async (mid) => [mid, await fetchMonster(mid)] as const),
-    );
     const dropEntries = await Promise.all(
         [...dropIds].map(async (did) => [did, await fetchDrop(did)] as const),
     );
+
+    // Fetch all weapons: player's hotbar + monsters' weapons
+    const allWeaponIds = new Set<string>([...HOTBAR_IDS, ...monsterWeaponIds]);
+    const allWeaponEntries = await Promise.all(
+        [...allWeaponIds].map(async (wid) => [wid, await fetchWeapon(wid)] as const),
+    );
+    const weaponsById = new Map<string, WeaponSpec>(allWeaponEntries);
+    const weapons = HOTBAR_IDS.map((wid) => weaponsById.get(wid)!).filter(Boolean);
 
     return {
         id,
         level,
         weapons,
+        weaponsById,
         character,
-        monsters: new Map(monsterEntries),
+        monsters: monsterSpecMap,
         drops: new Map(dropEntries),
     };
 }
@@ -98,6 +114,7 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
         },
         scene: [new LoadScene(scene.id, scene.level, {
             weapons: scene.weapons,
+            weaponsById: scene.weaponsById,
             character: scene.character,
             monsterSpecs: scene.monsters,
             dropSpecs: scene.drops,

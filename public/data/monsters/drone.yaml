@@ -1,10 +1,7 @@
 name: Drone
 hp: 30
 moveSpeed: 4
-kind: melee
-attackRange: 36
-attackIntervalMs: 1000
-contactDamage: 8
+weaponId: drone-claws
 drops:
   - dropId: hp-shard
     chance: 0.4

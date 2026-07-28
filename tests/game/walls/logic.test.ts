@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { CAT } from '@/lib/constants';
-import { triangulate, wallCategory, wallMask } from '@/game/scenes/load-wall';
+import { triangulate, wallCategory, wallMask } from '@/game/walls/logic';
 import type { AirWallVertex } from '@/lib/levels/types';
 
 describe('wallCategory', () => {

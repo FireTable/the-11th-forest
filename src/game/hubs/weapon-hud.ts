@@ -7,8 +7,7 @@
  * Passive view — character.ts pulls state via WeaponController.getters each
  * frame and calls draw(). Nothing in the HUD writes back.
  *
- * Anchored in screen-pixel space via `makeScreenAnchoredContainer` — see
- * hud-base.ts for the FIT-scale trick.
+ * Anchored in screen-pixel space via `BaseHud`.
  */
 
 import * as Phaser from 'phaser';
@@ -17,7 +16,7 @@ import type { WeaponSpec } from '@/lib/weapons';
 
 import type { WeaponController } from '@/game/weapons/logic';
 
-import { makeScreenAnchoredContainer } from './base-hub';
+import { BaseHud } from './base-hub';
 
 const PADDING = 14;
 const PANEL_W = 244;
@@ -42,8 +41,7 @@ interface SlotState {
     ammo: number;
 }
 
-export class WeaponHud {
-    private readonly root: Phaser.GameObjects.Container;
+export class WeaponHud extends BaseHud {
     private readonly panel: Phaser.GameObjects.Graphics;
     private readonly weaponName: Phaser.GameObjects.Text;
     private readonly ammoBig: Phaser.GameObjects.Text;
@@ -55,12 +53,7 @@ export class WeaponHud {
     constructor(scene: Phaser.Scene, weapons: WeaponController) {
         const displayW = scene.scale.displaySize.width;
         const displayH = scene.scale.displaySize.height;
-        const { container } = makeScreenAnchoredContainer(
-            scene,
-            displayW - PANEL_W - PADDING,
-            displayH - PANEL_H - PADDING,
-        );
-        this.root = container;
+        super(scene, displayW - PANEL_W - PADDING, displayH - PANEL_H - PADDING);
 
         // Background panel
         this.panel = scene.add.graphics();
@@ -176,9 +169,5 @@ export class WeaponHud {
             slot.ammo.setOrigin(1, 0);
             slot.ammo.setPosition(slotX + SLOT_SIZE - 4, SLOT_Y + SLOT_SIZE - 14);
         }
-    }
-
-    destroy(): void {
-        this.root.destroy();
     }
 }

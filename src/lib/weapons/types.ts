@@ -3,29 +3,47 @@
  * --------------------------------------------------------------------------
  * Runtime weapon data. One YAML per weapon, no `id` field — filename is the id.
  *
- * Weapons are magazine-style:
- *   clipSize        — bullets per magazine
- *   reloadTimeMs    — duration of a full reload (head indicator tracks this)
- *   fireIntervalMs  — ms between shots when holding fire
- *   bulletsPerShot  — bullets consumed/spawned per trigger pull (shotguns = 5+)
- *   bullet.{speed,damage} — straight-line bullet physics
+ * A weapon is the unified attack primitive used by both player and
+ * monsters. The kind is inferred from which fields are present:
+ *
+ *   Ranged (projectileSpeed present, hitWidth absent):
+ *     - Player fires on click; cooldown between shots = cooldownMs
+ *     - Monster fires when player in range; cooldown = cooldownMs
+ *     - clipSize / reloadTimeMs / bulletsPerShot are player-only (magazine)
+ *
+ *   Melee (hitWidth + hitHeight present, projectileSpeed absent):
+ *     - Currently only monsters; click-to-melee for player is future
+ *     - range = hit radius for contact damage
+ *
+ * Shared fields:
+ *   damage      — per-hit HP dealt
+ *   cooldownMs  — time between attacks
+ *   range       — effective combat range (AI decision + bullet distance)
  */
-
-export type BulletSpec = {
-    /** px/sec — bullet moves at this rate */
-    speed: number;
-    /** HP dealt on hit */
-    damage: number;
-};
 
 export type WeaponSpec = {
     id: string;
     name: string;
-    clipSize: number;
-    reloadTimeMs: number;
-    fireIntervalMs: number;
-    bulletsPerShot: number;
-    bullet: BulletSpec;
+    /** Per-hit damage. */
+    damage: number;
+    /** Time between attacks. Player: between shots. Monster: between attacks. */
+    cooldownMs: number;
+    /** Effective combat range. For ranged: bullet distance. For melee: hit radius. */
+    range: number;
+    // ── Ranged fields (player magazine-style) ──────────────────────
+    /** Bullets per magazine. Player only. */
+    clipSize?: number;
+    /** Time to refill magazine. Player only. */
+    reloadTimeMs?: number;
+    /** Bullets per trigger pull. Shotguns = 5+. Player only. */
+    bulletsPerShot?: number;
+    /** Bullet speed in px / sec. Required for ranged weapons. */
+    projectileSpeed?: number;
+    // ── Melee fields ───────────────────────────────────────────────
+    /** Hit-area width. Required for melee weapons. */
+    hitWidth?: number;
+    /** Hit-area height. Required for melee weapons. */
+    hitHeight?: number;
 };
 
 /** Ordered manifest of all weapons. */

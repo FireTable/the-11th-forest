@@ -2,25 +2,29 @@
  * src/game/monsters/monster.ts
  * --------------------------------------------------------------------------
  * Monsters module — entity + controller + projectile + drop roller in one
- * file. Pure helpers (distBetween / dirTo / decideAIState / chaseVelocity
- * / pickClosestMonster) live in `./logic.ts`.
+ * file. Pure helpers (distBetween / dirTo / decideAIState / chaseVelocity /
+ * pickClosestMonster) live in `./logic.ts`.
  *
- *   - Monster: one monster entity (body + visual + HP + AI state).
+ *   - Monster: one monster entity (body + visual + HP + AI state + weapon).
  *   - MonsterController: scene-side orchestrator. Self-spawns monsters
- *     from spawn array, runs per-frame AI tick, fires projectiles, and
- *     resolves monster → player damage via collisionstart.
- *   - fireMonsterProjectile: ranged-monster projectile factory.
+ *     from a spawn array, runs per-frame AI tick, fires the monster's
+ *     weapon (delegated to the shared `weapons/` module).
+ *   - fireProjectile: shared projectile factory (reused from weapons/).
  *   - rollDrops: monster death drop table roller (independent Bernoulli).
+ *
+ * Monster attacks are routed through the weapons/ module so the same
+ * projectile physics, wall policy, and visual style apply. The only
+ * difference is the trigger: monsters auto-fire on cooldown; the player
+ * fires on click.
  */
 
 import * as Phaser from 'phaser';
 
-import { MONSTER_PROJECTILE_MASK } from '@/game/weapons/logic';
 import { CAT } from '@/lib/constants';
-import type { DropRef } from '@/lib/monsters';
-import type { MonsterSpec } from '@/lib/monsters';
-import type { MonsterSpawn } from '@/lib/levels/types';
-import type { DropSpec } from '@/lib/drops';
+import type { WeaponSpec } from '@/lib/weapons';
+import { spawnProjectile } from '@/game/weapons/weapon';
+import { MONSTER_PROJECTILE_MASK } from '@/game/weapons/logic';
+import type { DropRef, MonsterSpec } from '@/lib/monsters';
 
 import {
     chaseVelocity,
@@ -30,17 +34,19 @@ import {
     pickClosestMonster,
 } from './logic';
 
-const ATTACK_COOLDOWN_MS = 100; // minimum gap between consecutive attacks
+const ATTACK_COOLDOWN_MS = 100; // minimum gap between consecutive damage events
 const PROJECTILE_RADIUS = 4;
+const PROJECTILE_W = 14;
+const PROJECTILE_H = 4;
+const PROJECTILE_COLOR = 0xef4444;
 
 // ─── Entity ──────────────────────────────────────────────────────────────
-
-export type MonsterKind = 'melee' | 'ranged';
 
 export type MonsterState = 'idle' | 'chase' | 'attack' | 'dying';
 
 export class Monster {
     readonly spec: MonsterSpec;
+    readonly weapon: WeaponSpec;
     readonly body: MatterJS.BodyType;
     readonly rect: Phaser.GameObjects.Rectangle;
     hp: number;
@@ -48,16 +54,17 @@ export class Monster {
     lastAttackAt = 0;
     /** Set by MonsterController when killed — used to suppress further collisions. */
     dead = false;
-    /** Visual tint per kind. */
+    /** Visual tint per weapon kind — derived from weapon (ranged/melee). */
     static readonly TINT_MELEE = 0xef4444;
     static readonly TINT_RANGED = 0xa855f7;
 
-    constructor(scene: Phaser.Scene, spec: MonsterSpec, x: number, y: number) {
+    constructor(scene: Phaser.Scene, spec: MonsterSpec, weapon: WeaponSpec, x: number, y: number) {
         this.spec = spec;
+        this.weapon = weapon;
         this.hp = spec.hp;
 
-        const w = spec.kind === 'melee' ? 28 : 24;
-        const h = spec.kind === 'melee' ? 28 : 24;
+        const w = weapon.hitWidth ?? 28;
+        const h = weapon.hitHeight ?? 28;
 
         this.body = scene.matter.add.rectangle(x, y, w, h, {
             label: 'monster',
@@ -70,8 +77,9 @@ export class Monster {
             },
         });
 
-        const tint =
-            spec.kind === 'melee' ? Monster.TINT_MELEE : Monster.TINT_RANGED;
+        const tint = weapon.projectileSpeed !== undefined
+            ? Monster.TINT_RANGED
+            : Monster.TINT_MELEE;
         this.rect = scene.add.rectangle(x, y, w, h, tint, 0.85);
         this.rect.setStrokeStyle(2, 0x111827, 1);
     }
@@ -87,58 +95,18 @@ export class Monster {
     }
 }
 
-// ─── Projectile factory ──────────────────────────────────────────────────
-
-export interface MonsterProjectile {
-    body: MatterJS.BodyType;
-    rect: Phaser.GameObjects.Rectangle;
-    damage: number;
-}
-
-export function fireMonsterProjectile(
-    scene: Phaser.Scene,
-    originX: number,
-    originY: number,
-    dx: number,
-    dy: number,
-    speed: number,
-    damage: number,
-): MonsterProjectile {
-    const matter = (Phaser as any).Physics.Matter.Matter;
-    const len = Math.hypot(dx, dy);
-    if (len === 0) throw new Error('fireMonsterProjectile: zero-length direction');
-    const body = scene.matter.add.circle(originX, originY, PROJECTILE_RADIUS, {
-        label: 'monster-projectile',
-        collisionFilter: {
-            category: CAT.MONSTER_PROJECTILE,
-            // Mask comes from weapons/logic — same wall semantics as player
-            // bullets: tall walls block, short walls don't.
-            mask: MONSTER_PROJECTILE_MASK,
-        },
-    });
-
-    matter.Body.setVelocity(body, {
-        x: (dx / len) * speed,
-        y: (dy / len) * speed,
-    });
-
-    const angle = Math.atan2(dy, dx);
-    const rect = scene.add.rectangle(originX, originY, 14, 4, 0xef4444);
-    rect.setStrokeStyle(1, 0x7f1d1d, 1);
-    rect.setRotation(angle);
-
-    return { body, rect, damage };
-}
-
 // ─── Drop roller ─────────────────────────────────────────────────────────
 
 export interface RolledDrop {
     dropId: string;
-    spec: DropSpec;
+    spec: unknown; // DropSpec — resolved at the call site
 }
 
 /** Roll each entry independently; return all that succeed. */
-export function rollDrops(table: DropRef[], byId: (id: string) => DropSpec): RolledDrop[] {
+export function rollDrops(
+    table: DropRef[],
+    byId: (id: string) => unknown,
+): RolledDrop[] {
     const out: RolledDrop[] = [];
     for (const entry of table) {
         if (Math.random() < entry.chance) {
@@ -160,6 +128,14 @@ export interface MonsterControllerCallbacks {
     onPlayerHit: (damage: number) => void;
 }
 
+/** Snapshot of a monster projectile — owns body + visual + damage. */
+export interface MonsterProjectile {
+    body: MatterJS.BodyType;
+    rect: Phaser.GameObjects.Rectangle;
+    damage: number;
+    monster: Monster;
+}
+
 export class MonsterController {
     private readonly scene: Phaser.Scene;
     private readonly monsters: Monster[] = [];
@@ -174,9 +150,8 @@ export class MonsterController {
 
     constructor(
         scene: Phaser.Scene,
-        spawns: MonsterSpawn[] | undefined,
+        spawns: { spec: MonsterSpec; weapon: WeaponSpec; x: number; y: number }[] | undefined,
         playerBody: MatterJS.BodyType,
-        getMonster: (id: string) => MonsterSpec,
         cb: MonsterControllerCallbacks,
     ) {
         this.scene = scene;
@@ -184,10 +159,11 @@ export class MonsterController {
         this.cb = cb;
         this.matter = (Phaser as any).Physics.Matter.Matter;
 
-        // Self-spawn monsters from the level spawn array.
+        // Self-spawn monsters from the spawn list (replaces the old
+        // spawnMonsters helper — controller owns its own construction).
         if (spawns) {
             for (const s of spawns) {
-                this.monsters.push(new Monster(scene, getMonster(s.type), s.x, s.y));
+                this.monsters.push(new Monster(scene, s.spec, s.weapon, s.x, s.y));
             }
         }
 
@@ -207,7 +183,7 @@ export class MonsterController {
             const dirToPlayer = dirTo(mp, this.playerBody.position);
 
             // ── AI transitions ─────────────────────────────────────────
-            m.state = decideAIState(dist, m.spec.attackRange);
+            m.state = decideAIState(dist, m.weapon.range);
 
             // ── Velocity ──────────────────────────────────────────────
             let vx = 0;
@@ -222,9 +198,9 @@ export class MonsterController {
             // ── Attack tick ──────────────────────────────────────────
             if (
                 m.state === 'attack' &&
-                time - m.lastAttackAt >= m.spec.attackIntervalMs
+                time - m.lastAttackAt >= m.weapon.cooldownMs
             ) {
-                this.performAttack(m, dirToPlayer.x, dirToPlayer.y);
+                this.performAttack(m, dirToPlayer);
                 m.lastAttackAt = time;
             }
 
@@ -266,27 +242,40 @@ export class MonsterController {
         this.projectiles.length = 0;
     }
 
-    // ─── internal helpers ─────────────────────────────────────────────────
+    // ─── internals ──────────────────────────────────────────────────────
 
-    private performAttack(m: Monster, dx: number, dy: number): void {
-        if (m.spec.kind === 'melee') {
-            // Melee: contact damage goes through collisionstart in
-            // bindCollisions below — no projectile here.
-            return;
-        }
-        const mp = m.body.position;
-        const len = Math.hypot(dx, dy);
+    private performAttack(m: Monster, dirToPlayer: { x: number; y: number }): void {
+        const weapon = m.weapon;
+        // Melee: contact damage via collisionstart (handled in bindCollisions).
+        // No projectile to spawn — just return.
+        if (weapon.projectileSpeed === undefined) return;
+
+        // Ranged: fire a projectile from the monster center toward the
+        // player's CURRENT position. Don't lead — player dodge makes that
+        // less rewarding than reaction aim.
+        const len = Math.hypot(dirToPlayer.x, dirToPlayer.y);
         if (len === 0) return;
-        const proj = fireMonsterProjectile(
+        const speed = weapon.projectileSpeed;
+        const visual = spawnProjectile(
             this.scene,
-            mp.x,
-            mp.y,
-            dx,
-            dy,
-            m.spec.projectile!.speed,
-            m.spec.projectile!.damage,
+            this.matter,
+            { x: m.body.position.x, y: m.body.position.y },
+            { x: dirToPlayer.x, y: dirToPlayer.y },
+            {
+                label: 'monster-projectile',
+                category: CAT.MONSTER_PROJECTILE,
+                mask: MONSTER_PROJECTILE_MASK,
+                speed,
+                damage: weapon.damage,
+                size: {
+                    radius: PROJECTILE_RADIUS,
+                    width: PROJECTILE_W,
+                    height: PROJECTILE_H,
+                    color: PROJECTILE_COLOR,
+                },
+            },
         );
-        this.projectiles.push(proj);
+        this.projectiles.push({ ...visual, monster: m });
     }
 
     private kill(m: Monster): void {
@@ -359,10 +348,12 @@ export class MonsterController {
         const now = this.scene.time.now;
         if (now - this.lastDamageAt < ATTACK_COOLDOWN_MS) return;
         // Find which melee monster is overlapping the player; pick nearest.
-        const meleeMonsters = this.monsters.filter((m) => !m.dead && m.spec.kind === 'melee');
+        const meleeMonsters = this.monsters.filter(
+            (m) => !m.dead && m.weapon.projectileSpeed === undefined,
+        );
         const best = pickClosestMonster(this.playerBody.position, meleeMonsters, Infinity);
         if (!best) return;
-        this.cb.onPlayerHit(best.spec.contactDamage ?? 0);
+        this.cb.onPlayerHit(best.weapon.damage);
         this.lastDamageAt = now;
     }
 

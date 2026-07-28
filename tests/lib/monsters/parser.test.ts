@@ -2,121 +2,75 @@ import { describe, it, expect } from 'vitest';
 
 import { parseMonsterIndex, parseMonsterYaml } from '@/lib/monsters/parser';
 
-describe('parseMonsterYaml — melee', () => {
-    const validYaml = `
+describe('parseMonsterYaml', () => {
+    const meleeYaml = `
 name: Drone
 hp: 30
 moveSpeed: 4
-kind: melee
-attackRange: 36
-attackIntervalMs: 1000
-contactDamage: 8
+weaponId: drone-claws
 drops:
   - dropId: hp-shard
     chance: 0.4
 `;
 
-    it('parses a melee monster', () => {
-        const m = parseMonsterYaml(validYaml, 'drone');
-        expect(m).toEqual({
-            id: 'drone',
-            name: 'Drone',
-            hp: 30,
-            moveSpeed: 4,
-            kind: 'melee',
-            attackRange: 36,
-            attackIntervalMs: 1000,
-            contactDamage: 8,
-            drops: [{ dropId: 'hp-shard', chance: 0.4 }],
-        });
+    it('parses a melee monster (with weapon reference)', () => {
+        const m = parseMonsterYaml(meleeYaml, 'drone');
+        expect(m.id).toBe('drone');
+        expect(m.name).toBe('Drone');
+        expect(m.hp).toBe(30);
+        expect(m.moveSpeed).toBe(4);
+        expect(m.weaponId).toBe('drone-claws');
+        expect(m.drops).toEqual([{ dropId: 'hp-shard', chance: 0.4 }]);
     });
 
-    it('rejects melee missing contactDamage', () => {
-        // Missing field → undefined → throws
-        expect(() => parseMonsterYaml(`
-name: D
-hp: 1
-moveSpeed: 1
-kind: melee
-attackRange: 1
-attackIntervalMs: 1
-`, 'd')).toThrow(/contactDamage/);
-        // Zero is not positive → throws
-        const zeroed = validYaml.replace('contactDamage: 8', 'contactDamage: 0');
-        expect(() => parseMonsterYaml(zeroed, 'drone')).toThrow(/contactDamage/);
-    });
-});
-
-describe('parseMonsterYaml — ranged', () => {
-    const validYaml = `
+    it('parses a ranged monster (weapon references ranged weapon)', () => {
+        const yamlText = `
 name: Gunner
 hp: 20
 moveSpeed: 3
-kind: ranged
-attackRange: 200
-attackIntervalMs: 1500
-projectile:
-  speed: 14
-  damage: 6
+weaponId: gunner-blast
 drops: []
 `;
-
-    it('parses a ranged monster', () => {
-        const m = parseMonsterYaml(validYaml, 'gunner');
-        expect(m.kind).toBe('ranged');
-        expect(m.projectile).toEqual({ speed: 14, damage: 6 });
+        const m = parseMonsterYaml(yamlText, 'gunner');
+        expect(m.weaponId).toBe('gunner-blast');
         expect(m.drops).toEqual([]);
     });
 
-    it('rejects ranged missing projectile', () => {
-        // Missing field → undefined → throws
-        expect(() => parseMonsterYaml(`
-name: G
+    it('requires weaponId', () => {
+        const yamlText = `
+name: Bad
 hp: 1
 moveSpeed: 1
-kind: ranged
-attackRange: 1
-attackIntervalMs: 1
-`, 'g')).toThrow(/projectile/);
-    });
-});
-
-describe('parseMonsterYaml — common', () => {
-    const validYaml = `
-name: Drone
-hp: 30
-moveSpeed: 4
-kind: melee
-attackRange: 36
-attackIntervalMs: 1000
-contactDamage: 8
 drops: []
 `;
+        expect(() => parseMonsterYaml(yamlText, 'bad')).toThrow(/weaponId/);
+    });
 
-    it('rejects unknown kind', () => {
-        const yamlText = validYaml.replace('kind: melee', 'kind: invisible');
-        expect(() => parseMonsterYaml(yamlText, 'drone')).toThrow(/kind/);
+    it('rejects non-positive moveSpeed', () => {
+        expect(() =>
+            parseMonsterYaml(
+                `${meleeYaml.replace('moveSpeed: 4', 'moveSpeed: 0')}`,
+                'drone',
+            ),
+        ).toThrow(/moveSpeed/);
     });
 
     it('rejects drop chance outside [0, 1]', () => {
         expect(() =>
             parseMonsterYaml(
-                `${validYaml.replace(
-                    'drops: []',
-                    'drops:\n  - dropId: a\n    chance: 1.5',
-                )}`,
+                `${meleeYaml.replace('chance: 0.4', 'chance: 1.5')}`,
                 'drone',
             ),
         ).toThrow(/chance/);
     });
 
-    it('accepts drops: [] (no drops)', () => {
-        const m = parseMonsterYaml(validYaml, 'drone');
-        expect(m.drops).toEqual([]);
-    });
-
     it('accepts drops omitted (defaults to empty)', () => {
-        const yamlText = validYaml.replace('drops: []', '');
+        const yamlText = `
+name: Drone
+hp: 30
+moveSpeed: 4
+weaponId: drone-claws
+`;
         const m = parseMonsterYaml(yamlText, 'drone');
         expect(m.drops).toEqual([]);
     });

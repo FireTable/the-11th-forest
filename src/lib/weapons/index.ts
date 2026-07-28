@@ -7,6 +7,6 @@
  *   import { fetchWeapon, fetchWeaponIndex } from '@/lib/weapons';
  */
 
-export type { BulletSpec, WeaponSpec, WeaponIndex } from './types';
+export type { WeaponSpec, WeaponIndex } from './types';
 export { parseWeaponIndex, parseWeaponYaml } from './parser';
 export { fetchWeapon, fetchWeaponIndex } from './loader';

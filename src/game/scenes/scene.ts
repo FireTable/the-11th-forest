@@ -11,7 +11,7 @@ import type { Level } from '@/lib/levels/types';
 import type { MonsterSpec } from '@/lib/monsters';
 import type { WeaponSpec } from '@/lib/weapons';
 
-import { createWallBodies } from './load-wall';
+import { createWallBodies } from '@/game/walls/wall';
 
 /**
  * Payload the Game shell hands to the scene after pre-fetching all data
@@ -24,6 +24,9 @@ import { createWallBodies } from './load-wall';
  * demand inside the DropController callback (kept lazy until Phase 5).
  */
 export interface SceneAssets {
+    /** All weapons (player hotbar + monster weapons), keyed by id. */
+    weaponsById: Map<string, WeaponSpec>;
+    /** Player hotbar (subset of weaponsById, in order). */
     weapons: WeaponSpec[];
     character: CharacterSpec;
     monsterSpecs: Map<string, MonsterSpec>;
@@ -84,13 +87,15 @@ export class LoadScene extends Scene {
         // Wire monster controller — self-spawns from level.monsters.
         this.monsterSystem = new MonsterController(
             this,
-            this.level.monsters,
+            this.level.monsters?.map((m) => ({
+                spec: this.assets.monsterSpecs.get(m.type)!,
+                weapon: this.assets.weaponsById.get(
+                    this.assets.monsterSpecs.get(m.type)!.weaponId,
+                )!,
+                x: m.x,
+                y: m.y,
+            })),
             this.character.body,
-            (id) => {
-                const spec = this.assets.monsterSpecs.get(id);
-                if (!spec) throw new Error(`Unknown monster type: ${id}`);
-                return spec;
-            },
             {
                 onMonsterDied: (monster) => {
                     const mp = monster.body.position;
@@ -102,7 +107,7 @@ export class LoadScene extends Scene {
                         return spec;
                     });
                     for (const r of rolled) {
-                        this.dropSystem.spawn(r.spec, mp.x, mp.y);
+                        this.dropSystem.spawn(r.spec as never, mp.x, mp.y);
                     }
                 },
                 onPlayerHit: (damage) => this.character.heal(-damage, 0),
@@ -144,12 +149,8 @@ export class LoadScene extends Scene {
                 if (!bullet) continue;
                 const other = bullet === a ? b : a;
                 if (other.label !== 'monster') continue;
-                // 12 is pistol base damage; ideally pulled from the
-                // weapon spec — for the demo we read the active weapon
-                // from character.weapons.getActive() so picking up
-                // different hotbar slots rebalances damage.
                 this.monsterSystem.applyBulletDamage(
-                    this.character.weapons.getActive().bullet.damage,
+                    this.character.weapons.getActive().damage,
                     bullet,
                 );
             }

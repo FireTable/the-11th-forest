@@ -6,7 +6,7 @@
 
 import { load as parseYaml } from 'js-yaml';
 
-import type { BulletSpec, WeaponIndex, WeaponSpec } from './types';
+import type { WeaponIndex, WeaponSpec } from './types';
 
 function requirePositiveNumber(value: unknown, label: string, id: string): number {
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
@@ -15,15 +15,15 @@ function requirePositiveNumber(value: unknown, label: string, id: string): numbe
     return value;
 }
 
-function parseBullet(raw: unknown, id: string): BulletSpec {
-    if (typeof raw !== 'object' || raw === null) {
-        throw new Error(`Weapon ${id}: bullet must be an object`);
+function requireNonNegativeNumber(value: unknown, label: string, id: string): number {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+        throw new Error(`Weapon ${id}: ${label} must be a non-negative number`);
     }
-    const b = raw as Record<string, unknown>;
-    return {
-        speed: requirePositiveNumber(b.speed, 'bullet.speed', id),
-        damage: requirePositiveNumber(b.damage, 'bullet.damage', id),
-    };
+    return value;
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+    return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 export function parseWeaponYaml(text: string, id: string): WeaponSpec {
@@ -31,21 +31,62 @@ export function parseWeaponYaml(text: string, id: string): WeaponSpec {
     if (raw === null || typeof raw !== 'object') {
         throw new Error(`Weapon ${id}: empty or non-object YAML`);
     }
-    const { name, clipSize, reloadTimeMs, fireIntervalMs, bulletsPerShot, bullet } =
-        raw;
 
-    if (typeof name !== 'string' || name.length === 0) {
+    if (typeof raw.name !== 'string' || raw.name.length === 0) {
         throw new Error(`Weapon ${id}: name required`);
     }
 
+    const damage = requirePositiveNumber(raw.damage, 'damage', id);
+    const cooldownMs = requireNonNegativeNumber(raw.cooldownMs, 'cooldownMs', id);
+    const range = requirePositiveNumber(raw.range, 'range', id);
+
+    // Kind inferred from field presence: ranged has projectileSpeed,
+    // melee has hitWidth + hitHeight. Exactly one must apply.
+    const isRanged = typeof raw.projectileSpeed === 'number';
+    const isMelee = typeof raw.hitWidth === 'number' || typeof raw.hitHeight === 'number';
+
+    if (isRanged === isMelee) {
+        throw new Error(
+            `Weapon ${id}: must be either ranged (projectileSpeed) or melee (hitWidth + hitHeight), not both or neither`,
+        );
+    }
+
+    if (isRanged) {
+        const projectileSpeed = requirePositiveNumber(
+            raw.projectileSpeed,
+            'projectileSpeed',
+            id,
+        );
+        return {
+            id,
+            name: raw.name,
+            damage,
+            cooldownMs,
+            range,
+            projectileSpeed,
+            clipSize: raw.clipSize === undefined
+                ? undefined
+                : requirePositiveNumber(raw.clipSize, 'clipSize', id),
+            reloadTimeMs: raw.reloadTimeMs === undefined
+                ? undefined
+                : requirePositiveNumber(raw.reloadTimeMs, 'reloadTimeMs', id),
+            bulletsPerShot: raw.bulletsPerShot === undefined
+                ? undefined
+                : requirePositiveNumber(raw.bulletsPerShot, 'bulletsPerShot', id),
+        };
+    }
+
+    // Melee
+    const hitWidth = requirePositiveNumber(raw.hitWidth, 'hitWidth', id);
+    const hitHeight = requirePositiveNumber(raw.hitHeight, 'hitHeight', id);
     return {
         id,
-        name,
-        clipSize: requirePositiveNumber(clipSize, 'clipSize', id),
-        reloadTimeMs: requirePositiveNumber(reloadTimeMs, 'reloadTimeMs', id),
-        fireIntervalMs: requirePositiveNumber(fireIntervalMs, 'fireIntervalMs', id),
-        bulletsPerShot: requirePositiveNumber(bulletsPerShot, 'bulletsPerShot', id),
-        bullet: parseBullet(bullet, id),
+        name: raw.name,
+        damage,
+        cooldownMs,
+        range,
+        hitWidth,
+        hitHeight,
     };
 }
 
@@ -66,3 +107,6 @@ export function parseWeaponIndex(text: string): WeaponIndex {
     }
     return { weapons: ids };
 }
+
+// Re-export isPlainObject for tests if needed.
+export { isPlainObject };
