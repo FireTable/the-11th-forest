@@ -20,10 +20,63 @@ import { planDropEffect } from './logic';
 
 // ─── Entity ──────────────────────────────────────────────────────────────
 
+export function textureKey(spec: DropSpec): string {
+    return `drop:${spec.id}`;
+}
+
+export function animKey(spec: DropSpec, track: string): string {
+    return `drop:anim:${spec.id}:${track}`;
+}
+
+export function loadDropAssets(
+    scene: Pick<Phaser.Scene, 'load'>,
+    specs: Iterable<DropSpec>,
+): void {
+    for (const spec of specs) {
+        if (!spec.sprite) continue;
+        const key = textureKey(spec);
+        const url = spec.sprite.texture.startsWith('/')
+            ? spec.sprite.texture
+            : `/${spec.sprite.texture}`;
+
+        scene.load.spritesheet(key, url, {
+            frameWidth: 64,
+            frameHeight: 64,
+        });
+    }
+}
+
+export function createDropAnims(
+    scene: Pick<Phaser.Scene, 'anims'>,
+    specs: Iterable<DropSpec>,
+): void {
+    for (const spec of specs) {
+        if (!spec.sprite || !spec.anims) continue;
+        const key = textureKey(spec);
+        for (const [track, animSpec] of Object.entries(spec.anims)) {
+            const trackKey = animKey(spec, track);
+            if (scene.anims.exists(trackKey)) scene.anims.remove(trackKey);
+
+            const [start, end] = animSpec.frames;
+            const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+            for (let i = start; i <= end; i++) {
+                frames.push({ key, frame: i });
+            }
+            scene.anims.create({
+                key: trackKey,
+                frames,
+                frameRate: animSpec.frameRate,
+                repeat: animSpec.repeat ?? -1,
+            });
+        }
+    }
+}
+
 export class DropInstance {
     readonly spec: DropSpec;
     readonly body: MatterJS.BodyType;
     readonly rect: Phaser.GameObjects.Rectangle;
+    readonly sprite?: Phaser.GameObjects.Sprite;
     taken = false;
 
     constructor(scene: Phaser.Scene, spec: DropSpec, x: number, y: number) {
@@ -33,25 +86,40 @@ export class DropInstance {
             label: 'drop',
             isSensor: true,
             collisionFilter: {
-                category: CAT.CHARACTER, // reusing the category bit (sensor, no physics)
+                category: CAT.CHARACTER,
                 mask: CAT.CHARACTER,
             },
         });
 
+        // Debug / fallback rectangle (hidden when sprite is present)
         this.rect = scene.add.rectangle(
             x,
             y,
             spec.visual.size,
             spec.visual.size,
             spec.visual.tint,
-            0.9,
+            0.4,
         );
-        this.rect.setStrokeStyle(2, 0x111827, 1);
+        this.rect.setStrokeStyle(1.5, 0x22c55e, 1);
+        this.rect.setVisible(false);
+
+        if (spec.sprite && scene.textures.exists(textureKey(spec))) {
+            const idleAnimKey = animKey(spec, 'idle');
+            const spriteObj = scene.add.sprite(x, y, textureKey(spec));
+            spriteObj.setDepth(Math.round(y));
+            if (spec.sprite.scale) spriteObj.setScale(spec.sprite.scale);
+
+            if (scene.anims.exists(idleAnimKey)) {
+                spriteObj.play(idleAnimKey);
+            }
+            this.sprite = spriteObj;
+        }
     }
 
     destroy(scene: Phaser.Scene): void {
         scene.matter.world.remove(this.body);
         this.rect.destroy();
+        this.sprite?.destroy();
     }
 }
 

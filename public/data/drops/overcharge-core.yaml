@@ -1,11 +1,12 @@
-name: Ammo Cache
+name: Overcharge Core
 kind: static
 visual:
-    size: 18
-    tint: 0xfacc15
+    size: 22
+    tint: 0xef4444
 effect:
-    type: refill-ammo
-    ammoFraction: 0.3
+    type: instant
+    hp: 50
+    sp: 50
 
 sprite:
     texture: assets/image/drops/drops.png
@@ -15,6 +16,6 @@ sprite:
 
 anims:
     idle:
-        frames: [8, 11]
+        frames: [12, 15]
         frameRate: 6
         repeat: -1

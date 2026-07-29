@@ -43,28 +43,27 @@ const SpriteOffsetSchema = z
     .strict()
     .optional();
 
-const SpriteSchema = z
+export const SpriteSchema = z
     .object({
         texture: z.string().min(1),
-        grid: SpriteGridSchema,
-        scale: z.number().gt(0),
+        grid: SpriteGridSchema.optional(),
+        scale: z.number().gt(0).optional(),
         offset: SpriteOffsetSchema,
         script: z
             .object({
-                downsample: z.number().int().gt(0).optional(),
-                colors: z.number().int().gt(0).optional(),
-                pad: z.number().int().gte(0).optional(),
+                downsample: z.number().optional(),
+                colors: z.number().optional(),
+                pad: z.number().optional(),
             })
-            .strict()
             .optional(),
     })
     .strict();
 
-const AnimSpecSchema = z
+export const AnimSpecSchema = z
     .object({
-        frames: z.tuple([z.number().int().gte(0), z.number().int().gte(0)]),
+        frames: z.tuple([z.number(), z.number()]),
         frameRate: z.number().gt(0),
-        repeat: z.number().int(),
+        repeat: z.number().optional(),
     })
     .strict()
     .refine((v) => v.frames[1] >= v.frames[0], {

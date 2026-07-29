@@ -1,8 +1,20 @@
 name: HP Shard
 kind: static
 visual:
-  size: 18
-  tint: 0x22c55e
+    size: 18
+    tint: 0x22c55e
 effect:
-  type: instant
-  hp: 25
+    type: instant
+    hp: 25
+
+sprite:
+    texture: assets/image/drops/drops.png
+    grid: { rows: 4, cols: 4 }
+    scale: 1
+    offset: { left: 0, bottom: 0 }
+
+anims:
+    idle:
+        frames: [0, 3]
+        frameRate: 6
+        repeat: -1

@@ -63,6 +63,8 @@ export const DropEffectSchema = z.discriminatedUnion('type', [
 // an optional field so test fixtures (which build the object directly)
 // can include it. The loader still overwrites it with the canonical id.
 
+import { SpriteSchema, AnimSpecSchema } from '@/lib/monsters/schema';
+
 export const DropSpecSchema = z
     .object({
         id: z.string().min(1).optional(),
@@ -70,6 +72,9 @@ export const DropSpecSchema = z
         kind: z.enum(['static', 'monster']),
         visual: DropVisualSchema,
         effect: DropEffectSchema,
+        sprite: SpriteSchema.optional(),
+        anims: z.record(z.string(), AnimSpecSchema).optional(),
+        prompt: z.string().optional(),
     })
     .strict();
 

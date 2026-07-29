@@ -8,6 +8,8 @@ weaponId: gunner-blast
 drops:
     - dropId: ammo-cache
       chance: 0.5
+    - dropId: overcharge-core
+      chance: 0.2
 
 sprite:
     texture: assets/image/monsters/gunner.png
