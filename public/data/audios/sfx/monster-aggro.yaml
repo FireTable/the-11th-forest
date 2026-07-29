@@ -1,0 +1,6 @@
+kind: sfx
+id: monster-aggro
+name: Monster Aggro
+source: assets/audio/sfx/monster-aggro.wav
+volume: 0.6
+prompt: Low growl, monster spotted player

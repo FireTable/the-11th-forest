@@ -1,0 +1,6 @@
+kind: sfx
+id: reload-finish
+name: Reload Finish
+source: assets/audio/sfx/reload-finish.wav
+volume: 0.5
+prompt: Magazine snap, reload complete

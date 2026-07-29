@@ -110,6 +110,8 @@ export class Monster {
     lastHitAt = 0;
     /** Set by MonsterController when killed — used to suppress further collisions. */
     dead = false;
+    /** One-shot guard so the aggro growl only fires once per monster. */
+    hasAggroed = false;
     /** Waypoints for pathfinding navigation. */
     path: { x: number; y: number }[] | null = null;
     currentWaypointIdx = 0;
@@ -318,7 +320,13 @@ export class MonsterController {
             }
 
             // ── AI transitions ─────────────────────────────────────────
+            const prevState = m.state;
             m.state = decideAIState(dist, m.weapon.range);
+            // One-shot aggro growl on the first idle → chase transition.
+            if (!m.hasAggroed && prevState === 'idle' && m.state === 'chase') {
+                m.hasAggroed = true;
+                EventBus.emit(SFX_EVENT('monster-aggro'));
+            }
 
             // ── Velocity ──────────────────────────────────────────────
             let vx = 0;

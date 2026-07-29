@@ -121,6 +121,7 @@ export class WeaponController {
         slot.reloading = false;
         slot.justCompletedAt = 0;
         this.currentIndex = index;
+        EventBus.emit(SFX_EVENT('weapon-switch'));
     }
 
     /** R key — manual reload. Only when ammo < clipSize and not already reloading. */
@@ -131,6 +132,7 @@ export class WeaponController {
         if (slot.ammo >= clipSize) return;
         slot.reloading = true;
         slot.reloadStartedAt = this.scene.time.now;
+        EventBus.emit(SFX_EVENT('reload-start'));
     }
 
     /** Drop ammo into the current slot — caps at clipSize. */
@@ -217,6 +219,7 @@ export class WeaponController {
                     slot.ammo = slot.spec.clipSize ?? 1;
                     slot.reloading = false;
                     slot.justCompletedAt = time;
+                    EventBus.emit(SFX_EVENT('reload-finish'));
                 }
             }
             if (slot.justCompletedAt > 0) {
@@ -232,12 +235,20 @@ export class WeaponController {
         if (active.ammo === 0 && !active.reloading && active.justCompletedAt === 0) {
             active.reloading = true;
             active.reloadStartedAt = time;
+            EventBus.emit(SFX_EVENT('reload-start'));
         }
 
         // 3. Fire — gated by reload state and ammo.
         if (fire && !active.reloading && active.ammo > 0) {
             if (time - active.lastFireAt >= active.spec.cooldownMs) {
                 this.fire(tx, ty);
+                active.lastFireAt = time;
+            }
+        } else if (fire && !active.reloading && active.ammo === 0) {
+            // Dry-fire click on empty clip — once per fire-press. Tracks
+            // the rising edge of `fire` via lastFireAt so we don't spam.
+            if (time - active.lastFireAt >= 80) {
+                EventBus.emit(SFX_EVENT('dry-fire'));
                 active.lastFireAt = time;
             }
         }

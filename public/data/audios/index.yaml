@@ -10,14 +10,23 @@ sfx:
   - pickup-sp
   - pickup-ammo
   - pickup-overcharge
+  - pickup-weapon
+  - pickup-generic
   - player-shoot
+  - dry-fire
   - bullet-wall
+  - reload-start
+  - reload-finish
+  - weapon-switch
   - monster-hit
   - monster-death
   - monster-shoot
+  - monster-aggro
   - player-hit
   - player-hurt
   - dodge
+  - footstep
+  - low-hp-heartbeat
 
 music:
   - forest-ambient

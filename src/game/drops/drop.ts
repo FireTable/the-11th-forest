@@ -218,8 +218,7 @@ export class DropController {
     private applyEffect(spec: DropSpec): void {
         // Emit SFX BEFORE applying effect so the audio engine can play
         // before the pickup animation / freeze-frame finishes.
-        const sfxId = sfxIdForDrop(spec);
-        if (sfxId) EventBus.emit(SFX_EVENT(sfxId));
+        EventBus.emit(SFX_EVENT(sfxIdForDrop(spec)));
         planDropEffect(spec, {
             heal: (hp, sp) => this.character.heal(hp, sp),
             refillAmmo: (f) => this.character.refillAmmo(f),
@@ -228,8 +227,10 @@ export class DropController {
     }
 }
 
-/** Map a drop spec id to the SFX id played when picked up. */
-function sfxIdForDrop(spec: DropSpec): string | null {
+/** Map a drop spec id to the SFX id played when picked up. Every drop
+ *  kind has a dedicated pickup tone so adding a new drop id is a
+ *  one-line change here. */
+function sfxIdForDrop(spec: DropSpec): string {
     switch (spec.id) {
         case 'hp-shard':
             return 'pickup-hp';
@@ -239,7 +240,11 @@ function sfxIdForDrop(spec: DropSpec): string | null {
             return 'pickup-ammo';
         case 'overcharge-core':
             return 'pickup-overcharge';
+        case 'weapon-pickup':
+            return 'pickup-weapon';
         default:
-            return null;
+            // Belt-and-braces fallback for any unlisted drop id — never
+            // silent, even if the spec is novel.
+            return 'pickup-generic';
     }
 }

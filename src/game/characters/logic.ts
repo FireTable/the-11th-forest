@@ -186,6 +186,11 @@ export class CharacterController {
     // instead of immediately snapping to wherever the cursor happens to be.
     private targetX: number | null = null;
     private targetY: number | null = null;
+    /** Last footstep SFX time — throttle to ~5 per second so the loop
+     *  doesn't spam when the player holds WASD. */
+    private lastFootstepAt = 0;
+    /** Throttle for the low-HP heartbeat so it pulses rather than buzzes. */
+    private lastHeartbeatAt = 0;
 
     private readonly cleanupFns: Array<() => void> = [];
 
@@ -335,6 +340,20 @@ export class CharacterController {
                 this.spec.sp,
                 this.sp + (this.spec.sp * 16) / this.spec.spRegenMs,
             );
+        }
+
+        // ── Footstep SFX (throttled) ─────────────────────────────────
+        const moving = intent.vx !== 0 || intent.vy !== 0;
+        if (moving && now >= this.dodgeActiveUntil && now - this.lastFootstepAt > 200) {
+            EventBus.emit(SFX_EVENT('footstep'));
+            this.lastFootstepAt = now;
+        }
+
+        // ── Low-HP heartbeat (only while HP < 30%) ───────────────────
+        const lowHpThreshold = this.spec.hp * 0.3;
+        if (this.hp < lowHpThreshold && now - this.lastHeartbeatAt > 900) {
+            EventBus.emit(SFX_EVENT('low-hp-heartbeat'));
+            this.lastHeartbeatAt = now;
         }
 
         // ── Weapon update ───────────────────────────────────────────

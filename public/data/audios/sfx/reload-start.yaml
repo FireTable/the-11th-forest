@@ -1,0 +1,6 @@
+kind: sfx
+id: reload-start
+name: Reload Start
+source: assets/audio/sfx/reload-start.wav
+volume: 0.5
+prompt: Magazine click, reload start
