@@ -9,6 +9,7 @@ import {
 import { DropController } from '@/game/drops/drop';
 import { MaterialManager } from '@/game/materials/material';
 import { MonsterController, rollDrops } from '@/game/monsters/monster';
+import { PathfindingService } from '@/game/monsters/logic';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
 import type { CharacterSpec } from '@/lib/characters';
@@ -125,6 +126,12 @@ export class LoadScene extends Scene {
             EventBus.removeListener('editor-open', onEditorOpen),
         );
 
+        // Initialize A* Pathfinding service with level air walls
+        const pathfinder = new PathfindingService(
+            this.level.imageSize,
+            this.level.airWalls,
+        );
+
         // Wire monster controller — self-spawns from level.monsters.
         this.monsterSystem = new MonsterController(
             this,
@@ -153,6 +160,7 @@ export class LoadScene extends Scene {
                 },
                 onPlayerHit: (damage) => this.character.heal(-damage, 0),
             },
+            pathfinder,
         );
 
         // Wire drop controller — self-spawns from level.dropSpawns.

@@ -31,6 +31,7 @@ import {
     dirTo,
     distBetween,
     pickClosestMonster,
+    PathfindingService,
 } from './logic';
 
 // ─── Entity ──────────────────────────────────────────────────────────────
@@ -48,6 +49,9 @@ export class Monster {
     lastAttackAt = 0;
     /** Set by MonsterController when killed — used to suppress further collisions. */
     dead = false;
+    /** Waypoints for pathfinding navigation. */
+    path: { x: number; y: number }[] | null = null;
+    currentWaypointIdx = 0;
     /** Visual tint per weapon kind — derived from weapon (ranged/melee). */
     static readonly TINT_MELEE = 0xef4444;
     static readonly TINT_RANGED = 0xa855f7;
@@ -146,6 +150,9 @@ export class MonsterController {
     /** Cached for fast lookup in attack tests. */
     private readonly playerBody: MatterJS.BodyType;
     private readonly matter: any;
+    private readonly pathfinder?: PathfindingService;
+    private lastPathCalcAt = 0;
+    private lastPlayerPos = { x: 0, y: 0 };
     /** Last attack timestamp per monster — independently tracked to avoid
      *  interleaved races when two monsters fire on the same frame. */
     private lastDamageAt = 0;
@@ -155,11 +162,13 @@ export class MonsterController {
         spawns: { spec: MonsterSpec; weapon: WeaponSpec; x: number; y: number }[] | undefined,
         playerBody: MatterJS.BodyType,
         cb: MonsterControllerCallbacks,
+        pathfinder?: PathfindingService,
     ) {
         this.scene = scene;
         this.playerBody = playerBody;
         this.cb = cb;
         this.matter = (Phaser as any).Physics.Matter.Matter;
+        this.pathfinder = pathfinder;
 
         // Self-spawn monsters from the spawn list (replaces the old
         // spawnMonsters helper — controller owns its own construction).
@@ -174,6 +183,17 @@ export class MonsterController {
 
     /** Per-frame: AI tick + projectile sync + cleanup. */
     update(time: number): void {
+        const pp = this.playerBody.position;
+        const playerMovedDist = distBetween(this.lastPlayerPos, pp);
+        const shouldRecalcPaths =
+            this.pathfinder &&
+            (playerMovedDist > 32 || time - this.lastPathCalcAt > 600);
+
+        if (shouldRecalcPaths) {
+            this.lastPathCalcAt = time;
+            this.lastPlayerPos = { x: pp.x, y: pp.y };
+        }
+
         for (let i = this.monsters.length - 1; i >= 0; i--) {
             const m = this.monsters[i];
             if (m.dead) {
@@ -181,8 +201,19 @@ export class MonsterController {
                 continue;
             }
             const mp = m.body.position;
-            const dist = distBetween(mp, this.playerBody.position);
-            const dirToPlayer = dirTo(mp, this.playerBody.position);
+            const dist = distBetween(mp, pp);
+            const dirToPlayer = dirTo(mp, pp);
+
+            // Recalculate A* path if needed
+            if (shouldRecalcPaths && dist > m.weapon.range && this.pathfinder) {
+                const path = this.pathfinder.findPath(mp, pp);
+                if (path && path.length > 1) {
+                    m.path = path;
+                    m.currentWaypointIdx = 1; // 0 is start cell
+                } else {
+                    m.path = null;
+                }
+            }
 
             // ── AI transitions ─────────────────────────────────────────
             m.state = decideAIState(dist, m.weapon.range);
@@ -191,7 +222,19 @@ export class MonsterController {
             let vx = 0;
             let vy = 0;
             if (m.state === 'chase') {
-                const cv = chaseVelocity(dirToPlayer, m.spec.moveSpeed);
+                let targetDir = dirToPlayer;
+                // Follow Waypoints if available
+                if (m.path && m.currentWaypointIdx < m.path.length) {
+                    const targetWp = m.path[m.currentWaypointIdx];
+                    const distToWp = distBetween(mp, targetWp);
+                    if (distToWp < 16) {
+                        m.currentWaypointIdx++;
+                    }
+                    if (m.currentWaypointIdx < m.path.length) {
+                        targetDir = dirTo(mp, m.path[m.currentWaypointIdx]);
+                    }
+                }
+                const cv = chaseVelocity(targetDir, m.spec.moveSpeed);
                 vx = cv.vx;
                 vy = cv.vy;
             }

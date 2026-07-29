@@ -6,6 +6,7 @@ import {
     dirTo,
     distBetween,
     pickClosestMonster,
+    PathfindingService,
 } from '@/game/monsters/logic';
 
 describe('monsters/logic — decideAIState', () => {
@@ -83,5 +84,33 @@ describe('monsters/logic — pickClosestMonster', () => {
         const list = [far, near];
         const r = pickClosestMonster({ x: 0, y: 0 }, list, 100);
         expect(r).toBe(near);
+    });
+});
+
+describe('monsters/logic — PathfindingService', () => {
+    it('bypasses wall obstacles using A* pathfinding', () => {
+        // 100x100 world with a vertical air wall in the middle (x=40..60, y=0..80)
+        const levelSize = { width: 100, height: 100 };
+        const airWalls = [
+            {
+                points: [
+                    [40, 0],
+                    [60, 0],
+                    [60, 80],
+                    [40, 80],
+                ] as [number, number][],
+            },
+        ];
+
+        const pathfinder = new PathfindingService(levelSize, airWalls, 10);
+        // Start at (10, 50), target at (80, 50)
+        const path = pathfinder.findPath({ x: 10, y: 50 }, { x: 80, y: 50 });
+
+        expect(path).not.toBeNull();
+        expect(path!.length).toBeGreaterThan(2);
+
+        // Verify that path bypasses the wall obstacle by going around y > 80
+        const maxY = Math.max(...path!.map((p) => p.y));
+        expect(maxY).toBeGreaterThanOrEqual(80);
     });
 });
