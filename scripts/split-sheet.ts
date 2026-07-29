@@ -1,40 +1,83 @@
 /**
- * Split an AI-generated sprite sheet with a magenta chroma-key background
- * into individual transparent PNG frames.
+ * Universal AI Sprite Sheet Splitter & Chroma-Key Processor.
  *
- * Usage: pnpm tsx scripts/split-sheet.ts <sheet.png> <outDir> [--pad=2]
- *        pnpm tsx scripts/split-sheet.ts --recompose <outDir> <orig.png> --rows=N --cols=M [<out.png>]
+ * Automatically detects background color (Magenta, Green screen, Blue screen, etc.),
+ * performs intelligent CIEDE2000 + Lch Hue color-keying, purges narrow crevice micro-holes,
+ * applies 8-connected pixel-level edge erosion/outlining, downsamples crisp pixel-art,
+ * quantizes palette with image-q NeuQuant (default 32 colors), and crops transparent frames.
  *
- * The sheet does not need an even grid: frames are found by scanning for
- * fully-transparent bands (rows first, then columns within each row).
+ * Usage:
+ *   # Default: Auto-detect background, 2px transparent edge erosion, 2px padding
+ *   pnpm tsx scripts/split-sheet.ts <sheet.png> <outDir> [--pad=2] [--outline=2] [--no-recompose]
+ *
+ *   # Pixelize & Quantize (32 colors default, optional --dither for Floyd-Steinberg grid):
+ *   pnpm tsx scripts/split-sheet.ts <sheet.png> <outDir> --pixelize=4 [--colors=32] [--dither] [--in-place --id=wanderer]
+ *
+ *   # Recompose grid:
+ *   pnpm tsx scripts/split-sheet.ts --recompose <outDir> <orig.png> --rows=N --cols=M [<out.png>]
+ *
+ * Default Settings:
+ *   - Background: Auto-detected from 4 corners (detectKeyColor)
+ *   - Edge Erosion (--outline): 2px (8-connected pass)
+ *   - Outline Color (--outline-color): transparent (strips anti-aliasing fringe)
+ *   - Padding (--pad): 2px transparent border
+ *   - Quantization Palette (--colors): 32 colors (via image-q NeuQuant)
+ *
+ * Flowchart Diagram:
+ *
+ *   ┌────────────────────────────────────────────────────────┐
+ *   │            Input AI Sprite Sheet (PNG)                 │
+ *   └───────────────────────────┬────────────────────────────┘
+ *                               │
+ *                               ▼
+ *   ┌────────────────────────────────────────────────────────┐
+ *   │ Step 1: detectKeyColor (Auto Corner Sampling)          │
+ *   └───────────────────────────┬────────────────────────────┘
+ *                               │
+ *                               ▼
+ *   ┌────────────────────────────────────────────────────────┐
+ *   │ Step 2: Outer FloodFill (CIEDE2000 + Lch Hue Match)     │
+ *   └───────────────────────────┬────────────────────────────┘
+ *                               │
+ *                               ▼
+ *   ┌────────────────────────────────────────────────────────┐
+ *   │ Step 3: Pure Hole FloodFill & Micro-Hole Purger        │
+ *   │ (Purge Boundary-Touching Crevices w/ Lch Safeguards)   │
+ *   └───────────────────────────┬────────────────────────────┘
+ *                               │
+ *                               ▼
+ *   ┌────────────────────────────────────────────────────────┐
+ *   │ Step 4: 8-Connected Pixel Outline / Edge Erosion      │
+ *   │ (N-Pass Inward Erosion: Transparent or Pixel-Stroke)   │
+ *   └───────────────────────────┬────────────────────────────┘
+ *                               │
+ *                               ▼
+ *   ┌────────────────────────────────────────────────────────┐
+ *   │ Step 5: Pixelize & Image-Q Quantize (Optional)         │
+ *   │ (Nearest-Center Downsample + NeuQuant 32-Color Palette)│
+ *   └───────────────────────────┬────────────────────────────┘
+ *                               │
+ *                               ▼
+ *   ┌────────────────────────────────────────────────────────┐
+ *   │ Step 6: Crop Frames with Transparent Edge Padding     │
+ *   └────────────────────────────────────────────────────────┘
  */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, copyFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 import { PNG } from 'pngjs';
+import { colord, extend, AnyColor } from 'colord';
+import lchPlugin from 'colord/plugins/lch';
+import labPlugin from 'colord/plugins/lab';
+import * as iq from 'image-q';
 
-/**
- * Edge anti-halo: for low-alpha pixels, check the *underlying* RGB.
- * If the color is still magenta, drop it fully; otherwise it is
- * genuine edge anti-aliasing on the sprite, so let it through.
- *
- * Without this, every sprite ends up with a faint purple fringe
- * because PNG chroma-key tolerance is a single threshold and
- * real edges straddle it. The check only touches low-alpha pixels;
- * fully-opaque sprite colors are never inspected.
- */
-function stripEdgeHalo(png: PNG): void {
-    const { data } = png;
-    for (let i = 0; i < data.length; i += 4) {
-        const a = data[i + 3];
-        if (a === 0 || a === 255) continue;
-        if (isMagentaLeaning(data[i], data[i + 1], data[i + 2])) data[i + 3] = 0;
-    }
-}
+extend([lchPlugin, labPlugin]);
+
+
 
 /**
  * 4-connected flood-fill from a seed. Iterative (stack, not recursion)
- * so a 2048×2048 magenta field never blows the call stack.
+ * so a 2048×2048 background field never blows the call stack.
  * `accept` is the "matches?" predicate; pixels where it returns false
  * are skipped and don't propagate to neighbors.
  */
@@ -61,8 +104,8 @@ function floodFill(
     }
 }
 
-/** Find a magenta corner pixel to use as the flood-fill seed. */
-function findKeySeed(png: PNG): { x: number; y: number } | null {
+/** Detect key background color from four corners */
+function detectKeyColor(png: PNG): AnyColor {
     const { width, height, data } = png;
     const corners = [
         [0, 0],
@@ -72,76 +115,188 @@ function findKeySeed(png: PNG): { x: number; y: number } | null {
     ] as const;
     for (const [x, y] of corners) {
         const i = (width * y + x) << 2;
-        if (isMagentaLeaning(data[i], data[i + 1], data[i + 2])) return { x, y };
+        if (data[i + 3] > 0) {
+            return { r: data[i], g: data[i + 1], b: data[i + 2] };
+        }
+    }
+    return { r: 255, g: 0, b: 255 }; // Fallback to magenta if all corners are transparent
+}
+
+function isBgColorLeaning(
+    r: number,
+    g: number,
+    b: number,
+    keyColor: AnyColor,
+    opts: { relaxed?: boolean } = {},
+): boolean {
+    const c = colord({ r, g, b });
+    const targetKey = colord(keyColor);
+    if (c.delta(targetKey) < 0.14) return true;
+
+    const lch = c.toLch();
+    const targetLch = targetKey.toLch();
+    const hueDiff = Math.abs(lch.h - targetLch.h);
+    const isHueSimilar = hueDiff <= 25 || hueDiff >= 335;
+
+    if (opts.relaxed) {
+        // On boundary edges, relax lightness/chroma thresholds to catch dark corner fringe
+        return lch.c > 25 && isHueSimilar;
+    }
+
+    return lch.l > 45 && lch.c > 35 && isHueSimilar;
+}
+
+function findKeySeed(png: PNG, keyColor: AnyColor): { x: number; y: number } | null {
+    const { width, height, data } = png;
+    const corners = [
+        [0, 0],
+        [width - 1, 0],
+        [0, height - 1],
+        [width - 1, height - 1],
+    ] as const;
+    for (const [x, y] of corners) {
+        const i = (width * y + x) << 2;
+        if (isBgColorLeaning(data[i], data[i + 1], data[i + 2], keyColor)) return { x, y };
     }
     return null;
 }
 
-/**
- * Edge pixels (silhouette boundary) sit between the chroma background
- * and the sprite, where PNG anti-aliasing leaves RGB values that are
- * partially magenta and partially sprite color. A plain distance check
- * would also eat dark outline strokes (rgb 20,20,20 is ~126 weighted
- * units from magenta), so we use a magenta-axis predicate instead:
- * only pixels with elevated r/b and depressed g qualify. This rejects
- * dark neutrals while still catching the magenta-hair / magenta-skin
- * anti-alias fringe.
- */
-function isMagentaLeaning(r: number, g: number, b: number): boolean {
-    // r > 80 && b > 80 catches the bulk magenta-tinted edge AA pixels.
-    // g < 120 is the discriminator: real magenta has near-zero green;
-    // any color with non-trivial green (brown shadows, skin, shirt)
-    // is rejected. The residual 1px purple fringe at the silhouette
-    // (e.g. rgb(74, 0, 72) which fails r > 80) is a known minor
-    // artifact — see keyOut comment for the deliberate trade-off.
-    return r > 80 && b > 80 && g < 120;
+function stripEdgeHalo(png: PNG, keyColor: AnyColor): void {
+    const { data } = png;
+    for (let i = 0; i < data.length; i += 4) {
+        const a = data[i + 3];
+        if (a === 0 || a === 255) continue;
+        if (isBgColorLeaning(data[i], data[i + 1], data[i + 2], keyColor, { relaxed: true })) data[i + 3] = 0;
+    }
+}
+
+/** Despill/desaturate residual edge fringe color into dark neutral shades */
+function despillEdgeFringe(png: PNG, keyColor: AnyColor): void {
+    const { data, width: w, height: h } = png;
+    const targetKey = colord(keyColor);
+    const targetLch = targetKey.toLch();
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const idx = w * y + x;
+            const i = idx << 2;
+            if (data[i + 3] === 0) continue;
+
+            // Check if on transparent boundary
+            const onEdge =
+                (x > 0 && data[((w * y + x - 1) << 2) + 3] === 0) ||
+                (x < w - 1 && data[((w * y + x + 1) << 2) + 3] === 0) ||
+                (y > 0 && data[((w * (y - 1) + x) << 2) + 3] === 0) ||
+                (y < h - 1 && data[((w * (y + 1) + x) << 2) + 3] === 0);
+
+            if (!onEdge) continue;
+
+            const c = colord({ r: data[i], g: data[i + 1], b: data[i + 2] });
+            const lch = c.toLch();
+            const hueDiff = Math.abs(lch.h - targetLch.h);
+            const isHueSimilar = hueDiff <= 35 || hueDiff >= 325;
+
+            // Despill: pull down only the background tint channel rather than mixing with gray
+            if (isHueSimilar && lch.c > 20) {
+                const keyRgb = targetKey.toRgb();
+                // If background is Magenta-dominant (high R&B, low G), suppress green/magenta bias
+                if (keyRgb.r > 200 && keyRgb.b > 200) {
+                    const avg = Math.round((data[i] + data[i + 2]) / 2);
+                    if (data[i + 1] < avg * 0.8) {
+                        data[i] = Math.round(data[i] * 0.8 + data[i + 1] * 0.2);
+                        data[i + 2] = Math.round(data[i + 2] * 0.8 + data[i + 1] * 0.2);
+                    }
+                } else if (keyRgb.g > 200) {
+                    // If Green screen, suppress green channel spill
+                    data[i + 1] = Math.min(data[i + 1], Math.round((data[i] + data[i + 2]) / 2));
+                }
+            }
+        }
+    }
 }
 
 /**
- * Sub-threshold magenta-leaning predicate for the residual fringe.
- * Originally `g < 30 && |r - b| < 30` — but that's too strict for the
- * magenta-leaning AA around purple sprites (e.g. the bow on blonde2
- * is purple ~rgb(180, 80, 200); AA pixels at its edge sit at
- * rgb(140, 50, 175), g=50 fails g<30). Switched to H-channel check:
- * magenta is hue 300°, purple ~270°, so the magenta-leaning AA
- * between them sits in [280, 340] and gets caught.
- *
- * Returns true only for colors whose dominant hue is in the magenta /
- * magenta-leaning-purple range. Grayscale (H=0) and skin tones
- * (H=20-40) are correctly rejected.
+ * Purge isolated micro-hole islands in narrow crevices (Area <= maxHoleArea).
+ * Strictly requires the component to touch a transparent border to prevent eroding interior details (like bows).
  */
-function isResidualMagenta(r: number, g: number, b: number): boolean {
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    if (max === min) return false;        // grayscale: no hue
-    const d = max - min;
-    let h: number;
-    if (max === r) h = ((g - b) / d + 6) % 6;
-    else if (max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    h *= 60;                              // 0-360°
-    return h >= 260 && h <= 360;
+function cleanMicroHoles(png: PNG, keyColor: AnyColor, maxHoleArea = 100): void {
+    const { width: w, height: h, data } = png;
+    const visited = new Uint8Array(w * h);
+    const targetKey = colord(keyColor);
+    const targetLch = targetKey.toLch();
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            if (visited[idx]) continue;
+            const di = idx << 2;
+            if (data[di + 3] === 0) continue;
+
+            const c = colord({ r: data[di], g: data[di + 1], b: data[di + 2] });
+            const lch = c.toLch();
+            const hueDiff = Math.abs(lch.h - targetLch.h);
+            const isHueSimilar = hueDiff <= 35 || hueDiff >= 325;
+            // Protect dark/black objects (lch.l <= 40) and low-chroma items (lch.c <= 30)
+            const isFringeHole = isHueSimilar && lch.c > 30 && lch.l > 40;
+            if (!isFringeHole) continue;
+
+            const component: number[] = [];
+            const stack = [idx];
+            visited[idx] = 1;
+            let touchesTransparentBorder = false;
+
+            while (stack.length) {
+                const i = stack.pop()!;
+                component.push(i);
+                if (component.length > maxHoleArea) break;
+
+                const ix = i % w;
+                const iy = (i - ix) / w;
+                const neighbors = [
+                    ix > 0 ? i - 1 : -1,
+                    ix < w - 1 ? i + 1 : -1,
+                    iy > 0 ? i - w : -1,
+                    iy < h - 1 ? i + w : -1,
+                ];
+
+                for (const n of neighbors) {
+                    if (n < 0) {
+                        touchesTransparentBorder = true;
+                        continue;
+                    }
+                    const ndi = n << 2;
+                    if (data[ndi + 3] === 0) {
+                        touchesTransparentBorder = true;
+                        continue;
+                    }
+                    if (visited[n]) continue;
+
+                    const nc = colord({ r: data[ndi], g: data[ndi + 1], b: data[ndi + 2] });
+                    const nlch = nc.toLch();
+                    const nhueDiff = Math.abs(nlch.h - targetLch.h);
+                    const nHueSimilar = nhueDiff <= 35 || nhueDiff >= 325;
+                    const nFringeHole = nHueSimilar && nlch.c > 30 && nlch.l > 40;
+                    if (nFringeHole) {
+                        visited[n] = 1;
+                        stack.push(n);
+                    }
+                }
+            }
+
+            // Only clear if component touches a transparent border and is a small crevice
+            if (touchesTransparentBorder && component.length <= maxHoleArea) {
+                for (const i of component) {
+                    data[(i << 2) + 3] = 0;
+                }
+            }
+        }
+    }
 }
 
 /**
- * Strict pure-magenta predicate for the second-pass scan. AI generators
- * tend to anchor the background to `rgb(255, 0, 255)`; we catch any
- * leftover full-saturation magenta the broad flood-fill missed (e.g.
- * interior pockets disconnected from the corner seed). Tight thresholds
- * avoid false-positives on purple/pink sprite colors.
+ * Flood-fill every background-like region from any seed to catch isolated interior pockets.
  */
-function isPureMagenta(r: number, g: number, b: number): boolean {
-    return r > 150 && g < 50 && b > 150 && Math.abs(r - b) < 60;
-}
-
-/**
- * Flood-fill every pure-magenta region (predicate `isPureMagenta`)
- * from any seed — corners or interior pockets, no specific starting
- * point required. Different starting strategy from `findKeySeed` which
- * is corner-only; this catches isolated magenta islands the main
- * flood-fill could not reach through 4-connectivity.
- */
-function pureMagentaFloodFill(png: PNG): void {
+function pureBgFloodFill(png: PNG, keyColor: AnyColor): void {
     const { width: w, height: h, data } = png;
     const visited = new Uint8Array(w * h);
     const stack: number[] = [];
@@ -150,17 +305,14 @@ function pureMagentaFloodFill(png: PNG): void {
             const idx = y * w + x;
             if (visited[idx]) continue;
             const di = idx << 2;
-            if (data[di + 3] === 0) continue;
-            if (!isPureMagenta(data[di], data[di + 1], data[di + 2])) continue;
-            // Found a pure-magenta seed; flood-fill its region.
+            if (data[di + 3] === 0 || !isBgColorLeaning(data[di], data[di + 1], data[di + 2], keyColor)) continue;
             stack.push(idx);
             while (stack.length) {
                 const i = stack.pop()!;
                 if (visited[i]) continue;
                 visited[i] = 1;
                 const ddi = i << 2;
-                if (data[ddi + 3] === 0) continue;
-                if (!isPureMagenta(data[ddi], data[ddi + 1], data[ddi + 2])) continue;
+                if (data[ddi + 3] === 0 || !isBgColorLeaning(data[ddi], data[ddi + 1], data[ddi + 2], keyColor)) continue;
                 data[ddi + 3] = 0;
                 const ix = i % w;
                 const iy = (i - ix) / w;
@@ -174,59 +326,81 @@ function pureMagentaFloodFill(png: PNG): void {
 }
 
 /**
- * Edge cleanup: paint black on silhouette-boundary pixels that are
- * magenta-leaning but weren't cleared by `keyOut` — the residual 1px
- * purple ring. Real outline pixels (already near-black) pass through;
- * non-magenta sprite pixels fail `isResidualMagenta` and are skipped.
+ * Pixel-art Outline Generator (Support N-pixel thickness and 4/8-connected pixel stroke).
+ *
+ * Scans image boundary to generate clean, solid dark outlines.
+ * - `outlineWidth`: Thickness of the stroke (1px, 2px, etc.)
+ * - `mode`: 'inner' (replaces edge pixels) or 'outer' (expands into transparent area)
  */
-function blackenMagentaFringe(png: PNG): void {
+function applyPixelOutline(
+    png: PNG,
+    opts: { outlineWidth?: number; outlineColor?: [number, number, number] | 'transparent' } = {},
+): void {
+    const strokeWidth = opts.outlineWidth ?? 2;
+    if (strokeWidth <= 0) return;
+
+    const color = opts.outlineColor ?? 'transparent';
     const { data, width: w, height: h } = png;
-    for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-            const i = (w * y + x) << 2;
-            if (data[i + 3] === 0) continue;
-            const r = data[i], g = data[i + 1], b = data[i + 2];
-            if (r === 0 && g === 0 && b === 0) continue;
-            const onEdge =
-                (x > 0 && data[((w * y + x - 1) << 2) + 3] === 0) ||
-                (x < w - 1 && data[((w * y + x + 1) << 2) + 3] === 0) ||
-                (y > 0 && data[((w * (y - 1) + x) << 2) + 3] === 0) ||
-                (y < h - 1 && data[((w * (y + 1) + x) << 2) + 3] === 0);
-            if (!onEdge) continue;
-            if (!isResidualMagenta(r, g, b)) continue;
-            data[i] = 0;
-            data[i + 1] = 0;
-            data[i + 2] = 0;
-            data[i + 3] = 255;
+
+    // Track pixels that are transparent or already part of the outer edge stroke
+    const isBgOrBorder = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+        if (data[(i << 2) + 3] === 0) {
+            isBgOrBorder[i] = 1;
+        }
+    }
+
+    for (let pass = 0; pass < strokeWidth; pass++) {
+        const nextEdgeIndices: number[] = [];
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const idx = w * y + x;
+                if (isBgOrBorder[idx]) continue;
+
+                // Check 8-connected neighbor for border/transparent (prevents diagonal fringe leaks)
+                const onEdge =
+                    (x > 0 && isBgOrBorder[idx - 1]) ||
+                    (x < w - 1 && isBgOrBorder[idx + 1]) ||
+                    (y > 0 && isBgOrBorder[idx - w]) ||
+                    (y < h - 1 && isBgOrBorder[idx + w]) ||
+                    (x > 0 && y > 0 && isBgOrBorder[idx - w - 1]) ||
+                    (x < w - 1 && y > 0 && isBgOrBorder[idx - w + 1]) ||
+                    (x > 0 && y < h - 1 && isBgOrBorder[idx + w - 1]) ||
+                    (x < w - 1 && y < h - 1 && isBgOrBorder[idx + w + 1]);
+
+                if (onEdge) {
+                    nextEdgeIndices.push(idx);
+                }
+            }
+        }
+
+        // Apply dark outline stroke or erase to transparent
+        for (const idx of nextEdgeIndices) {
+            const i = idx << 2;
+            if (color === 'transparent') {
+                data[i + 3] = 0;
+            } else {
+                data[i] = color[0];
+                data[i + 1] = color[1];
+                data[i + 2] = color[2];
+                data[i + 3] = 255;
+            }
+            isBgOrBorder[idx] = 1; // Mark as processed
         }
     }
 }
 
-/**
- * Zero the alpha of every magenta background pixel, in place.
- *
- * Two passes:
- *   1. 4-connected flood-fill from a corner seed using the magenta-
- *      axis predicate. Marks the unambiguous background; interior
- *      pixels that happen to be magenta-tinted (pink shirt) are
- *      spared because they are not 4-connected to the corner.
- *   2. Edge dilation: opaque pixels adjacent to the bg mask are
- *      re-evaluated with the same predicate. This catches the
- *      magenta-hair / magenta-skin anti-aliasing fringe without
- *      killing interior color.
- *
- * Falls back to a global scan if no corner is magenta.
- */
-export function keyOut(png: PNG, opts: { blackFringe?: boolean } = {}): void {
+export function keyOut(png: PNG, opts: { outlineWidth?: number; outlineColor?: [number, number, number] | 'transparent' } = {}): void {
     const { data, width: w, height: h } = png;
-    const seed = findKeySeed(png);
+    const keyColor = detectKeyColor(png);
+    const seed = findKeySeed(png, keyColor);
     if (!seed) {
         for (let i = 0; i < data.length; i += 4) {
-            if (isMagentaLeaning(data[i], data[i + 1], data[i + 2])) data[i + 3] = 0;
+            if (isBgColorLeaning(data[i], data[i + 1], data[i + 2], keyColor)) data[i + 3] = 0;
         }
-        stripEdgeHalo(png);
-        pureMagentaFloodFill(png);
-        if (opts.blackFringe) blackenMagentaFringe(png);
+        stripEdgeHalo(png, keyColor);
+        pureBgFloodFill(png, keyColor);
+        applyPixelOutline(png, opts);
         return;
     }
 
@@ -234,11 +408,7 @@ export function keyOut(png: PNG, opts: { blackFringe?: boolean } = {}): void {
     floodFill(png, seed.x, seed.y, (x, y) => {
         const idx = w * y + x;
         const i = idx << 2;
-        // Only mark pixels that are magenta-tinted (high r/b, low g).
-        // This rejects dark outline strokes and body shadows like
-        // rgb(80,80,100) which a distance-based check would wrongly
-        // absorb.
-        if (!isMagentaLeaning(data[i], data[i + 1], data[i + 2])) return false;
+        if (!isBgColorLeaning(data[i], data[i + 1], data[i + 2], keyColor)) return false;
         isBg[idx] = 1;
         return true;
     });
@@ -247,13 +417,6 @@ export function keyOut(png: PNG, opts: { blackFringe?: boolean } = {}): void {
         if (isBg[idx]) data[(idx << 2) + 3] = 0;
     }
 
-    // Edge dilation: pixels adjacent to bg get re-evaluated. We use
-    // a magenta-axis predicate (not distance) so dark outline strokes
-    // survive — they are 4-neighbors of magenta but are not magenta-
-    // tinted themselves, so the predicate rejects them.
-    // ponytail: 4-connectivity only; 8-connectivity would also catch
-    // diagonally-adjacent magenta, but the AI sheets tested never
-    // need it and skipping it shaves one branch per pixel.
     for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
             const idx = w * y + x;
@@ -265,20 +428,18 @@ export function keyOut(png: PNG, opts: { blackFringe?: boolean } = {}): void {
                 (x < w - 1 && isBg[idx + 1]) ||
                 (y > 0 && isBg[idx - w]) ||
                 (y < h - 1 && isBg[idx + w]);
-            if (onEdge && isMagentaLeaning(data[i], data[i + 1], data[i + 2])) {
+            if (onEdge && isBgColorLeaning(data[i], data[i + 1], data[i + 2], keyColor)) {
                 data[i + 3] = 0;
             }
         }
     }
 
-    stripEdgeHalo(png);
-    // Pure-magenta second pass before blackenMagentaFringe: removes
-    // any leftover pure-magenta pockets the broad flood-fill missed
-    // (e.g. interior islands disconnected from the corner seed). Runs
-    // before the blacken pass so the silhouette boundary that blacken
-    // paints is the final, post-pure-cleanup edge.
-    pureMagentaFloodFill(png);
-    if (opts.blackFringe) blackenMagentaFringe(png);
+    stripEdgeHalo(png, keyColor);
+    // Remove isolated interior background islands
+    pureBgFloodFill(png, keyColor);
+    cleanMicroHoles(png, keyColor, 120);
+    applyPixelOutline(png, opts);
+    despillEdgeFringe(png, keyColor);
 }
 
 /**
@@ -350,132 +511,72 @@ export function findFrames(png: PNG, minRun = 8, minArea = 2000): Box[] {
 }
 
 /**
- * Alpha-weighted box-average downsample. Each target pixel averages the
- * RGB of source pixels in its region, weighted by source alpha so the
- * chroma-keyed transparent borders don't bleed into the sprite body.
- * Output alpha is the mean source alpha, rounded.
- *
- * Target regions fully outside the sprite (all-transparent) stay
- * transparent — keeps the outline sharp rather than smearing the
- * background into a halo.
+ * Clean Pixel-Art Downsampler.
+ * Uses center-pixel nearest neighbor sampling for 100% accurate colors (protecting skin tones)
+ * without forcing artificial dark borders, eliminating speckle noise.
  */
 export function downsample(src: PNG, targetW: number, targetH: number): PNG {
     const out = new PNG({ width: targetW, height: targetH });
     out.data.fill(0);
     const sx = src.width / targetW;
     const sy = src.height / targetH;
+
     for (let ty = 0; ty < targetH; ty++) {
         for (let tx = 0; tx < targetW; tx++) {
-            const x0 = Math.floor(tx * sx);
-            const x1 = Math.min(src.width, Math.max(x0 + 1, Math.floor((tx + 1) * sx)));
-            const y0 = Math.floor(ty * sy);
-            const y1 = Math.min(src.height, Math.max(y0 + 1, Math.floor((ty + 1) * sy)));
-            let r = 0, g = 0, b = 0, wSum = 0, count = 0;
-            for (let y = y0; y < y1; y++) {
-                for (let x = x0; x < x1; x++) {
-                    const i = (src.width * y + x) << 2;
-                    const sa = src.data[i + 3];
-                    if (sa === 0) continue;
-                    r += src.data[i] * sa;
-                    g += src.data[i + 1] * sa;
-                    b += src.data[i + 2] * sa;
-                    wSum += sa;
-                    count++;
-                }
+            // Find center of sampling region in high-res source
+            const centerX = Math.floor((tx + 0.5) * sx);
+            const centerY = Math.floor((ty + 0.5) * sy);
+
+            const i = (src.width * centerY + centerX) << 2;
+            const sa = src.data[i + 3];
+
+            if (sa > 50) {
+                const oi = (targetW * ty + tx) << 2;
+                out.data[oi] = src.data[i];
+                out.data[oi + 1] = src.data[i + 1];
+                out.data[oi + 2] = src.data[i + 2];
+                out.data[oi + 3] = 255;
             }
-            if (count === 0) continue;
-            const oi = (targetW * ty + tx) << 2;
-            out.data[oi] = Math.round(r / wSum);
-            out.data[oi + 1] = Math.round(g / wSum);
-            out.data[oi + 2] = Math.round(b / wSum);
-            out.data[oi + 3] = Math.min(255, Math.round(wSum / count));
         }
     }
     return out;
 }
 
 /**
- * Median-cut color quantizer. Splits the longest RGB axis of the
- * largest bucket, recursively, until we have `nColors` buckets. Each
- * bucket's mean becomes a centroid; every opaque pixel snaps to the
- * nearest centroid. Transparent pixels are passed through untouched.
- *
- * Standard palette-reduction alg for true pixel-art output — GIMP,
- * Aseprite, etc. all use median-cut or k-means under the hood.
+ * Professional Image-Q Quantizer with optional Floyd-Steinberg Dithering.
+ * Uses NeuQuant neural-network color quantization + CIEDE2000/BT709 distance matching.
  */
-export function quantize(png: PNG, nColors: number): void {
-    const opaque: Array<[number, number, number]> = [];
+export function quantize(png: PNG, nColors: number, useDither = false): void {
+    const pointContainer = iq.utils.PointContainer.fromUint8Array(
+        new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength),
+        png.width,
+        png.height,
+    );
+
+    const distanceCalculator = new iq.distance.EuclideanBT709();
+    const paletteQuantizer = new iq.palette.NeuQuant(distanceCalculator, nColors);
+
+    paletteQuantizer.sample(pointContainer);
+    const palette = paletteQuantizer.quantizeSync();
+
+    // Map image pixels to quantized palette: use ErrorDiffusion (Floyd-Steinberg) or NearestColor
+    const imageQuantizer = useDither
+        ? new iq.image.ErrorDiffusionArray(
+              distanceCalculator,
+              iq.image.ErrorDiffusionArrayKernel.FloydSteinberg,
+              true,
+          )
+        : new iq.image.NearestColor(distanceCalculator);
+
+    const resultContainer = imageQuantizer.quantizeSync(pointContainer, palette);
+    const outData = resultContainer.toUint8Array();
+
     for (let i = 0; i < png.data.length; i += 4) {
         if (png.data[i + 3] === 0) continue;
-        opaque.push([png.data[i], png.data[i + 1], png.data[i + 2]]);
-    }
-    if (opaque.length === 0) return;
-    const buckets: Array<Array<[number, number, number]>> = [opaque];
-    while (buckets.length < nColors) {
-        let bestIdx = -1;
-        let bestRange = 0;
-        let bestAxis = 0;
-        for (let i = 0; i < buckets.length; i++) {
-            const b = buckets[i];
-            if (b.length < 2) continue;
-            let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
-            for (const px of b) {
-                if (px[0] < rMin) rMin = px[0];
-                if (px[0] > rMax) rMax = px[0];
-                if (px[1] < gMin) gMin = px[1];
-                if (px[1] > gMax) gMax = px[1];
-                if (px[2] < bMin) bMin = px[2];
-                if (px[2] > bMax) bMax = px[2];
-            }
-            const rR = rMax - rMin;
-            const gR = gMax - gMin;
-            const bR = bMax - bMin;
-            const maxR = Math.max(rR, gR, bR);
-            if (maxR > bestRange) {
-                bestRange = maxR;
-                bestIdx = i;
-                bestAxis = maxR === rR ? 0 : maxR === gR ? 1 : 2;
-            }
-        }
-        if (bestIdx < 0 || bestRange === 0) break;
-        const bucket = buckets.splice(bestIdx, 1)[0];
-        bucket.sort((p, q) => p[bestAxis] - q[bestAxis]);
-        const mid = bucket.length >> 1;
-        buckets.push(bucket.slice(0, mid));
-        buckets.push(bucket.slice(mid));
-    }
-    const centroids: Array<[number, number, number]> = buckets.map((b) => {
-        let r = 0, g = 0, bb = 0;
-        for (const px of b) {
-            r += px[0];
-            g += px[1];
-            bb += px[2];
-        }
-        const n = b.length || 1;
-        return [Math.round(r / n), Math.round(g / n), Math.round(bb / n)];
-    });
-    for (let i = 0; i < png.data.length; i += 4) {
-        if (png.data[i + 3] === 0) continue;
-        const r = png.data[i];
-        const g = png.data[i + 1];
-        const b = png.data[i + 2];
-        let best = Infinity;
-        let bestIdx = 0;
-        for (let c = 0; c < centroids.length; c++) {
-            const [cr, cg, cb] = centroids[c];
-            const dr = r - cr;
-            const dg = g - cg;
-            const db = b - cb;
-            const d = dr * dr + dg * dg + db * db;
-            if (d < best) {
-                best = d;
-                bestIdx = c;
-            }
-        }
-        const [nr, ng, nb] = centroids[bestIdx];
-        png.data[i] = nr;
-        png.data[i + 1] = ng;
-        png.data[i + 2] = nb;
+        png.data[i] = outData[i];
+        png.data[i + 1] = outData[i + 1];
+        png.data[i + 2] = outData[i + 2];
+        png.data[i + 3] = outData[i + 3];
     }
 }
 
@@ -503,8 +604,8 @@ function main(): void {
     const [src, outDir, ...flags] = process.argv.slice(2);
     if (!src || !outDir) {
         console.error(
-            'usage: tsx scripts/split-sheet.ts <sheet.png> <outDir> [--pad=2] [--no-black-fringe]\n' +
-                '                                       [--pixelize[=WxH]] [--colors=N] [--rows=N --cols=M] [--no-recompose]\n' +
+            'usage: tsx scripts/split-sheet.ts <sheet.png> <outDir> [--pad=2] [--outline=2]\n' +
+                '                                       [--downsample[=N]] [--colors[=N]] [--dither] [--rows=N --cols=M] [--no-recompose]\n' +
                 '       tsx scripts/split-sheet.ts --recompose <outDir> <orig.png> ' +
                 '--rows=N --cols=M [<out.png>]',
         );
@@ -533,46 +634,61 @@ function main(): void {
         return;
     }
     const pad = Number(flags.find((f) => f.startsWith('--pad='))?.slice(6) ?? 2);
-    const blackFringe = !flags.includes('--no-black-fringe');
-    // `--pixelize[=N]` enables the pixel-art pipeline. `N` is a scale
-    // factor (sheet downsampled by N). Default 4 takes a 2048 sheet to
-    // 512. `--colors=N` picks palette size (default 64).
-    const pixelizeArg = flags.find(
-        (f) => f === '--pixelize' || f.startsWith('--pixelize='),
+    const outlineWidth = Number(flags.find((f) => f.startsWith('--outline='))?.slice(10) ?? 2);
+    const outlineColorArg = flags.find((f) => f.startsWith('--outline-color='))?.slice(16) ?? 'transparent';
+
+    let outlineColor: [number, number, number] | 'transparent' = 'transparent';
+    if (outlineColorArg !== 'transparent') {
+        const parsed = colord(outlineColorArg);
+        if (parsed.isValid()) {
+            const rgb = parsed.toRgb();
+            outlineColor = [rgb.r, rgb.g, rgb.b];
+        }
+    }
+
+    // `--downsample[=N]` reduces sheet physical resolution by N (default 4).
+    // `--colors[=N]` performs image-q NeuQuant palette quantization (default 32 colors).
+    const downsampleArg = flags.find(
+        (f) => f === '--downsample' || f.startsWith('--downsample='),
     );
-    const pixelize = !!pixelizeArg;
-    const pixelizeScale = pixelizeArg && pixelizeArg.includes('=')
-        ? Number(pixelizeArg.slice('--pixelize='.length))
+    const doDownsample = !!downsampleArg;
+    const downsampleScale = downsampleArg && downsampleArg.includes('=')
+        ? Number(downsampleArg.slice('--downsample='.length))
         : 4;
-    const colors = Number(
-        flags.find((f) => f.startsWith('--colors='))?.slice(9) ?? 64,
+
+    const colorsArg = flags.find(
+        (f) => f === '--colors' || f.startsWith('--colors='),
     );
+    const doQuantize = !!colorsArg;
+    const colors = colorsArg && colorsArg.includes('=')
+        ? Number(colorsArg.slice('--colors='.length))
+        : 32;
+
+    const dither = flags.includes('--dither');
     const inPlace = flags.includes('--in-place');
 
     const png = PNG.sync.read(readFileSync(src));
-    keyOut(png, { blackFringe });
+    keyOut(png, { outlineWidth, outlineColor });
 
-    // Pixelize at the sheet level so every layer (sheet, cells, frame
-    // content) scales by the same factor — frame centers stay aligned
-    // to the same grid positions, just smaller. Quantize the whole
-    // sheet at once for a single global palette (true pixel-art look).
     let workPng: PNG = png;
-    if (pixelize) {
-        if (!Number.isFinite(pixelizeScale) || pixelizeScale < 2) {
+    if (doDownsample) {
+        if (!Number.isFinite(downsampleScale) || downsampleScale < 2) {
             throw new Error(
-                `--pixelize requires scale >= 2 (sheet is downsampled by this factor)`,
+                `--downsample requires scale >= 2 (sheet is downsampled by this factor)`,
             );
         }
-        const smallerW = Math.max(1, Math.floor(png.width / pixelizeScale));
-        const smallerH = Math.max(1, Math.floor(png.height / pixelizeScale));
+        const smallerW = Math.max(1, Math.floor(png.width / downsampleScale));
+        const smallerH = Math.max(1, Math.floor(png.height / downsampleScale));
         workPng = downsample(png, smallerW, smallerH);
-        quantize(workPng, colors);
     }
-    // Area threshold scales as 1/scale²: frames shrink with the sheet,
-    // so a 2000 px threshold on the 1× sheet is ~31 px at 8×, which
-    // would drop every frame. Floor at 100 to avoid catching speckle.
-    const minArea = pixelize
-        ? Math.max(100, Math.floor(2000 / (pixelizeScale * pixelizeScale)))
+
+    if (doQuantize) {
+        quantize(workPng, colors, dither);
+    }
+
+    // Area threshold scales as 1/scale² when downsampled
+    const minArea = doDownsample
+        ? Math.max(100, Math.floor(2000 / (downsampleScale * downsampleScale)))
         : 2000;
     const frames = findFrames(workPng, 8, minArea);
 
@@ -585,14 +701,15 @@ function main(): void {
     frames.forEach((box, i) => {
         const name = `frame-${String(i).padStart(2, '0')}.png`;
         const frame = crop(workPng, box, pad);
-        writeFileSync(join(outDir, name), PNG.sync.write(frame));
+        writeFileSync(join(outDir, name), new Uint8Array(PNG.sync.write(frame)));
         console.log(`${name}  ${frame.width}x${frame.height}  @ ${box.x},${box.y}`);
     });
     console.log(`\n${frames.length} frames → ${outDir}`);
-    if (pixelize) {
-        console.log(
-            `  pixelize: sheet → ${workPng.width}x${workPng.height} (scale ${pixelizeScale}), palette: ${colors} colors`,
-        );
+    if (doDownsample) {
+        console.log(`  downsample: sheet → ${workPng.width}x${workPng.height} (scale ${downsampleScale})`);
+    }
+    if (doQuantize) {
+        console.log(`  quantize: palette reduced to ${colors} colors (image-q NeuQuant${dither ? ' + dither' : ''})`);
     }
 
     // Auto-recompose using the source grid. The grid is detected from
@@ -728,7 +845,7 @@ export function recompose(
             }
         }
     }
-    writeFileSync(outFile, PNG.sync.write(canvas));
+    writeFileSync(outFile, new Uint8Array(PNG.sync.write(canvas)));
     console.log(`recomposed ${names.length} frames in ${rows}x${cols} grid → ${outFile}`);
 }
 

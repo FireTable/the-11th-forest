@@ -16,12 +16,32 @@ interface ScenePayload {
     level: Level;
 }
 
-type Tab = 'air-walls' | 'prompts';
+/**
+ * Two-level tab tree.
+ *
+ * Top level routes between resource kinds (Scenes vs Characters).
+ * Scene sub-tabs decide which part of the level is being edited —
+ * only Air Walls needs the Konva overlay above the Phaser canvas,
+ * Materials / Prompts are pure form UIs.
+ */
+type TopTab = 'scenes' | 'characters';
+type SceneSubTab = 'materials' | 'air-walls' | 'prompts';
 
-const TABS: { id: Tab; label: string }[] = [
+const TOP_TABS: { id: TopTab; label: string }[] = [
+    { id: 'scenes', label: 'Scenes' },
+    { id: 'characters', label: 'Characters' },
+];
+
+const SCENE_SUB_TABS: { id: SceneSubTab; label: string }[] = [
+    { id: 'materials', label: 'Materials' },
     { id: 'air-walls', label: 'Air walls' },
     { id: 'prompts', label: 'Prompts' },
 ];
+
+/** Only Air Walls renders the Konva overlay above the Phaser canvas. */
+function needsWallCanvas(sub: SceneSubTab): boolean {
+    return sub === 'air-walls';
+}
 
 /**
  * Editor panel. Lazy-loaded (see App.tsx) so react-konva and editor UI
@@ -39,7 +59,8 @@ export function EditorPanel() {
     const [open, setOpen] = useState(false);
     const [sceneId, setSceneId] = useState<string | null>(null);
     const [level, setLevel] = useState<Level | null>(null);
-    const [tab, setTab] = useState<Tab>('air-walls');
+    const [topTab, setTopTab] = useState<TopTab>('scenes');
+    const [sceneSubTab, setSceneSubTab] = useState<SceneSubTab>('air-walls');
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -147,13 +168,13 @@ export function EditorPanel() {
                 hidden={!open}
             >
                 <nav className="flex border-b border-neutral-800">
-                    {TABS.map((t) => (
+                    {TOP_TABS.map((t) => (
                         <Button
                             key={t.id}
                             variant="ghost"
-                            onClick={() => setTab(t.id)}
+                            onClick={() => setTopTab(t.id)}
                             className={`flex-1 rounded-none border-b-2 ${
-                                tab === t.id
+                                topTab === t.id
                                     ? 'border-cyan-400 text-cyan-400'
                                     : 'border-transparent text-neutral-500 hover:text-neutral-300'
                             }`}
@@ -162,13 +183,31 @@ export function EditorPanel() {
                         </Button>
                     ))}
                 </nav>
+                {topTab === 'scenes' && (
+                    <nav className="flex border-b border-neutral-800 bg-neutral-900/60">
+                        {SCENE_SUB_TABS.map((t) => (
+                            <Button
+                                key={t.id}
+                                variant="ghost"
+                                onClick={() => setSceneSubTab(t.id)}
+                                className={`flex-1 rounded-none border-b-2 ${
+                                    sceneSubTab === t.id
+                                        ? 'border-cyan-400 text-cyan-400'
+                                        : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                                }`}
+                            >
+                                {t.label}
+                            </Button>
+                        ))}
+                    </nav>
+                )}
                 <div className="flex-1 overflow-y-auto p-3">
                     {!level && (
                         <div className="text-neutral-500 italic text-center py-4">
                             Waiting for scene…
                         </div>
                     )}
-                    {level && tab === 'air-walls' && (
+                    {level && topTab === 'scenes' && sceneSubTab === 'air-walls' && (
                         <AirWallsSection
                             level={level}
                             setLevel={handleLevelChange}
@@ -177,9 +216,19 @@ export function EditorPanel() {
                             onAddWall={handleAddWall}
                         />
                     )}
-                    {level && tab === 'prompts' && (
+                    {level && topTab === 'scenes' && sceneSubTab === 'materials' && (
+                        <div className="text-neutral-500 italic text-center py-4">
+                            Materials editor — v2
+                        </div>
+                    )}
+                    {level && topTab === 'scenes' && sceneSubTab === 'prompts' && (
                         <div className="text-neutral-500 italic text-center py-4">
                             Prompts editor — v2
+                        </div>
+                    )}
+                    {topTab === 'characters' && (
+                        <div className="text-neutral-500 italic text-center py-4">
+                            Characters editor — v2
                         </div>
                     )}
                 </div>
@@ -199,8 +248,10 @@ export function EditorPanel() {
                 the Phaser canvas — rendering it here in #app would put
                 it as a flex sibling to the panel, not over the canvas.
                 Skipped when the editor is closed: WallCanvas is purely
-                an editor feature, no need to render Konva when hidden. */}
-            {level && overlayTarget && open &&
+                an editor feature, no need to render Konva when hidden.
+                Also skipped unless the user is on the Air Walls sub-tab —
+                Materials / Prompts / Characters don't need the overlay. */}
+            {level && overlayTarget && open && needsWallCanvas(sceneSubTab) &&
                 createPortal(
                     <WallCanvas
                         level={level}

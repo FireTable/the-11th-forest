@@ -131,7 +131,7 @@ async function generateImage(opts: MainOpts): Promise<void> {
     const outName = `${model}-${Date.now()}.png`;
     const outPath = `./tmp/image/${outName}`;
     mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(outPath, bytes);
+    writeFileSync(outPath, new Uint8Array(bytes));
     console.log(`\nSaved ${bytes.length} bytes -> ${outPath}`);
 }
 
