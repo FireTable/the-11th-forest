@@ -16,7 +16,7 @@
 
 import type * as Phaser from 'phaser';
 
-import { RENDER_BULLET_TRAIL_LENGTH } from '@/lib/constants';
+import { DEPTH, RENDER_BULLET_TRAIL_LENGTH } from '@/lib/constants';
 
 // ─── Bullets ─────────────────────────────────────────────────────────────
 
@@ -95,10 +95,12 @@ export interface BulletTrail {
     positions: { x: number; y: number }[];
 }
 
-/** Create the shared trail graphics (one for all bullets, drawn in -1 depth). */
+
+
+/** Create the shared trail graphics (one for all bullets). */
 export function createBulletTrail(scene: Phaser.Scene): Phaser.GameObjects.Graphics {
     const g = scene.add.graphics();
-    g.setDepth(-1);
+    g.setDepth(DEPTH.BULLET_TRAIL);
     return g;
 }
 

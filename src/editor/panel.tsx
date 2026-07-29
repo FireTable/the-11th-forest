@@ -39,10 +39,7 @@ const SCENE_SUB_TABS: { id: SceneSubTab; label: string }[] = [
     { id: 'prompts', label: 'Prompts' },
 ];
 
-/** Only Air Walls renders the Konva overlay above the Phaser canvas. */
-function needsWallCanvas(sub: SceneSubTab): boolean {
-    return sub === 'air-walls';
-}
+
 
 /**
  * Editor panel. Lazy-loaded (see App.tsx) so react-konva and editor UI
@@ -244,17 +241,16 @@ export function EditorPanel() {
             </aside>
             {/* Konva overlay above the Phaser canvas. Portaled into
                 #game-container so it tracks the same display size as
-                the Phaser canvas — rendering it here in #app would put
-                it as a flex sibling to the panel, not over the canvas.
-                Skipped when the editor is closed: WallCanvas is purely
-                an editor feature, no need to render Konva when hidden.
-                Also skipped unless the user is on the Air Walls sub-tab —
-                Materials / Prompts / Characters don't need the overlay. */}
-            {level && overlayTarget && open && needsWallCanvas(sceneSubTab) &&
+                the Phaser canvas.
+                Renders air-walls visually in all Scenes sub-tabs, but only
+                enables pointer events / interactions when on the 'air-walls' tab.
+                Other tabs (Materials, Prompts) pass pointer events through to Phaser. */}
+            {level && overlayTarget && open && topTab === 'scenes' &&
                 createPortal(
                     <WallCanvas
                         level={level}
                         drawing={drawing}
+                        active={sceneSubTab === 'air-walls'}
                         onLevelChange={handleLevelChange}
                         onAirWallDrawn={handleAirWallDrawn}
                     />,

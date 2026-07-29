@@ -114,3 +114,22 @@ export function movePoint(
         }),
     };
 }
+
+/** Move all vertices of the named wall by delta (dx, dy). */
+export function moveWallPolygon(
+    level: Level,
+    id: string,
+    dx: number,
+    dy: number,
+): Level {
+    return {
+        ...level,
+        airWalls: level.airWalls.map((w) => {
+            if (w.id !== id) return w;
+            return {
+                ...w,
+                points: w.points.map(([x, y]) => [Math.round(x + dx), Math.round(y + dy)] as AirWallVertex),
+            };
+        }),
+    };
+}

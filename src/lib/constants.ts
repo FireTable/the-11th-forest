@@ -25,7 +25,9 @@ export const CAT = {
 export const DEPTH = {
     BACKGROUND_IMAGE: 0,
     MATERIAL_BACKGROUND: 10,
-    // Y-sorting range for characters, monsters, bullets, and y-sort materials (y-coord + offset)
+    BULLET_TRAIL: 15,
+    PROJECTILE_BASE: 20, // Min base depth for bullets so they always render OVER background materials
+    // Y-sorting range for characters, monsters, bullets, and y-sort materials (PROJECTILE_BASE + y-coord + offset)
     FOREGROUND_MATERIAL: 10000,
     SELECTION_BOX: 15000,
     HUD: 20000,

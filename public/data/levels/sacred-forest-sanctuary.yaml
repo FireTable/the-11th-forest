@@ -9,17 +9,17 @@ airWalls:
         - 658
       - - 114
         - 699
-      - - 201
-        - 790
+      - - 226
+        - 821
       - - 313
         - 901
-      - - 397
-        - 909
-      - - 441
-        - 909
+      - - 395
+        - 897
+      - - 453
+        - 897
       - - 498
         - 920
-      - - 528
+      - - 540
         - 963
       - - 536
         - 1009
@@ -69,35 +69,6 @@ airWalls:
         - 1532
       - - 5
         - 1532
-  - id: wall-2
-    kind: short
-    points:
-      - - 2004
-        - 996
-      - - 1977
-        - 1017
-      - - 1987
-        - 1042
-      - - 2000
-        - 1067
-      - - 2009
-        - 1086
-      - - 2052
-        - 1090
-      - - 2091
-        - 1079
-      - - 2118
-        - 1073
-      - - 2110
-        - 1044
-      - - 2116
-        - 1025
-      - - 2110
-        - 990
-      - - 2070
-        - 968
-      - - 2027
-        - 977
   - id: wall-3
     kind: short
     points:
@@ -342,4 +313,16 @@ monsters:
     at:
       - 2000
       - 600
-materials: []
+materials:
+  - id: mat-ms66o299
+    texture: assets/image/materials/common/hash-77c652357d92.png
+    x: 1376
+    'y': 1020
+    mode: background
+    depthOffset: 0
+  - id: mat-ms66unex
+    texture: assets/image/materials/common/hash-2a4e7b7464d2.png
+    x: 2078
+    'y': 1320
+    mode: foreground
+    depthOffset: 0

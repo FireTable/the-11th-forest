@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Circle, Layer, Line, Stage } from 'react-konva';
+import { Circle, Group, Layer, Line, Stage } from 'react-konva';
 import type Konva from 'konva';
 
-import { movePoint, removePoint } from '@/lib/editor/air-walls';
+import { movePoint, moveWallPolygon, removePoint } from '@/lib/editor/air-walls';
 import { isMeaningfulPolygon } from '@/lib/editor/polygon';
 import type { AirWall, AirWallVertex, Level } from '@/lib/levels/types';
 
@@ -27,6 +27,7 @@ import type { AirWall, AirWallVertex, Level } from '@/lib/levels/types';
 interface Props {
     level: Level;
     drawing: boolean;
+    active?: boolean;
     onLevelChange: (next: Level) => void;
     /** Called when the user closes a draft polygon by clicking near vertex 0. */
     onAirWallDrawn: (points: AirWallVertex[]) => void;
@@ -37,10 +38,10 @@ const HANDLE_RADIUS = 4;
 const DRAFT_POINT_RADIUS = 5;
 
 const COLORS = {
-    tallFill: 'rgba(255, 51, 68, 0.4)',
-    tallStroke: '#ff3344',
-    shortFill: 'rgba(51, 136, 255, 0.4)',
-    shortStroke: '#3388ff',
+    tallFill: 'rgba(255, 51, 68, 0.2)',
+    tallStroke: 'rgba(255, 51, 68, 0.5)',
+    shortFill: 'rgba(51, 136, 255, 0.2)',
+    shortStroke: 'rgba(51, 136, 255, 0.5)',
     draftLine: '#00ffff',
     handleFill: 'rgba(0, 255, 255, 0.55)',
     handleStroke: 'rgba(0, 0, 0, 0.6)',
@@ -53,7 +54,7 @@ interface StageBox {
     height: number;
 }
 
-export function WallCanvas({ level, drawing, onLevelChange, onAirWallDrawn }: Props) {
+export function WallCanvas({ level, drawing, active = true, onLevelChange, onAirWallDrawn }: Props) {
     const wrapperRef = useRef<HTMLDivElement>(null);
     const [box, setBox] = useState<StageBox>({ x: 0, y: 0, width: 0, height: 0 });
     const [draftPoints, setDraftPoints] = useState<AirWallVertex[]>([]);
@@ -104,30 +105,35 @@ export function WallCanvas({ level, drawing, onLevelChange, onAirWallDrawn }: Pr
 
     function handleStagePointer(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
         if (!drawing) return;
+        // Stage coordinates are relative to the Stage element (0..box.width/height).
         const stage = e.target.getStage();
-        if (!stage) return;
-        const pos = stage.getPointerPosition();
+        const pos = stage?.getPointerPosition();
         if (!pos) return;
+
+        // Convert display px → image px
         const imgX = Math.round(pos.x / scale);
         const imgY = Math.round(pos.y / scale);
-        const current = draftPointsRef.current;
 
-        if (current.length >= 3) {
-            const [fx, fy] = current[0];
-            const dx = imgX - fx;
-            const dy = imgY - fy;
-            if (dx * dx + dy * dy < CLOSE_TOLERANCE_PX ** 2) {
-                if (isMeaningfulPolygon(current)) {
-                    onAirWallDrawn(current);
+        const currentDraft = draftPointsRef.current;
+        if (currentDraft.length >= 3) {
+            // Check for close-polygon click near vertex 0
+            const [x0, y0] = currentDraft[0];
+            const d = Math.hypot(pos.x - x0 * scale, pos.y - y0 * scale);
+            if (d <= CLOSE_TOLERANCE_PX) {
+                // Done! Commit and reset draft state
+                if (isMeaningfulPolygon(currentDraft)) {
+                    onAirWallDrawn(currentDraft);
                 }
                 setDraftPoints([]);
                 return;
             }
         }
-
-        const last = current[current.length - 1];
+        
+        // Prevent duplicate consecutive points
+        const last = currentDraft[currentDraft.length - 1];
         if (last && last[0] === imgX && last[1] === imgY) return;
-        setDraftPoints([...current, [imgX, imgY]]);
+        
+        setDraftPoints([...currentDraft, [imgX, imgY]]);
     }
 
     function handleEscape(e: KeyboardEvent) {
@@ -140,6 +146,8 @@ export function WallCanvas({ level, drawing, onLevelChange, onAirWallDrawn }: Pr
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [drawing]);
 
+    const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
+
     return (
         <div
             ref={wrapperRef}
@@ -147,32 +155,74 @@ export function WallCanvas({ level, drawing, onLevelChange, onAirWallDrawn }: Pr
         >
             {box.width > 0 && box.height > 0 && (
                 <div
-                    className="pointer-events-auto absolute"
+                    className={`absolute ${active ? 'pointer-events-auto' : 'pointer-events-none'}`}
                     style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
                 >
                     <Stage
                         width={box.width}
                         height={box.height}
-                        onClick={handleStagePointer}
-                        onTap={handleStagePointer}
+                        onClick={(e) => {
+                            // Clear selected wall if clicking empty stage space
+                            if (e.target === e.target.getStage()) {
+                                setSelectedWallId(null);
+                            }
+                            handleStagePointer(e);
+                        }}
+                        onTap={(e) => {
+                            if (e.target === e.target.getStage()) {
+                                setSelectedWallId(null);
+                            }
+                            handleStagePointer(e);
+                        }}
                     >
-                    <Layer listening={false}>
-                        {level.airWalls.map((w) => (
-                            <WallShape key={w.id} wall={w} scale={scale} />
-                        ))}
-                    </Layer>
-                    <Layer>
-                        {level.airWalls.map((w) => (
-                            <VertexHandles
-                                key={w.id}
-                                wall={w}
-                                scale={scale}
-                                onMove={(i, x, y) =>
-                                    onLevelChange(movePoint(level, w.id, i, x, y))
-                                }
-                                onRemove={(i) => onLevelChange(removePoint(level, w.id, i))}
-                            />
-                        ))}
+                    <Layer listening={active}>
+                        {level.airWalls.map((w) => {
+                            const isSelected = selectedWallId === w.id;
+                            const canDrag = active && !drawing;
+                            return (
+                                <Group
+                                    key={w.id}
+                                    draggable={canDrag}
+                                    onClick={(e) => {
+                                        e.cancelBubble = true;
+                                        setSelectedWallId(w.id);
+                                    }}
+                                    onTap={(e) => {
+                                        e.cancelBubble = true;
+                                        setSelectedWallId(w.id);
+                                    }}
+                                    onDragEnd={(e) => {
+                                        const node = e.target;
+                                        // Only handle dragEnd if the event target is this Group
+                                        if (node.nodeType === 'Group') {
+                                            const dx = Math.round(node.x() / scale);
+                                            const dy = Math.round(node.y() / scale);
+                                            node.x(0);
+                                            node.y(0);
+                                            if (dx !== 0 || dy !== 0) {
+                                                onLevelChange(moveWallPolygon(level, w.id, dx, dy));
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <WallShape
+                                        wall={w}
+                                        scale={scale}
+                                        isSelected={isSelected}
+                                    />
+                                    {active && (
+                                        <VertexHandles
+                                            wall={w}
+                                            scale={scale}
+                                            onMove={(i, x, y) =>
+                                                onLevelChange(movePoint(level, w.id, i, x, y))
+                                            }
+                                            onRemove={(i) => onLevelChange(removePoint(level, w.id, i))}
+                                        />
+                                    )}
+                                </Group>
+                            );
+                        })}
                     </Layer>
                     {drawing && (
                         <Layer listening={false}>
@@ -213,16 +263,22 @@ export function WallCanvas({ level, drawing, onLevelChange, onAirWallDrawn }: Pr
 interface WallShapeProps {
     wall: AirWall;
     scale: number;
+    isSelected: boolean;
 }
 
-function WallShape({ wall, scale }: WallShapeProps) {
+function WallShape({ wall, scale, isSelected }: WallShapeProps) {
     const flat = useMemo(
         () => wall.points.flatMap(([x, y]) => [x * scale, y * scale]),
         [wall.points, scale],
     );
     const fill = wall.kind === 'tall' ? COLORS.tallFill : COLORS.shortFill;
-    const stroke = wall.kind === 'tall' ? COLORS.tallStroke : COLORS.shortStroke;
-    const strokeWidth = wall.kind === 'tall' ? 2 : 3;
+    const stroke = isSelected
+        ? '#00ffff'
+        : wall.kind === 'tall'
+          ? COLORS.tallStroke
+          : COLORS.shortStroke;
+    const strokeWidth = isSelected ? 3 : wall.kind === 'tall' ? 2 : 3;
+
     return (
         <Line
             points={flat}
