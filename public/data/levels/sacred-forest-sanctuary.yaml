@@ -412,19 +412,16 @@ airWalls:
       - - 2744
         - 6
 characterSpawn:
-  at:
-    - 2600
-    - 800
+  x: 2600
+  'y': 800
   facing: left
 monsters:
   - type: drone
-    at:
-      - 800
-      - 800
+    x: 800
+    'y': 800
   - type: gunner
-    at:
-      - 2000
-      - 600
+    x: 2000
+    'y': 600
 materials:
   - id: mat-ms66o299
     texture: assets/image/materials/common/hash-77c652357d92.png

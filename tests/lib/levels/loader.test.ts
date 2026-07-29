@@ -158,12 +158,15 @@ airWalls: []
 character: wanderer
 monsters:
   - type: drone
-    at: [400, 400]
+    x: 400
+    y: 400
   - type: gunner
-    at: [800, 200]
+    x: 800
+    y: 200
 dropSpawns:
   - type: hp-shard
-    at: [200, 800]
+    x: 200
+    y: 800
 `;
         const level = parseLevelYaml(yamlText, 'spawny');
         expect(level.character).toBe('wanderer');
@@ -201,7 +204,7 @@ monsters:
         expect(() => parseLevelYaml(yamlText, 't')).toThrow(/type/);
     });
 
-    it('rejects monster spawn with at that is not [x, y]', () => {
+    it('rejects monster spawn with invalid coordinates', () => {
         const yamlText = `
 title: t
 background: a.png
@@ -210,12 +213,12 @@ promptFile: p.yaml
 airWalls: []
 monsters:
   - type: drone
-    at: [10]
+    x: 10
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/at/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/numbers x and y/);
     });
 
-    it('parses characterSpawn with at + facing', () => {
+    it('parses characterSpawn with x/y + facing', () => {
         const yamlText = `
 title: t
 background: a.png
@@ -223,7 +226,8 @@ imageSize: 100x100
 promptFile: p.yaml
 airWalls: []
 characterSpawn:
-  at: [200, 300]
+  x: 200
+  y: 300
   facing: left
 `;
         const level = parseLevelYaml(yamlText, 't');
@@ -250,13 +254,14 @@ imageSize: 1x1
 promptFile: p.yaml
 airWalls: []
 characterSpawn:
-  at: [10, 20]
+  x: 10
+  y: 20
   facing: sideways
 `;
         expect(() => parseLevelYaml(yamlText, 't')).toThrow(/facing/);
     });
 
-    it('rejects characterSpawn without at', () => {
+    it('rejects characterSpawn without x and y', () => {
         const yamlText = `
 title: t
 background: a.png
@@ -266,7 +271,7 @@ airWalls: []
 characterSpawn:
   facing: right
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/at/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/numbers x and y/);
     });
 });
 

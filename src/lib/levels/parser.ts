@@ -116,8 +116,8 @@ function parseAirWall(raw: unknown, idx: number): AirWall {
  *
  * Optional Phase-1+ fields:
  *   character:  string                # character id (no extra config; just the id)
- *   monsters:   [{ type: id, at: [x, y] }, ...]
- *   dropSpawns: [{ type: id, at: [x, y] }, ...]
+ *   monsters:   [{ type: id, x, y }, ...]
+ *   dropSpawns: [{ type: id, x, y }, ...]
  *
  * Missing fields are simply absent — no default monster spawns unless listed.
  */
@@ -222,15 +222,15 @@ function parsePlacedMaterial(raw: unknown, idx: number, id: string): PlacedMater
     return res;
 }
 
-function parsePoint(raw: unknown, label: string, idx: number, id: string): { x: number; y: number } {
-    if (!Array.isArray(raw) || raw.length !== 2) {
-        throw new Error(`Level ${id}: ${label}[${idx}].at must be [x, y]`);
+function parsePoint(obj: Record<string, unknown>, label: string, idx: number, id: string): { x: number; y: number } {
+    if (typeof obj.x === 'number' && Number.isFinite(obj.x) && typeof obj.y === 'number' && Number.isFinite(obj.y)) {
+        return { x: Math.round(obj.x), y: Math.round(obj.y) };
     }
-    const [x, y] = raw;
-    if (typeof x !== 'number' || typeof y !== 'number') {
-        throw new Error(`Level ${id}: ${label}[${idx}].at must be two numbers`);
+    // Backward compatibility for legacy `at: [x, y]`
+    if (Array.isArray(obj.at) && obj.at.length === 2 && typeof obj.at[0] === 'number' && typeof obj.at[1] === 'number') {
+        return { x: Math.round(obj.at[0]), y: Math.round(obj.at[1]) };
     }
-    return { x: Math.round(x), y: Math.round(y) };
+    throw new Error(`Level ${id}: ${label}${idx >= 0 ? `[${idx}]` : ''} must specify numbers x and y`);
 }
 
 function parseMonsterSpawn(raw: unknown, idx: number, id: string): MonsterSpawn {
@@ -241,8 +241,8 @@ function parseMonsterSpawn(raw: unknown, idx: number, id: string): MonsterSpawn 
     if (typeof m.type !== 'string' || m.type.length === 0) {
         throw new Error(`Level ${id}: monsters[${idx}].type must be a non-empty string`);
     }
-    const at = parsePoint(m.at, 'monsters', idx, id);
-    return { type: m.type, x: at.x, y: at.y };
+    const point = parsePoint(m, 'monsters', idx, id);
+    return { type: m.type, x: point.x, y: point.y };
 }
 
 function parseDropSpawn(raw: unknown, idx: number, id: string): DropSpawn {
@@ -253,8 +253,8 @@ function parseDropSpawn(raw: unknown, idx: number, id: string): DropSpawn {
     if (typeof d.type !== 'string' || d.type.length === 0) {
         throw new Error(`Level ${id}: dropSpawns[${idx}].type must be a non-empty string`);
     }
-    const at = parsePoint(d.at, 'dropSpawns', idx, id);
-    return { type: d.type, x: at.x, y: at.y };
+    const point = parsePoint(d, 'dropSpawns', idx, id);
+    return { type: d.type, x: point.x, y: point.y };
 }
 
 function parseCharacterSpawn(raw: unknown, id: string): CharacterSpawn {
@@ -262,7 +262,7 @@ function parseCharacterSpawn(raw: unknown, id: string): CharacterSpawn {
         throw new Error(`Level ${id}: characterSpawn must be an object`);
     }
     const s = raw as Record<string, unknown>;
-    const point = parsePoint(s.at, 'characterSpawn', 0, id);
+    const point = parsePoint(s, 'characterSpawn', -1, id);
     if (s.facing !== 'left' && s.facing !== 'right') {
         throw new Error(
             `Level ${id}: characterSpawn.facing must be 'left' or 'right', got ${JSON.stringify(s.facing)}`,

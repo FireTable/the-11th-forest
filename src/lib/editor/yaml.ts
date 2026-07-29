@@ -19,13 +19,9 @@ export function serializeLevelYaml(level: Level): string {
     //
     // Each field is mapped explicitly to its YAML shape:
     //   - imageSize       → "WxH" string
-    //   - characterSpawn  → { at: [x, y], facing } (parser expects at)
-    //   - monsters        → [{ type, at: [x, y] }, ...] (same as parser)
-    //   - dropSpawns      → [{ type, at: [x, y] }, ...] (same as parser)
-    //
-    // Re-emitting monsters/dropSpawns as `at: [x, y]` (not flat `x/y`)
-    // keeps round-tripping through the parser and avoids js-yaml quoting
-    // `y`/`n` keys (YAML 1.1 booleans).
+    //   - characterSpawn  → { x, y, facing }
+    //   - monsters        → [{ type, x, y }, ...]
+    //   - dropSpawns      → [{ type, x, y }, ...]
     //
     // Undefined optional fields are dropped so the YAML stays minimal.
     const payload: Record<string, unknown> = {
@@ -38,20 +34,23 @@ export function serializeLevelYaml(level: Level): string {
     if (level.character !== undefined) payload.character = level.character;
     if (level.characterSpawn !== undefined) {
         payload.characterSpawn = {
-            at: [level.characterSpawn.x, level.characterSpawn.y],
+            x: level.characterSpawn.x,
+            y: level.characterSpawn.y,
             facing: level.characterSpawn.facing,
         };
     }
     if (level.monsters !== undefined) {
         payload.monsters = level.monsters.map((m) => ({
             type: m.type,
-            at: [m.x, m.y],
+            x: m.x,
+            y: m.y,
         }));
     }
     if (level.dropSpawns !== undefined) {
         payload.dropSpawns = level.dropSpawns.map((d) => ({
             type: d.type,
-            at: [d.x, d.y],
+            x: d.x,
+            y: d.y,
         }));
     }
     if (level.materials !== undefined) {

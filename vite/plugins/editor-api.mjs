@@ -33,8 +33,7 @@ const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
  * optional fields were silently dropped here. Same shape as the client
  * implementation: every Level field emitted in the documented YAML
  * order, undefined optional fields omitted, characterSpawn / monsters /
- * dropSpawns mapped to { at: [x, y], ... } so the parser accepts them
- * back and js-yaml doesn't have to quote the bare `y`/`n` keys.
+ * dropSpawns mapped to { x, y, ... } so the parser accepts them.
  */
 function serializeLevelYaml(level) {
     const payload = {
@@ -47,20 +46,23 @@ function serializeLevelYaml(level) {
     if (level.character !== undefined) payload.character = level.character;
     if (level.characterSpawn !== undefined) {
         payload.characterSpawn = {
-            at: [level.characterSpawn.x, level.characterSpawn.y],
+            x: level.characterSpawn.x,
+            y: level.characterSpawn.y,
             facing: level.characterSpawn.facing,
         };
     }
     if (level.monsters !== undefined) {
         payload.monsters = level.monsters.map((m) => ({
             type: m.type,
-            at: [m.x, m.y],
+            x: m.x,
+            y: m.y,
         }));
     }
     if (level.dropSpawns !== undefined) {
         payload.dropSpawns = level.dropSpawns.map((d) => ({
             type: d.type,
-            at: [d.x, d.y],
+            x: d.x,
+            y: d.y,
         }));
     }
     if (level.materials !== undefined) payload.materials = level.materials;
