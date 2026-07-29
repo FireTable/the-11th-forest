@@ -347,7 +347,7 @@ export class CharacterController {
      *   - `run` while moving and not in a dodge roll.
      *   - `idle` otherwise.
      *   - When the dodge roll's animationcomplete fires, onAnimComplete
-     *     chains to run or idle based on current movement.
+     *     chains to walk or idle based on current movement.
      *
      * Each anim is gated on `scene.anims.exists(key)` so a character
      * without declared anims falls through silently (debug fallback).
@@ -355,7 +355,7 @@ export class CharacterController {
     private driveAnims(isMovingInput: boolean, isDodging: boolean): void {
         if (!this.spec.anims) return;
         const sprite = this.parts.sprite;
-        const runKey = animKey(this.spec, 'run');
+        const walkKey = animKey(this.spec, 'walk');
         const dodgeKey = animKey(this.spec, 'dodge');
         const idleKey = animKey(this.spec, 'idle');
         const cur = sprite.anims.currentAnim?.key ?? null;
@@ -368,13 +368,13 @@ export class CharacterController {
         if (cur === dodgeKey) {
             // Dodge window ended but the roll animation is still in
             // flight — let it play through. onAnimComplete chains to
-            // run or idle based on movement state.
+            // walk or idle based on movement state.
             return;
         }
         const moving = isMovingInput;
         if (moving) {
-            if (cur !== runKey && this.scene.anims.exists(runKey)) {
-                sprite.anims.play(runKey, true);
+            if (cur !== walkKey && this.scene.anims.exists(walkKey)) {
+                sprite.anims.play(walkKey, true);
             }
         } else if (cur !== idleKey && this.scene.anims.exists(idleKey)) {
             sprite.anims.play(idleKey, true);
@@ -405,8 +405,8 @@ export class CharacterController {
             right: kb.addKey(KEY_D).isDown,
         });
         if (intent.vx !== 0 || intent.vy !== 0) {
-            const runKey = animKey(this.spec, 'run');
-            if (this.scene.anims.exists(runKey)) sprite.anims.play(runKey, true);
+            const walkKey = animKey(this.spec, 'walk');
+            if (this.scene.anims.exists(walkKey)) sprite.anims.play(walkKey, true);
         } else {
             const idleKey = animKey(this.spec, 'idle');
             if (this.scene.anims.exists(idleKey)) sprite.anims.play(idleKey, true);

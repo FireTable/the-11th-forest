@@ -8,8 +8,8 @@
  * The sheet does not need an even grid: frames are found by scanning for
  * fully-transparent bands (rows first, then columns within each row).
  */
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, copyFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 import { PNG } from 'pngjs';
 
@@ -547,6 +547,7 @@ function main(): void {
     const colors = Number(
         flags.find((f) => f.startsWith('--colors='))?.slice(9) ?? 64,
     );
+    const inPlace = flags.includes('--in-place');
 
     const png = PNG.sync.read(readFileSync(src));
     keyOut(png, { blackFringe });
@@ -606,6 +607,32 @@ function main(): void {
                 : detectGrid(frames);
         const outFile = join(outDir, 'recomposed.png');
         recompose(outDir, src, grid.rows, grid.cols, outFile, workPng);
+
+        // --in-place: copy source to raws/<id>.png and processed to
+        // <id>.png under public/assets/image/characters/. Requires
+        // --id=<character_id>. Runs the project, not /tmp, so the
+        // Phaser asset pipeline picks up the new sprite immediately.
+        if (inPlace) {
+            const id = flags.find((f) => f.startsWith('--id='))?.slice(5);
+            if (!id) {
+                throw new Error('--in-place requires --id=<character_id>');
+            }
+            const projectRoot = resolve(__dirname, '..');
+            const processedPath = join(
+                projectRoot,
+                'public/assets/image/characters',
+                `${id}.png`,
+            );
+            const rawsPath = join(
+                projectRoot,
+                'public/assets/image/characters/raws',
+                `${id}.png`,
+            );
+            mkdirSync(dirname(rawsPath), { recursive: true });
+            copyFileSync(src, rawsPath);
+            copyFileSync(outFile, processedPath);
+            console.log(`in-place: ${id}.png ← raws/${id}.png (source archived)`);
+        }
     }
 }
 

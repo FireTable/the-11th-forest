@@ -2,7 +2,7 @@ id: wanderer
 name: Wanderer
 hp: 9999
 sp: 60
-moveSpeed: 5
+moveSpeed: 4
 spRegenMs: 5000
 body:
     halfW: 16
@@ -25,7 +25,7 @@ anims:
         frames: [0, 4]
         frameRate: 3
         repeat: -1
-    run:
+    walk:
         frames: [5, 9]
         frameRate: 12
         repeat: -1
