@@ -53,6 +53,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@eslint/js':
         specifier: ^9.22.0
@@ -104,7 +107,7 @@ importers:
         version: 15.5.2
       openai:
         specifier: ^6.49.0
-        version: 6.49.0(ws@8.21.1)
+        version: 6.49.0(ws@8.21.1)(zod@4.4.3)
       pngjs:
         specifier: 7.0.0
         version: 7.0.0
@@ -2956,6 +2959,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@babel/code-frame@7.29.7':
@@ -5122,9 +5128,10 @@ snapshots:
     dependencies:
       mimic-function: 5.0.1
 
-  openai@6.49.0(ws@8.21.1):
+  openai@6.49.0(ws@8.21.1)(zod@4.4.3):
     optionalDependencies:
       ws: 8.21.1
+      zod: 4.4.3
 
   optionator@0.9.4:
     dependencies:
@@ -5596,3 +5603,5 @@ snapshots:
   yaml@2.9.0: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.4.3: {}

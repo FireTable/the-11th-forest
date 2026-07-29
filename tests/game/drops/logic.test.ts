@@ -18,7 +18,7 @@ describe('drops/logic — planDropEffect', () => {
             name: 'HP Shard',
             kind: 'static',
             visual: { size: 18, tint: 0x22c55e },
-            effect: { type: 'instant', hp: 25 },
+            effect: { type: 'instant', hp: 25, sp: 0 },
         };
         planDropEffect(spec, sinks);
         expect(sinks.heal).toHaveBeenCalledWith(25, 0);
@@ -33,7 +33,7 @@ describe('drops/logic — planDropEffect', () => {
             name: 'SP',
             kind: 'static',
             visual: { size: 18, tint: 0x22c55e },
-            effect: { type: 'instant', sp: 30 },
+            effect: { type: 'instant', hp: 0, sp: 30 },
         };
         planDropEffect(spec, sinks);
         expect(sinks.heal).toHaveBeenCalledWith(0, 30);
