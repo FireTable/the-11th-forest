@@ -6,23 +6,121 @@
  *
  * Endpoints (all POST, JSON in / JSON out):
  *   /api/editor/save-level   body: { id: string, level: Level }
- *                            → writes public/data/levels/<id>.yaml
+ *                            → validates level payload with a parallel
+ *                              Zod schema, then writes
+ *                              public/data/levels/<id>.yaml
  *                              (Vite watches public/ and triggers full reload)
  *
  * Conventions:
  *   - id MUST match /^[a-z][a-z0-9-]*$/ (rejects path traversal, dots, etc.)
  *   - YAML shape mirrors src/lib/editor/yaml.ts. Drifts are caught by
  *     scripts/validate-levels.ts on the next run.
+ *
+ * The save-time validator below mirrors src/lib/levels/schema.ts. We
+ * can't directly import the TS schema (this file is .mjs, no tsx), so
+ * the shape is duplicated. If you change one, change both.
  */
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeFile } from 'node:fs/promises';
 import { dump as stringifyYaml } from 'js-yaml';
+import { z } from 'zod';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * Server-side mirror of src/lib/levels/schema.ts → LevelSchema.
+ *
+ * MUST stay in sync with the TS schema. The editor panel sends JSON
+ * before serializing; this server validates the JSON shape so a typo
+ * in the panel doesn't silently write a malformed YAML that the game
+ * then refuses to load.
+ *
+ * Kept narrower than the TS schema because the editor only sends the
+ * fields it knows about (no legacy rect air walls).
+ */
+const SaveLevelSchema = z
+    .object({
+        title: z.string().min(1),
+        background: z.string().min(1),
+        imageSize: z.union([
+            z.string().regex(/^\d+x\d+$/, 'expected "WxH"'),
+            z.object({ width: z.number(), height: z.number() }),
+        ]),
+        prompt: z.string().optional(),
+        airWalls: z
+            .array(
+                z
+                    .object({
+                        id: z.string().min(1),
+                        kind: z.enum(['tall', 'short']),
+                        points: z
+                            .array(z.tuple([z.number(), z.number()]))
+                            .min(3),
+                    })
+                    .strict(),
+            )
+            .optional(),
+        character: z.string().min(1).optional(),
+        characterSpawn: z
+            .object({
+                facing: z.enum(['left', 'right']),
+                x: z.number(),
+                y: z.number(),
+            })
+            .strict()
+            .optional(),
+        monsters: z
+            .array(
+                z
+                    .object({
+                        type: z.string().min(1),
+                        x: z.number(),
+                        y: z.number(),
+                    })
+                    .strict(),
+            )
+            .optional(),
+        dropSpawns: z
+            .array(
+                z
+                    .object({
+                        type: z.string().min(1),
+                        x: z.number(),
+                        y: z.number(),
+                    })
+                    .strict(),
+            )
+            .optional(),
+        materials: z
+            .array(
+                z
+                    .object({
+                        id: z.string().min(1),
+                        texture: z.string().min(1),
+                        x: z.number(),
+                        y: z.number(),
+                        scale: z.number().optional(),
+                        rotation: z.number().optional(),
+                        flipX: z.boolean().optional(),
+                        flipY: z.boolean().optional(),
+                        mode: z.enum(['background', 'y-sort', 'foreground']).optional(),
+                        depthOffset: z.number().optional(),
+                    })
+                    .strict(),
+            )
+            .optional(),
+    })
+    .strict();
+
+function formatZodIssues(issues) {
+    return issues
+        .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+        .join('; ');
+}
 
 /**
  * Server-side mirror of src/lib/editor/yaml.ts → serializeLevelYaml.
@@ -33,13 +131,19 @@ const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
  * optional fields were silently dropped here. Same shape as the client
  * implementation: every Level field emitted in the documented YAML
  * order, undefined optional fields omitted, characterSpawn / monsters /
- * dropSpawns mapped to { x, y, ... } so the parser accepts them.
+ * dropSpawns mapped to flat { x, y }.
  */
 function serializeLevelYaml(level) {
+    // Normalise imageSize to "WxH" string on the server side too.
+    const imageSize =
+        typeof level.imageSize === 'string'
+            ? level.imageSize
+            : `${level.imageSize.width}x${level.imageSize.height}`;
+
     const payload = {
         title: level.title,
         background: level.background,
-        imageSize: `${level.imageSize.width}x${level.imageSize.height}`,
+        imageSize,
         prompt: level.prompt,
         airWalls: level.airWalls,
     };
@@ -106,7 +210,18 @@ async function handleSaveLevel(req, res) {
     if (!level || typeof level !== 'object') {
         return sendJson(res, 400, { error: 'level required' });
     }
-    const yaml = serializeLevelYaml(level);
+
+    // Save-time validation: reject malformed payloads with 400 instead
+    // of writing a YAML the game refuses to load. Mirrors the TS
+    // LevelSchema in src/lib/levels/schema.ts.
+    const result = SaveLevelSchema.safeParse(level);
+    if (!result.success) {
+        return sendJson(res, 400, {
+            error: `level validation failed: ${formatZodIssues(result.error.issues)}`,
+        });
+    }
+
+    const yaml = serializeLevelYaml(result.data);
     const outPath = path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`);
     await writeFile(outPath, yaml, 'utf8');
     return sendJson(res, 200, { ok: true, path: path.relative(path.resolve(__dirname, '../..'), outPath) });
@@ -160,10 +275,10 @@ async function handleUploadMaterial(req, res) {
     const rawPath = path.join(folderDir, 'temp-upload-raw.png');
     await writeFile(rawPath, buffer);
 
-    // Call split-sheet.ts CLI script to cut material tiles with --append and --hash
+    // Call split-sheet.ts CLI script to cut material tiles with --append
     const projectRoot = path.resolve(__dirname, '../..');
-    const cmd = `pnpm tsx scripts/split-sheet.ts "${rawPath}" "${folderDir}" --append --hash --no-recompose`;
-    
+    const cmd = `pnpm tsx scripts/split-sheet.ts "${rawPath}" "${folderDir}" --append --no-recompose`;
+
     try {
         await execAsync(cmd, { cwd: projectRoot });
     } catch (e) {
@@ -215,8 +330,7 @@ export function editorApiPlugin() {
                 try {
                     await handleUploadMaterial(req, res);
                 } catch (e) {
-                    const status = e instanceof BadRequest ? 400 : 500;
-                    sendJson(res, status, { error: String(e?.message ?? e) });
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
                 }
             });
             server.middlewares.use('/api/editor/delete-material-item', async (req, res, next) => {
@@ -224,8 +338,7 @@ export function editorApiPlugin() {
                 try {
                     await handleDeleteMaterialItem(req, res);
                 } catch (e) {
-                    const status = e instanceof BadRequest ? 400 : 500;
-                    sendJson(res, status, { error: String(e?.message ?? e) });
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
                 }
             });
         },
