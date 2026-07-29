@@ -38,15 +38,73 @@ import {
 
 export type MonsterState = 'idle' | 'chase' | 'attack' | 'dying';
 
+export function textureKey(spec: MonsterSpec): string {
+    return `monster:${spec.id ?? spec.name}`;
+}
+
+export function animKey(spec: MonsterSpec, animName: string): string {
+    return `${textureKey(spec)}:${animName}`;
+}
+
+export function loadMonsterAssets(
+    scene: Pick<Phaser.Scene, 'load'>,
+    specs: Iterable<MonsterSpec>,
+    getSpriteCell: (spec: MonsterSpec) => Promise<{ width: number; height: number }>,
+): Promise<void> {
+    const promises: Promise<void>[] = [];
+    for (const spec of specs) {
+        if (!spec.sprite) continue;
+        const key = textureKey(spec);
+        const url = spec.sprite.texture.startsWith('/')
+            ? spec.sprite.texture
+            : `/${spec.sprite.texture}`;
+        promises.push(
+            getSpriteCell(spec).then((cell) => {
+                scene.load.spritesheet(key, url, {
+                    frameWidth: cell.width,
+                    frameHeight: cell.height,
+                });
+            }),
+        );
+    }
+    return Promise.all(promises).then(() => undefined);
+}
+
+export function createMonsterAnims(
+    scene: Pick<Phaser.Scene, 'anims'>,
+    specs: Iterable<MonsterSpec>,
+): void {
+    for (const spec of specs) {
+        if (!spec.anims) continue;
+        for (const [name, anim] of Object.entries(spec.anims)) {
+            const key = animKey(spec, name);
+            if (scene.anims.exists(key)) scene.anims.remove(key);
+            const texture = textureKey(spec);
+            const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+            for (let i = anim.frames[0]; i <= anim.frames[1]; i++) {
+                frames.push({ key: texture, frame: i });
+            }
+            scene.anims.create({
+                key,
+                frames,
+                frameRate: anim.frameRate,
+                repeat: anim.repeat,
+            });
+        }
+    }
+}
+
 export class Monster {
     readonly spec: MonsterSpec;
     readonly weapon: WeaponSpec;
     readonly body: MatterJS.BodyType;
     readonly rect: Phaser.GameObjects.Rectangle;
+    readonly sprite?: Phaser.GameObjects.Sprite;
     readonly shadow: Phaser.GameObjects.Ellipse;
     hp: number;
     state: MonsterState = 'idle';
     lastAttackAt = 0;
+    lastHitAt = 0;
     /** Set by MonsterController when killed — used to suppress further collisions. */
     dead = false;
     /** Waypoints for pathfinding navigation. */
@@ -68,9 +126,6 @@ export class Monster {
             label: 'monster',
             collisionFilter: {
                 category: CAT.MONSTER_MELEE,
-                // +BULLET so player bullets trigger collisionstart — the
-                // symmetric mask check fails otherwise and monsters never
-                // take damage. Walls stay in the mask so monsters still bump.
                 mask: CAT.CHARACTER | CAT.BULLET | (CAT.WALL_TALL | CAT.WALL_SHORT),
             },
         });
@@ -87,6 +142,22 @@ export class Monster {
 
         this.rect = scene.add.rectangle(x, y, w, h, tint, 0.85);
         this.rect.setStrokeStyle(2, 0x111827, 1);
+
+        if (spec.sprite && scene.textures.exists(textureKey(spec))) {
+            // Debug rectangle hidden when sprite texture is present
+            this.rect.setVisible(false);
+
+            const spriteObj = scene.add.sprite(x, y, textureKey(spec));
+            if (spec.sprite.scale) {
+                spriteObj.setScale(spec.sprite.scale);
+            }
+
+            const idleKey = animKey(spec, 'idle');
+            if (scene.anims.exists(idleKey)) {
+                spriteObj.play(idleKey);
+            }
+            this.sprite = spriteObj;
+        }
     }
 
     position(): { x: number; y: number } {
@@ -96,6 +167,7 @@ export class Monster {
     destroy(scene: Phaser.Scene): void {
         scene.matter.world.remove(this.body);
         this.rect.destroy();
+        this.sprite?.destroy();
         this.shadow.destroy();
         this.dead = true;
     }
@@ -215,6 +287,12 @@ export class MonsterController {
                 }
             }
 
+            if (m.state === 'dying') {
+                // Freeze physics body during death animation
+                this.matter.Body.setVelocity(m.body, { x: 0, y: 0 });
+                continue;
+            }
+
             // ── AI transitions ─────────────────────────────────────────
             m.state = decideAIState(dist, m.weapon.range);
 
@@ -249,13 +327,33 @@ export class MonsterController {
                 m.lastAttackAt = time;
             }
 
-            // ── Visual sync ───────────────────────────────────────────
+            // ── Visual sync & animation ───────────────────────────────
             const footY = Math.round(mp.y);
             m.rect.setPosition(mp.x, mp.y);
             m.rect.setDepth(footY);
             m.shadow.setPosition(mp.x, mp.y);
             m.shadow.setDepth(footY - 1);
-            if (dist > 1) {
+
+            if (m.sprite) {
+                m.sprite.setPosition(mp.x, mp.y);
+                m.sprite.setDepth(footY);
+
+                // Play corresponding animation track (idle / move / hit)
+                const isHit = time - m.lastHitAt < 250;
+                const animTrack = isHit ? 'hit' : m.state === 'chase' ? 'move' : 'idle';
+                const currentTrackKey = animKey(m.spec, animTrack);
+                if (
+                    this.scene.anims.exists(currentTrackKey) &&
+                    m.sprite.anims.currentAnim?.key !== currentTrackKey
+                ) {
+                    m.sprite.play(currentTrackKey);
+                }
+
+                // Flip sprite horizontally based on move direction / facing player
+                if (dist > 1) {
+                    m.sprite.setFlipX(dirToPlayer.x < 0);
+                }
+            } else if (dist > 1) {
                 m.rect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
             }
         }
@@ -274,8 +372,10 @@ export class MonsterController {
     applyBulletDamage(bulletDamage: number, bulletBody: MatterJS.BodyType): void {
         const bp = bulletBody.position;
         const target = pickClosestMonster(bp, this.monsters, 64);
-        if (target) {
+        if (target && target.state !== 'dying') {
             target.hp -= bulletDamage;
+            target.lastHitAt = this.scene.time.now;
+
             if (target.hp <= 0) {
                 this.kill(target);
             }
@@ -330,8 +430,23 @@ export class MonsterController {
     }
 
     private kill(m: Monster): void {
-        m.destroy(this.scene);
-        this.cb.onMonsterDied(m);
+        m.state = 'dying';
+
+        // Disable collision filter so dead monster doesn't block player or bullets
+        m.body.collisionFilter.mask = 0;
+
+        const deathTrackKey = animKey(m.spec, 'death');
+        if (m.sprite && this.scene.anims.exists(deathTrackKey)) {
+            m.sprite.play(deathTrackKey);
+            m.sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+                m.destroy(this.scene);
+                this.cb.onMonsterDied(m);
+            });
+        } else {
+            // Fallback if no sprite / death anim
+            m.destroy(this.scene);
+            this.cb.onMonsterDied(m);
+        }
     }
 
     private bindCollisions(): void {

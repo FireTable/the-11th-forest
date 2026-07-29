@@ -26,15 +26,66 @@ const BodySchema = z
     .strict()
     .default({ halfW: 14, halfH: 14 });
 
+const SpriteGridSchema = z
+    .object({
+        rows: z.number().gt(0),
+        cols: z.number().gt(0),
+    })
+    .strict();
+
+const SpriteOffsetSchema = z
+    .object({
+        left: z.number().optional(),
+        bottom: z.number().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+    })
+    .strict()
+    .optional();
+
+const SpriteSchema = z
+    .object({
+        texture: z.string().min(1),
+        grid: SpriteGridSchema,
+        scale: z.number().gt(0),
+        offset: SpriteOffsetSchema,
+        script: z
+            .object({
+                downsample: z.number().int().gt(0).optional(),
+                colors: z.number().int().gt(0).optional(),
+                pad: z.number().int().gte(0).optional(),
+            })
+            .strict()
+            .optional(),
+    })
+    .strict();
+
+const AnimSpecSchema = z
+    .object({
+        frames: z.tuple([z.number().int().gte(0), z.number().int().gte(0)]),
+        frameRate: z.number().gt(0),
+        repeat: z.number().int(),
+    })
+    .strict()
+    .refine((v) => v.frames[1] >= v.frames[0], {
+        message: 'frames[1] must be >= frames[0]',
+    });
+
+const AnimsSchema = z.record(z.string(), AnimSpecSchema);
+
 export const MonsterSpecSchema = z
     .object({
         id: z.string().min(1).optional(),
         name: z.string().min(1),
+        imageSize: z.string().regex(/^\d+x\d+$/).optional(),
+        prompt: z.string().optional(),
         hp: z.number().gte(0),
         moveSpeed: z.number().gt(0),
         body: BodySchema,
         weaponId: z.string().min(1),
         drops: z.array(DropRefSchema).default([]),
+        sprite: SpriteSchema.optional(),
+        anims: AnimsSchema.optional(),
     })
     .strict();
 

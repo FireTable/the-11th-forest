@@ -8,7 +8,34 @@ import {
 } from '@/game/characters/character';
 import { DropController } from '@/game/drops/drop';
 import { MaterialManager } from '@/game/materials/material';
-import { MonsterController, rollDrops } from '@/game/monsters/monster';
+import {
+    createMonsterAnims,
+    loadMonsterAssets,
+    MonsterController,
+    rollDrops,
+} from '@/game/monsters/monster';
+
+async function getMonsterSpriteCellDims(
+    spec: MonsterSpec,
+): Promise<{ width: number; height: number }> {
+    if (!spec.sprite) return { width: 0, height: 0 };
+    const url = spec.sprite.texture.startsWith('/')
+        ? spec.sprite.texture
+        : `/${spec.sprite.texture}`;
+    const natural = await new Promise<{ width: number; height: number }>(
+        (resolve, reject) => {
+            const img = new Image();
+            img.onload = () =>
+                resolve({ width: img.naturalWidth, height: img.naturalHeight });
+            img.onerror = () => reject(new Error(`Failed to load ${url}`));
+            img.src = url;
+        },
+    );
+    return {
+        width: Math.floor(natural.width / spec.sprite.grid.cols),
+        height: Math.floor(natural.height / spec.sprite.grid.rows),
+    };
+}
 import { PathfindingService } from '@/game/monsters/logic';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
@@ -78,6 +105,12 @@ export class LoadScene extends Scene {
             this.assets.spriteCell.width,
             this.assets.spriteCell.height,
         );
+        // Load monster spritesheet assets (if spec contains sprite config)
+        loadMonsterAssets(
+            this,
+            this.assets.monsterSpecs.values(),
+            getMonsterSpriteCellDims,
+        );
         MaterialManager.preloadMaterials(this, this.level.materials);
     }
 
@@ -100,10 +133,10 @@ export class LoadScene extends Scene {
         // Build static Matter bodies for every air wall + outer boundary walls.
         createWallBodies(this.matter, this.level.airWalls, this.level.imageSize);
 
-        // Register character anims once the sprite sheet has finished
-        // loading. Must run before `loadCharacter()` since the controller's
-        // `animationcomplete` listener expects these keys to exist.
+        // Register character anims once the sprite sheet has finished loading.
         createCharacterAnims(this, this.assets.character);
+        // Register monster anims for all loaded monster specs.
+        createMonsterAnims(this, this.assets.monsterSpecs.values());
 
         // Spawn the player character (WASD + Shift dodge + hotbar).
         this.character = loadCharacter(this, this.level, this.assets.character, this.assets.weapons);
