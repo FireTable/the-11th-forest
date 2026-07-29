@@ -19,51 +19,17 @@
  *   damage      — per-hit HP dealt
  *   cooldownMs  — time between attacks
  *   range       — effective combat range (AI decision + bullet distance)
+ *
+ * Types are derived from `./schema.ts` via `z.infer` — single source
+ * of truth shared with runtime validation.
  */
 
-/** Ranged-projectile visual + physics. Body radius (for collisions)
- *  plus the rect drawn over it (width/height — bullets are usually wider
- *  than their collision radius). */
-export type ProjectileVisual = {
-    speed: number;
-    visual: {
-        /** Matter body radius. Defaults to min(width, height) / 2. */
-        radius: number;
-        /** Rectangle drawn over the body (px). */
-        width: number;
-        /** Rectangle drawn over the body (px). */
-        height: number;
-        /** Fill colour, hex literal e.g. 0x22c55e. */
-        color: number;
-    };
-};
+import type { z } from 'zod';
 
-export type WeaponSpec = {
-    id: string;
-    name: string;
-    /** Per-hit damage. */
-    damage: number;
-    /** Time between attacks. Player: between shots. Monster: between attacks. */
-    cooldownMs: number;
-    /** Effective combat range. For ranged: bullet distance. For melee: hit radius. */
-    range: number;
-    // ── Ranged fields (player magazine-style) ──────────────────────
-    /** Bullets per magazine. Player only. */
-    clipSize?: number;
-    /** Time to refill magazine. Player only. */
-    reloadTimeMs?: number;
-    /** Bullets per trigger pull. Shotguns = 5+. Player only. */
-    bulletsPerShot?: number;
-    /** Projectile visual + speed. Required for ranged weapons. */
-    projectile?: ProjectileVisual;
-    // ── Melee fields ───────────────────────────────────────────────
-    /** Hit-area width. Required for melee weapons. */
-    hitWidth?: number;
-    /** Hit-area height. Required for melee weapons. */
-    hitHeight?: number;
-};
+import type { WeaponIndexSchema, WeaponSpecSchema } from './schema';
 
-/** Ordered manifest of all weapons. */
-export type WeaponIndex = {
-    weapons: string[];
-};
+export type ProjectileVisual = Extract<z.infer<typeof WeaponSpecSchema>, { projectile: unknown }>['projectile'];
+
+export type WeaponSpec = z.infer<typeof WeaponSpecSchema>;
+
+export type WeaponIndex = z.infer<typeof WeaponIndexSchema>;

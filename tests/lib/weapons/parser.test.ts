@@ -157,6 +157,6 @@ weapons:
     });
 
     it('rejects empty-id entries', () => {
-        expect(() => parseWeaponIndex('weapons:\n  - ""\n')).toThrow(/non-empty string/);
+        expect(() => parseWeaponIndex('weapons:\n  - ""\n')).toThrow(/Too small|>=1 characters/);
     });
 });

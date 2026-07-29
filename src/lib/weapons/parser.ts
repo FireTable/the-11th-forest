@@ -2,124 +2,51 @@
  * src/lib/weapons/parser.ts
  * --------------------------------------------------------------------------
  * Pure sync parsing + validation. No I/O. Caller supplies the YAML text.
+ *
+ * Validation is delegated to `./schema.ts` (Zod). Errors are re-thrown
+ * as plain Errors prefixed `Weapon ${id}:` to preserve the existing
+ * caller-facing format.
  */
 
 import { load as parseYaml } from 'js-yaml';
+import type { ZodError } from 'zod';
 
-import type { ProjectileVisual, WeaponIndex, WeaponSpec } from './types';
+import type { WeaponIndex, WeaponSpec } from './types';
+import { WeaponIndexSchema, WeaponSpecSchema } from './schema';
 
-function requirePositiveNumber(value: unknown, label: string, id: string): number {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-        throw new Error(`Weapon ${id}: ${label} must be a positive number`);
-    }
-    return value;
+function pathOf(issue: { path: ReadonlyArray<PropertyKey> }): string {
+    return issue.path.map(String).join('.');
 }
 
-function requireNonNegativeNumber(value: unknown, label: string, id: string): number {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-        throw new Error(`Weapon ${id}: ${label} must be a non-negative number`);
-    }
-    return value;
-}
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-    return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-function parseProjectile(raw: unknown, id: string): ProjectileVisual {
-    if (!isPlainObject(raw)) {
-        throw new Error(`Weapon ${id}: projectile must be an object { speed, visual: {…} }`);
-    }
-    const speed = requirePositiveNumber(raw.speed, 'projectile.speed', id);
-    const v = raw.visual;
-    if (!isPlainObject(v)) {
-        throw new Error(`Weapon ${id}: projectile.visual must be an object { radius, width, height, color }`);
-    }
-    const radius = requirePositiveNumber(v.radius, 'projectile.visual.radius', id);
-    const width = requirePositiveNumber(v.width, 'projectile.visual.width', id);
-    const height = requirePositiveNumber(v.height, 'projectile.visual.height', id);
-    if (typeof v.color !== 'number' || !Number.isFinite(v.color)) {
-        throw new Error(`Weapon ${id}: projectile.visual.color must be a number (hex literal)`);
-    }
-    return { speed, visual: { radius, width, height, color: v.color } };
+function rethrow(zerr: ZodError, id: string): never {
+    const summary = zerr.issues
+        .map((i) => `${pathOf(i)}: ${i.message}`)
+        .join('; ');
+    throw new Error(`Weapon ${id}: ${summary}`);
 }
 
 export function parseWeaponYaml(text: string, id: string): WeaponSpec {
-    const raw = parseYaml(text) as Record<string, unknown> | null;
+    const raw = parseYaml(text);
     if (raw === null || typeof raw !== 'object') {
         throw new Error(`Weapon ${id}: empty or non-object YAML`);
     }
-
-    if (typeof raw.name !== 'string' || raw.name.length === 0) {
-        throw new Error(`Weapon ${id}: name required`);
-    }
-
-    const damage = requirePositiveNumber(raw.damage, 'damage', id);
-    const cooldownMs = requireNonNegativeNumber(raw.cooldownMs, 'cooldownMs', id);
-    const range = requirePositiveNumber(raw.range, 'range', id);
-
-    // Kind inferred from field presence: ranged has projectile,
-    // melee has hitWidth + hitHeight. Exactly one must apply.
-    const isRanged = raw.projectile !== undefined;
-    const isMelee = typeof raw.hitWidth === 'number' || typeof raw.hitHeight === 'number';
-
-    if (isRanged === isMelee) {
-        throw new Error(
-            `Weapon ${id}: must be either ranged (projectile) or melee (hitWidth + hitHeight), not both or neither`,
-        );
-    }
-
-    if (isRanged) {
-        return {
-            id,
-            name: raw.name,
-            damage,
-            cooldownMs,
-            range,
-            projectile: parseProjectile(raw.projectile, id),
-            clipSize: raw.clipSize === undefined
-                ? undefined
-                : requirePositiveNumber(raw.clipSize, 'clipSize', id),
-            reloadTimeMs: raw.reloadTimeMs === undefined
-                ? undefined
-                : requirePositiveNumber(raw.reloadTimeMs, 'reloadTimeMs', id),
-            bulletsPerShot: raw.bulletsPerShot === undefined
-                ? undefined
-                : requirePositiveNumber(raw.bulletsPerShot, 'bulletsPerShot', id),
-        };
-    }
-
-    // Melee
-    const hitWidth = requirePositiveNumber(raw.hitWidth, 'hitWidth', id);
-    const hitHeight = requirePositiveNumber(raw.hitHeight, 'hitHeight', id);
-    return {
-        id,
-        name: raw.name,
-        damage,
-        cooldownMs,
-        range,
-        hitWidth,
-        hitHeight,
-    };
+    const result = WeaponSpecSchema.safeParse(raw);
+    if (!result.success) throw rethrow(result.error, id);
+    // Loader's id (from filename) wins over whatever the YAML had.
+    return { ...result.data, id } as WeaponSpec;
 }
 
 export function parseWeaponIndex(text: string): WeaponIndex {
-    const raw = parseYaml(text) as Record<string, unknown> | null;
+    const raw = parseYaml(text);
     if (raw === null || typeof raw !== 'object') {
         throw new Error('Weapon index: empty or non-object YAML');
     }
-    const { weapons } = raw;
-    if (!Array.isArray(weapons)) throw new Error('Weapon index: `weapons` must be an array');
-    const ids: string[] = [];
-    for (let i = 0; i < weapons.length; i++) {
-        const id = weapons[i];
-        if (typeof id !== 'string' || id.length === 0) {
-            throw new Error(`Weapon index: weapons[${i}] must be a non-empty string`);
-        }
-        ids.push(id);
+    const result = WeaponIndexSchema.safeParse(raw);
+    if (!result.success) {
+        const summary = result.error.issues
+            .map((i) => `${pathOf(i)}: ${i.message}`)
+            .join('; ');
+        throw new Error(`Weapon index: ${summary}`);
     }
-    return { weapons: ids };
+    return result.data;
 }
-
-// Re-export isPlainObject for tests if needed.
-export { isPlainObject };
