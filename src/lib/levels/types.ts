@@ -9,21 +9,28 @@
  *   tall   — solid: blocks character AND bullets (red)
  *   short  — half: blocks character only, bullets pass over (blue)
  *
- * AirWall stores a polygon as a list of [x, y] vertices in image pixel
- * space. The polygon is implicitly closed (last vertex connects to the
- * first). A rectangle is just a 4-vertex polygon. The parser also
- * accepts the legacy `x/y/width/height` form and migrates it.
+ * Types are derived from `./schema.ts` via `z.infer` — single source
+ * of truth shared with runtime validation. Legacy rect air walls are
+ * migrated by the schema; the OUTPUT type only ever carries `points`.
  */
+
+import type { z } from 'zod';
+
+import type {
+    AirWallSchema,
+    CharacterSpawnSchema,
+    DropSpawnSchema,
+    LevelIndexSchema,
+    LevelSchema,
+    MonsterSpawnSchema,
+    PlacedMaterialSchema,
+} from './schema';
+
 export type AirWallKind = 'tall' | 'short';
 
 export type AirWallVertex = [number, number];
 
-export type AirWall = {
-    id: string;
-    kind: AirWallKind;
-    /** Vertex list, [x, y] pairs in image pixel space. Implicitly closed. */
-    points: AirWallVertex[];
-};
+export type AirWall = z.infer<typeof AirWallSchema>;
 
 export type ImageSize = {
     width: number;
@@ -32,35 +39,9 @@ export type ImageSize = {
 
 export type MaterialMode = 'background' | 'y-sort' | 'foreground';
 
-export type PlacedMaterial = {
-    id: string;
-    texture: string; // Relative to public/ (e.g. assets/image/materials/ruins/item-1.png)
-    x: number;
-    y: number;
-    scale?: number;
-    rotation?: number; // In degrees 0..360
-    flipX?: boolean;
-    flipY?: boolean;
-    mode?: MaterialMode;
-    depthOffset?: number;
-};
+export type PlacedMaterial = z.infer<typeof PlacedMaterialSchema>;
 
-export type Level = {
-    title: string;
-    // Background asset path (relative to public/, resolved by the loader).
-    background: string;
-    // Native pixel dimensions of the background image.
-    imageSize: ImageSize;
-    prompt?: string;
-    airWalls: AirWall[];
-    // Optional: spawn config for entities (Phase 1+). Each field references
-    // a separate /data/<thing>/<id>.yaml by id; missing fields default sensibly.
-    character?: string; // character id from /data/characters/
-    characterSpawn?: CharacterSpawn; // optional override of the default center / right-facing spawn
-    monsters?: MonsterSpawn[];
-    dropSpawns?: DropSpawn[];
-    materials?: PlacedMaterial[];
-};
+export type Level = z.infer<typeof LevelSchema>;
 
 export type SpawnPoint = {
     x: number;
@@ -69,26 +50,18 @@ export type SpawnPoint = {
 
 /** Where + which way the player character spawns. Defaults to image center,
  *  facing right (matches the wanderer sprite's natural direction). */
-export type CharacterSpawn = SpawnPoint & {
-    facing: 'left' | 'right';
-};
+export type CharacterSpawn = z.infer<typeof CharacterSpawnSchema>;
 
-export type MonsterSpawn = SpawnPoint & {
-    type: string; // monster id from /data/monsters/
-};
+export type MonsterSpawn = z.infer<typeof MonsterSpawnSchema>;
 
-export type DropSpawn = SpawnPoint & {
-    type: string; // drop id from /data/drops/
-};
+export type DropSpawn = z.infer<typeof DropSpawnSchema>;
 
 /**
  * Ordered manifest of all levels. Each entry is a scene id (= filename
  * basename). Loader enforces: every id here must have a matching
  * data/levels/<id>.yaml file. Orphan files are allowed (drafts).
  */
-export type LevelIndex = {
-    levels: string[];
-};
+export type LevelIndex = z.infer<typeof LevelIndexSchema>;
 
 /**
  * Parse `WxH` (e.g. `2752x1536`) into an ImageSize. Throws on bad input.

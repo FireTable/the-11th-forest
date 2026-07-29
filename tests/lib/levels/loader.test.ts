@@ -29,7 +29,6 @@ describe('parseLevelYaml', () => {
 title: The 11th Forest — Sacred Forest Sanctuary
 background: assets/image/scenes/sacred-forest-sanctuary.png
 imageSize: 2752x1536
-promptFile: prompts/scenes/sacred-forest-sanctuary.yaml
 airWalls: []
 `;
 
@@ -46,7 +45,6 @@ airWalls: []
 title: test
 background: a.png
 imageSize: 100x100
-promptFile: p.yaml
 airWalls:
   - id: w1
     kind: tall
@@ -82,7 +80,6 @@ airWalls:
 title: test
 background: a.png
 imageSize: 100x100
-promptFile: p.yaml
 airWalls:
   - { id: w1, kind: tall, x: 10, y: 20, width: 30, height: 40 }
 `;
@@ -100,7 +97,6 @@ airWalls:
 title: t
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls:
   - id: w1
     kind: tall
@@ -108,7 +104,7 @@ airWalls:
       - [0, 0]
       - [10, 0]
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/at least 3/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/Too small|at least 3/);
     });
 
     it('rejects invalid air wall kind', () => {
@@ -116,7 +112,6 @@ airWalls:
 title: t
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls:
   - id: w1
     kind: huge
@@ -125,7 +120,7 @@ airWalls:
       - [1, 0]
       - [0, 1]
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/kind must be/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/Invalid input|kind/);
     });
 
     it('rejects non-positive legacy wall dimensions', () => {
@@ -133,11 +128,10 @@ airWalls:
 title: t
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls:
   - { id: w1, kind: tall, x: 0, y: 0, width: 0, height: 1 }
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/either/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/Too small|either/);
     });
 
     it('rejects missing required fields', () => {
@@ -153,7 +147,6 @@ background: a.png
 title: Spawny
 background: a.png
 imageSize: 100x100
-promptFile: p.yaml
 airWalls: []
 character: wanderer
 monsters:
@@ -182,7 +175,6 @@ dropSpawns:
 title: Plain
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls: []
 `;
         const level = parseLevelYaml(yamlText, 'plain');
@@ -196,12 +188,11 @@ airWalls: []
 title: t
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls: []
 monsters:
   - at: [10, 20]
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/type/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/Invalid input|type/);
     });
 
     it('rejects monster spawn with invalid coordinates', () => {
@@ -209,13 +200,12 @@ monsters:
 title: t
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls: []
 monsters:
   - type: drone
     x: 10
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/numbers x and y/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/Invalid input|numbers x and y/);
     });
 
     it('parses characterSpawn with x/y + facing', () => {
@@ -223,7 +213,6 @@ monsters:
 title: t
 background: a.png
 imageSize: 100x100
-promptFile: p.yaml
 airWalls: []
 characterSpawn:
   x: 200
@@ -239,7 +228,6 @@ characterSpawn:
 title: Plain
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls: []
 `;
         const level = parseLevelYaml(yamlText, 'plain');
@@ -251,14 +239,13 @@ airWalls: []
 title: t
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls: []
 characterSpawn:
   x: 10
   y: 20
   facing: sideways
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/facing/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/Invalid input|facing/);
     });
 
     it('rejects characterSpawn without x and y', () => {
@@ -266,12 +253,11 @@ characterSpawn:
 title: t
 background: a.png
 imageSize: 1x1
-promptFile: p.yaml
 airWalls: []
 characterSpawn:
   facing: right
 `;
-        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/numbers x and y/);
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/Invalid input|numbers x and y/);
     });
 });
 
@@ -296,6 +282,6 @@ levels:
     });
 
     it('rejects non-string entries', () => {
-        expect(() => parseLevelIndex('levels:\n  - 42\n')).toThrow(/non-empty string/);
+        expect(() => parseLevelIndex('levels:\n  - 42\n')).toThrow(/expected string|non-empty string/);
     });
 });
