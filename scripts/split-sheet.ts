@@ -474,7 +474,7 @@ interface Box {
  * Identifies each isolated island of opaque pixels independently,
  * eliminating the issue where vertically-overlapping items get merged together.
  */
-export function findFrames(png: PNG, _minRun = 8, minArea = 500): Box[] {
+export function findFrames(png: PNG, _minRun = 8, _minArea = 500): Box[] {
     const { width: w, height: h, data } = png;
     const visited = new Uint8Array(w * h);
     const boxes: Box[] = [];
@@ -532,10 +532,50 @@ export function findFrames(png: PNG, _minRun = 8, minArea = 500): Box[] {
             const bw = maxX - minX + 1;
             const bh = maxY - minY + 1;
 
-            // Reject noise speckles smaller than minArea pixels or tiny 2x2 specks
-            if (pixelCount >= 40 && bw * bh >= minArea) {
+            // Reject noise speckles smaller than 20 pixels
+            if (pixelCount >= 20 && bw * bh >= 100) {
                 boxes.push({ x: minX, y: minY, w: bw, h: bh });
             }
+        }
+    }
+
+    // 8px Box Proximity Merge Pass:
+    // Merges bounding boxes if their edge-to-edge gap is <= gapThreshold (8px),
+    // bridging cracks, broken arches, and floating particles into a single material piece.
+    const gapThreshold = 8;
+    let merged = true;
+    while (merged) {
+        merged = false;
+        for (let i = 0; i < boxes.length; i++) {
+            for (let j = i + 1; j < boxes.length; j++) {
+                const a = boxes[i];
+                const b = boxes[j];
+
+                // Calculate edge-to-edge gap distance on X and Y axes
+                const gapX = Math.max(0, Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w));
+                const gapY = Math.max(0, Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h));
+
+                // If boxes are within gapThreshold (8px) on both X and Y
+                if (gapX <= gapThreshold && gapY <= gapThreshold) {
+                    // Merge box B into box A
+                    const minX = Math.min(a.x, b.x);
+                    const minY = Math.min(a.y, b.y);
+                    const maxX = Math.max(a.x + a.w, b.x + b.w);
+                    const maxY = Math.max(a.y + a.h, b.y + b.h);
+
+                    boxes[i] = {
+                        x: minX,
+                        y: minY,
+                        w: maxX - minX,
+                        h: maxY - minY,
+                    };
+
+                    boxes.splice(j, 1);
+                    merged = true;
+                    break;
+                }
+            }
+            if (merged) break;
         }
     }
 
