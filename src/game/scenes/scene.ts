@@ -6,7 +6,7 @@ import {
     loadCharacterAssets,
     type CharacterRuntime,
 } from '@/game/characters/character';
-import { DropController } from '@/game/drops/drop';
+import { createDropAnims, DropController, loadDropAssets } from '@/game/drops/drop';
 import { MaterialManager } from '@/game/materials/material';
 import {
     createMonsterAnims,
@@ -18,10 +18,11 @@ import {
 async function getMonsterSpriteCellDims(
     spec: MonsterSpec,
 ): Promise<{ width: number; height: number }> {
-    if (!spec.sprite) return { width: 0, height: 0 };
-    const url = spec.sprite.texture.startsWith('/')
-        ? spec.sprite.texture
-        : `/${spec.sprite.texture}`;
+    const sprite = spec.sprite;
+    if (!sprite?.grid) return { width: 0, height: 0 };
+    const url = sprite.texture.startsWith('/')
+        ? sprite.texture
+        : `/${sprite.texture}`;
     const natural = await new Promise<{ width: number; height: number }>(
         (resolve, reject) => {
             const img = new Image();
@@ -32,8 +33,8 @@ async function getMonsterSpriteCellDims(
         },
     );
     return {
-        width: Math.floor(natural.width / spec.sprite.grid.cols),
-        height: Math.floor(natural.height / spec.sprite.grid.rows),
+        width: Math.floor(natural.width / sprite.grid.cols),
+        height: Math.floor(natural.height / sprite.grid.rows),
     };
 }
 import { PathfindingService } from '@/game/monsters/logic';
@@ -111,6 +112,8 @@ export class LoadScene extends Scene {
             this.assets.monsterSpecs.values(),
             getMonsterSpriteCellDims,
         );
+        // Load drop spritesheet assets
+        loadDropAssets(this, this.assets.dropSpecs.values());
         MaterialManager.preloadMaterials(this, this.level.materials);
     }
 
@@ -137,6 +140,8 @@ export class LoadScene extends Scene {
         createCharacterAnims(this, this.assets.character);
         // Register monster anims for all loaded monster specs.
         createMonsterAnims(this, this.assets.monsterSpecs.values());
+        // Register drop anims.
+        createDropAnims(this, this.assets.dropSpecs.values());
 
         // Spawn the player character (WASD + Shift dodge + hotbar).
         this.character = loadCharacter(this, this.level, this.assets.character, this.assets.weapons);
