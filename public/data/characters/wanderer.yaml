@@ -2,7 +2,7 @@ id: wanderer
 name: Wanderer
 hp: 9999
 sp: 60
-moveSpeed: 8
+moveSpeed: 5
 spRegenMs: 5000
 body:
     halfW: 16
@@ -19,17 +19,17 @@ hotbar:
 sprite:
     texture: assets/image/characters/wanderer.png
     grid: { rows: 4, cols: 4 }
-    scale: 2
+    scale: 1
 anims:
     idle:
-        frames: [0, 3]
-        frameRate: 6
+        frames: [0, 4]
+        frameRate: 3
         repeat: -1
     run:
-        frames: [5, 7]
+        frames: [5, 9]
         frameRate: 12
         repeat: -1
-    run-stop:
+    dodge:
         frames: [10, 14]
-        frameRate: 10
+        frameRate: 16
         repeat: 0

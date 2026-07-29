@@ -182,10 +182,6 @@ export class CharacterController {
     private firing = false;
     private targetX = 0;
     private targetY = 0;
-    /** Tracks last frame's movement intent so we can play run-stop on
-     * the transition run → idle without retriggering every frame the
-     * player just stands still. */
-    private prevMoving = false;
 
     private readonly cleanupFns: Array<() => void> = [];
 
@@ -207,7 +203,7 @@ export class CharacterController {
         this.bindKeyboard();
         this.bindPointer();
 
-        // Chain the run-stop -> idle transition. Bound once in the
+        // Chain the dodge -> idle transition. Bound once in the
         // constructor so we don't leak listeners on every stop event.
         const onAnimDone = () => this.onAnimComplete();
         this.parts.sprite.on('animationcomplete', onAnimDone);
@@ -345,49 +341,75 @@ export class CharacterController {
     // ─── Internals ──────────────────────────────────────────────────────
 
     /**
-     * State machine: idle ↔ run ↔ run-stop. Dodge velocity also counts
-     * as "moving" so the character stays in `run` while dashing. Each
-     * anim is gated on `scene.anims.exists(key)` so a character without
-     * declared anims falls through silently (debug fallback).
+     * State machine: idle ↔ run ↔ dodge.
+     *   - `dodge` plays for the entire dodge window (covers the full
+     *     roll animation, even past the 220ms physics window).
+     *   - `run` while moving and not in a dodge roll.
+     *   - `idle` otherwise.
+     *   - When the dodge roll's animationcomplete fires, onAnimComplete
+     *     chains to run or idle based on current movement.
+     *
+     * Each anim is gated on `scene.anims.exists(key)` so a character
+     * without declared anims falls through silently (debug fallback).
      */
     private driveAnims(isMovingInput: boolean, isDodging: boolean): void {
         if (!this.spec.anims) return;
         const sprite = this.parts.sprite;
         const runKey = animKey(this.spec, 'run');
-        const stopKey = animKey(this.spec, 'run-stop');
+        const dodgeKey = animKey(this.spec, 'dodge');
         const idleKey = animKey(this.spec, 'idle');
         const cur = sprite.anims.currentAnim?.key ?? null;
-        const moving = isMovingInput || isDodging;
 
+        if (isDodging && this.scene.anims.exists(dodgeKey)) {
+            // Active dodge window — start the roll if not already running.
+            if (cur !== dodgeKey) sprite.anims.play(dodgeKey, true);
+            return;
+        }
+        if (cur === dodgeKey) {
+            // Dodge window ended but the roll animation is still in
+            // flight — let it play through. onAnimComplete chains to
+            // run or idle based on movement state.
+            return;
+        }
+        const moving = isMovingInput;
         if (moving) {
             if (cur !== runKey && this.scene.anims.exists(runKey)) {
                 sprite.anims.play(runKey, true);
             }
-        } else if (this.prevMoving && cur === runKey) {
-            // Just released keys (or dodge ended) while running — kick off
-            // the skid animation. The constructor-bound animationcomplete
-            // listener chains back to idle.
-            if (this.scene.anims.exists(stopKey)) sprite.anims.play(stopKey, true);
-        } else if (!moving && !this.prevMoving && cur !== idleKey && cur !== stopKey) {
-            // Sitting still with no run-stop in flight — clamp to idle.
-            if (this.scene.anims.exists(idleKey)) sprite.anims.play(idleKey, true);
+        } else if (cur !== idleKey && this.scene.anims.exists(idleKey)) {
+            sprite.anims.play(idleKey, true);
         }
-        this.prevMoving = moving;
     }
 
     /**
      * Hooked on `sprite.on('animationcomplete', ...)` in the constructor.
-     * When run-stop finishes, transition to idle. Other animation ends
-     * are no-ops so this stays safe to bind once and forget.
+     * When the dodge roll finishes, chain to run (if still moving) or
+     * idle (otherwise). Other animation ends are no-ops so this stays
+     * safe to bind once and forget.
      */
     private onAnimComplete(): void {
         if (!this.spec.anims) return;
         const sprite = this.parts.sprite;
         const cur = sprite.anims.currentAnim?.key;
-        const idleKey = animKey(this.spec, 'idle');
-        const stopKey = animKey(this.spec, 'run-stop');
-        if (cur === stopKey && this.scene.anims.exists(idleKey)) {
-            sprite.anims.play(idleKey, true);
+        const dodgeKey = animKey(this.spec, 'dodge');
+        if (cur !== dodgeKey) return;
+        // Dodge roll finished — sample current movement to pick the
+        // right follow-up. Sampling at completion time (not at the
+        // original dodge trigger) means releasing WASD during the roll
+        // correctly transitions to idle.
+        const kb = this.scene.input.keyboard!;
+        const intent = moveIntent({
+            up: kb.addKey(KEY_W).isDown,
+            down: kb.addKey(KEY_S).isDown,
+            left: kb.addKey(KEY_A).isDown,
+            right: kb.addKey(KEY_D).isDown,
+        });
+        if (intent.vx !== 0 || intent.vy !== 0) {
+            const runKey = animKey(this.spec, 'run');
+            if (this.scene.anims.exists(runKey)) sprite.anims.play(runKey, true);
+        } else {
+            const idleKey = animKey(this.spec, 'idle');
+            if (this.scene.anims.exists(idleKey)) sprite.anims.play(idleKey, true);
         }
     }
 

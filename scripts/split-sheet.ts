@@ -98,13 +98,79 @@ function isMagentaLeaning(r: number, g: number, b: number): boolean {
 }
 
 /**
- * Sub-threshold magenta-axis predicate for the residual fringe. Catches
- * AA pixels the main keyer dropped because their r/b fall below `r > 80`
- * (e.g. rgb(74, 0, 72)). Near-zero green + r≈b is the safe discriminator:
- * real sprite shadows (skin, clothes) always have non-trivial green.
+ * Sub-threshold magenta-leaning predicate for the residual fringe.
+ * Originally `g < 30 && |r - b| < 30` — but that's too strict for the
+ * magenta-leaning AA around purple sprites (e.g. the bow on blonde2
+ * is purple ~rgb(180, 80, 200); AA pixels at its edge sit at
+ * rgb(140, 50, 175), g=50 fails g<30). Switched to H-channel check:
+ * magenta is hue 300°, purple ~270°, so the magenta-leaning AA
+ * between them sits in [280, 340] and gets caught.
+ *
+ * Returns true only for colors whose dominant hue is in the magenta /
+ * magenta-leaning-purple range. Grayscale (H=0) and skin tones
+ * (H=20-40) are correctly rejected.
  */
 function isResidualMagenta(r: number, g: number, b: number): boolean {
-    return g < 30 && Math.abs(r - b) < 30;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    if (max === min) return false;        // grayscale: no hue
+    const d = max - min;
+    let h: number;
+    if (max === r) h = ((g - b) / d + 6) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;                              // 0-360°
+    return h >= 260 && h <= 360;
+}
+
+/**
+ * Strict pure-magenta predicate for the second-pass scan. AI generators
+ * tend to anchor the background to `rgb(255, 0, 255)`; we catch any
+ * leftover full-saturation magenta the broad flood-fill missed (e.g.
+ * interior pockets disconnected from the corner seed). Tight thresholds
+ * avoid false-positives on purple/pink sprite colors.
+ */
+function isPureMagenta(r: number, g: number, b: number): boolean {
+    return r > 150 && g < 50 && b > 150 && Math.abs(r - b) < 60;
+}
+
+/**
+ * Flood-fill every pure-magenta region (predicate `isPureMagenta`)
+ * from any seed — corners or interior pockets, no specific starting
+ * point required. Different starting strategy from `findKeySeed` which
+ * is corner-only; this catches isolated magenta islands the main
+ * flood-fill could not reach through 4-connectivity.
+ */
+function pureMagentaFloodFill(png: PNG): void {
+    const { width: w, height: h, data } = png;
+    const visited = new Uint8Array(w * h);
+    const stack: number[] = [];
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            if (visited[idx]) continue;
+            const di = idx << 2;
+            if (data[di + 3] === 0) continue;
+            if (!isPureMagenta(data[di], data[di + 1], data[di + 2])) continue;
+            // Found a pure-magenta seed; flood-fill its region.
+            stack.push(idx);
+            while (stack.length) {
+                const i = stack.pop()!;
+                if (visited[i]) continue;
+                visited[i] = 1;
+                const ddi = i << 2;
+                if (data[ddi + 3] === 0) continue;
+                if (!isPureMagenta(data[ddi], data[ddi + 1], data[ddi + 2])) continue;
+                data[ddi + 3] = 0;
+                const ix = i % w;
+                const iy = (i - ix) / w;
+                if (ix > 0) stack.push(i - 1);
+                if (ix < w - 1) stack.push(i + 1);
+                if (iy > 0) stack.push(i - w);
+                if (iy < h - 1) stack.push(i + w);
+            }
+        }
+    }
 }
 
 /**
@@ -159,6 +225,8 @@ export function keyOut(png: PNG, opts: { blackFringe?: boolean } = {}): void {
             if (isMagentaLeaning(data[i], data[i + 1], data[i + 2])) data[i + 3] = 0;
         }
         stripEdgeHalo(png);
+        pureMagentaFloodFill(png);
+        if (opts.blackFringe) blackenMagentaFringe(png);
         return;
     }
 
@@ -204,6 +272,12 @@ export function keyOut(png: PNG, opts: { blackFringe?: boolean } = {}): void {
     }
 
     stripEdgeHalo(png);
+    // Pure-magenta second pass before blackenMagentaFringe: removes
+    // any leftover pure-magenta pockets the broad flood-fill missed
+    // (e.g. interior islands disconnected from the corner seed). Runs
+    // before the blacken pass so the silhouette boundary that blacken
+    // paints is the final, post-pure-cleanup edge.
+    pureMagentaFloodFill(png);
     if (opts.blackFringe) blackenMagentaFringe(png);
 }
 
@@ -588,10 +662,13 @@ export function recompose(
 ): void {
     // Sheet dimensions come from the pixelize-pass output when present
     // (smaller sheet after sheet-level downsample), otherwise from the
-    // original file. Cell size is `sheet.width / cols` either way.
+    // original file. Cell size is `sheet.width / cols` either way —
+    // rounded down to an even value so each cell's centre is a clean
+    // integer, eliminating sub-pixel jitter when a frame is centred
+    // in a cell of fractional size.
     const sheet = sourcePng ?? PNG.sync.read(readFileSync(origPath));
-    const cw = sheet.width / cols;
-    const ch = sheet.height / rows;
+    const cw = Math.floor(sheet.width / cols) & ~1;
+    const ch = Math.floor(sheet.height / rows) & ~1;
     const canvas = new PNG({ width: sheet.width, height: sheet.height });
     canvas.data.fill(0);
     const names = readdirSync(outDir)
@@ -603,8 +680,11 @@ export function recompose(
         const cx = col * cw + cw / 2;
         const cy = row * ch + ch / 2;
         const frame = PNG.sync.read(readFileSync(join(outDir, names[i])));
-        const startX = Math.round(cx - frame.width / 2);
-        const startY = Math.round(cy - frame.height / 2);
+        // floor (not round) — every frame centres the same way, so the
+        // 0.5px rounding noise that bothered a 75×121 frame in a 128×128
+        // cell doesn't shift it left or right arbitrarily.
+        const startX = Math.floor(cx - frame.width / 2);
+        const startY = Math.floor(cy - frame.height / 2);
         for (let y = 0; y < frame.height; y++) {
             const dy = startY + y;
             if (dy < 0 || dy >= canvas.height) continue;
