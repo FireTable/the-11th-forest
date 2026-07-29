@@ -9,28 +9,22 @@
  *
  *   - kind / damage / range / cooldown are derived from the weapon
  *   - drops is a weighted list rolled on death (chance 0..1)
+ *
+ * Types are derived from `./schema.ts` via `z.infer` — single source
+ * of truth shared with runtime validation.
  */
 
-export type DropRef = {
-    dropId: string;
-    chance: number; // 0..1, total rolls weighted by chance — independent rolls
-};
+import type { z } from 'zod';
 
-export type MonsterSpec = {
-    id: string;
-    name: string;
-    hp: number;
-    moveSpeed: number;
-    body: {
-        halfW: number;
-        halfH: number;
-    };
-    /** ID of a weapons/{id}.yaml — provides damage, range, cooldown, kind. */
-    weaponId: string;
-    drops: DropRef[];
-};
+import type {
+    DropRefSchema,
+    MonsterIndexSchema,
+    MonsterSpecSchema,
+} from './schema';
+
+export type DropRef = z.infer<typeof DropRefSchema>;
+
+export type MonsterSpec = z.infer<typeof MonsterSpecSchema>;
 
 /** Ordered manifest of all monster types. */
-export type MonsterIndex = {
-    monsters: string[];
-};
+export type MonsterIndex = z.infer<typeof MonsterIndexSchema>;
