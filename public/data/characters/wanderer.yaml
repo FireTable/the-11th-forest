@@ -19,7 +19,7 @@ hotbar:
 sprite:
     texture: assets/image/characters/wanderer.png
     grid: { rows: 4, cols: 4 }
-    scale: 1
+    scale: 1.2
 anims:
     idle:
         frames: [0, 4]

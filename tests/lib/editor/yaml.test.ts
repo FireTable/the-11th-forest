@@ -68,4 +68,25 @@ describe('serializeLevelYaml', () => {
             cursor = idx;
         }
     });
+
+    it('round-trips characterSpawn (regression: save used to drop it)', () => {
+        const level: Level = {
+            ...minimal,
+            character: 'wanderer',
+            characterSpawn: { x: 500, y: 1300, facing: 'right' },
+        };
+        const text = serializeLevelYaml(level);
+        // characterSpawn must be present in the emitted YAML.
+        expect(text).toContain('characterSpawn:');
+        // And it must round-trip through the parser unchanged.
+        expect(parseLevelYaml(text, 'test')).toEqual(level);
+    });
+
+    it('omits undefined optional fields entirely', () => {
+        const text = serializeLevelYaml(minimal);
+        expect(text).not.toContain('character:');
+        expect(text).not.toContain('characterSpawn:');
+        expect(text).not.toContain('monsters:');
+        expect(text).not.toContain('dropSpawns:');
+    });
 });
