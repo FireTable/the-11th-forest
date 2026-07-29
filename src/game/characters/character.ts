@@ -38,6 +38,7 @@ export interface CharacterRuntime {
     hud: CharacterHud;
     weaponHud: WeaponHud;
     statusHud: StatusHud;
+    debugBodyRect: Phaser.GameObjects.Rectangle;
     /** Apply HP/SP healing (clamped to [0, max]). Negative values damage. */
     heal(hpDelta: number, spDelta: number): void;
     /** Add `fraction * currentWeaponClipSize` bullets to the active weapon. */
@@ -147,6 +148,31 @@ export function loadCharacter(
         },
     );
 
+    const matter = (Phaser as any).Physics.Matter.Matter;
+    matter.Body.setInertia(body, Infinity);
+
+    // Visual: debug body rectangle (green outline) matching Matter body exactly
+    const debugBodyRect = scene.add.rectangle(
+        spawnX,
+        spawnY - spec.body.halfH,
+        spec.body.halfW * 2,
+        spec.body.halfH * 2,
+        0x22c55e,
+        0.25,
+    );
+    debugBodyRect.setStrokeStyle(1.5, 0x22c55e, 0.9);
+    debugBodyRect.setVisible(false);
+
+    // Visual: shadow under feet based on spec.body halfW / halfH
+    const shadow = scene.add.ellipse(
+        spawnX,
+        spawnY,
+        spec.body.halfW * 2,
+        spec.body.halfH * 0.8,
+        0x000000,
+        0.35,
+    );
+
     // Visual: sprite-sheet frame from the character's loaded texture.
     // The matter body controls collisions; the sprite is purely visual.
     // Anchor at (0.5, 1.0) so `sprite.position` represents the FEET,
@@ -159,7 +185,6 @@ export function loadCharacter(
     // but until the first pointermove fires we want the spawn pose to win.
     sprite.setFlipX((level.characterSpawn?.facing ?? 'right') === 'left');
 
-    const matter = (Phaser as any).Physics.Matter.Matter;
     const weaponsSys = new WeaponController(scene, matter, body, weapons);
     const hud = new CharacterHud(scene, spec);
     const weaponHud = new WeaponHud(scene, weaponsSys);
@@ -168,6 +193,8 @@ export function loadCharacter(
     const controller = new CharacterController(scene, level, spec, {
         body,
         sprite,
+        shadow,
+        debugBodyRect,
         matter,
         weapons: weaponsSys,
         hud,
@@ -190,6 +217,7 @@ export function loadCharacter(
         hud,
         weaponHud,
         statusHud,
+        debugBodyRect,
         heal: (hp, sp) => controller.heal(hp, sp),
         refillAmmo: (f) => controller.refillAmmo(f),
         pickUpWeapon: (id) => controller.pickUpWeapon(id),

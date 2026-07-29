@@ -102,11 +102,22 @@ function parseSprite(raw: unknown, id: string): SpriteSpec {
     if (typeof s.texture !== 'string' || s.texture.length === 0) {
         throw new Error(`Character ${id}: sprite.texture must be a non-empty string`);
     }
-    return {
+    const res: SpriteSpec = {
         texture: s.texture,
         grid: parseSpriteGrid(s.grid, id),
         scale: requirePositiveFinite(s.scale, 'sprite.scale', id),
     };
+    if (typeof s.offset === 'object' && s.offset !== null) {
+        const off = s.offset as Record<string, unknown>;
+        const left = typeof off.left === 'number' && Number.isFinite(off.left) ? off.left : undefined;
+        const bottom = typeof off.bottom === 'number' && Number.isFinite(off.bottom) ? off.bottom : undefined;
+        const x = typeof off.x === 'number' && Number.isFinite(off.x) ? off.x : undefined;
+        const y = typeof off.y === 'number' && Number.isFinite(off.y) ? off.y : undefined;
+        if (left !== undefined || bottom !== undefined || x !== undefined || y !== undefined) {
+            res.offset = { left, bottom, x, y };
+        }
+    }
+    return res;
 }
 
 function parseSpriteGrid(raw: unknown, id: string): SpriteSpec['grid'] {

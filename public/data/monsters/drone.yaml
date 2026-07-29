@@ -1,6 +1,9 @@
 name: Drone
 hp: 30
 moveSpeed: 4
+body:
+  halfW: 14
+  halfH: 14
 weaponId: drone-claws
 drops:
   - dropId: hp-shard

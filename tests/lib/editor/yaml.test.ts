@@ -81,6 +81,33 @@ describe('serializeLevelYaml', () => {
         expect(parseLevelYaml(text, 'test')).toEqual(level);
     });
 
+    it('round-trips monsters as at: [x, y] (regression: save used to flatten to x/y and quote `y`)', () => {
+        const level: Level = {
+            ...minimal,
+            monsters: [
+                { type: 'drone', x: 1200, y: 800 },
+                { type: 'gunner', x: 2000, y: 600 },
+            ],
+        };
+        const text = serializeLevelYaml(level);
+        // js-yaml auto-quotes `y` because it's a YAML 1.1 boolean
+        // shorthand. Using `at: [x, y]` avoids the bare key entirely.
+        expect(text).not.toMatch(/^\s+'y':/m);
+        expect(parseLevelYaml(text, 'test')).toEqual(level);
+    });
+
+    it('round-trips dropSpawns as at: [x, y]', () => {
+        const level: Level = {
+            ...minimal,
+            dropSpawns: [
+                { type: 'hp-shard', x: 300, y: 400 },
+                { type: 'ammo-cache', x: 700, y: 900 },
+            ],
+        };
+        const text = serializeLevelYaml(level);
+        expect(parseLevelYaml(text, 'test')).toEqual(level);
+    });
+
     it('omits undefined optional fields entirely', () => {
         const text = serializeLevelYaml(minimal);
         expect(text).not.toContain('character:');

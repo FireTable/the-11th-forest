@@ -93,9 +93,8 @@ export class LoadScene extends Scene {
             200,
         );
 
-        // Build static Matter bodies for every air wall — see load-wall.ts
-        // for category / mask policy.
-        createWallBodies(this.matter, this.level.airWalls);
+        // Build static Matter bodies for every air wall + outer boundary walls.
+        createWallBodies(this.matter, this.level.airWalls, this.level.imageSize);
 
         // Register character anims once the sprite sheet has finished
         // loading. Must run before `loadCharacter()` since the controller's
@@ -113,8 +112,11 @@ export class LoadScene extends Scene {
             this.character.weaponHud.setVisible(visible);
             this.character.statusHud.setVisible(visible);
         };
-        const onEditorOpen = (editorOpen: unknown) =>
-            setHubsVisible(editorOpen !== true);
+        const onEditorOpen = (editorOpen: unknown) => {
+            const isEditor = editorOpen === true;
+            setHubsVisible(!isEditor);
+            this.character.debugBodyRect.setVisible(isEditor);
+        };
         EventBus.on('editor-open', onEditorOpen);
         this.events.once('shutdown', () =>
             EventBus.removeListener('editor-open', onEditorOpen),

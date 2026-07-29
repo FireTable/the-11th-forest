@@ -66,6 +66,12 @@ export type SpriteSpec = {
         cols: number;
     };
     scale: number;
+    offset?: {
+        left?: number;
+        bottom?: number;
+        x?: number;
+        y?: number;
+    };
 };
 
 /**

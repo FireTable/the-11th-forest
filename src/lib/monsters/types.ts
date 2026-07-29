@@ -21,6 +21,10 @@ export type MonsterSpec = {
     name: string;
     hp: number;
     moveSpeed: number;
+    body: {
+        halfW: number;
+        halfH: number;
+    };
     /** ID of a weapons/{id}.yaml — provides damage, range, cooldown, kind. */
     weaponId: string;
     drops: DropRef[];

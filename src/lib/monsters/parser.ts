@@ -56,13 +56,25 @@ export function parseMonsterYaml(text: string, id: string): MonsterSpec {
     if (raw === null || typeof raw !== 'object') {
         throw new Error(`Monster ${id}: empty or non-object YAML`);
     }
-    const { name, hp, moveSpeed, weaponId, drops } = raw;
+    const { name, hp, moveSpeed, body, weaponId, drops } = raw;
 
     if (typeof name !== 'string' || name.length === 0) {
         throw new Error(`Monster ${id}: name required`);
     }
     if (typeof weaponId !== 'string' || weaponId.length === 0) {
         throw new Error(`Monster ${id}: weaponId required (e.g. "drone-claws")`);
+    }
+
+    let halfW = 14;
+    let halfH = 14;
+    if (typeof body === 'object' && body !== null) {
+        const b = body as Record<string, unknown>;
+        if (typeof b.halfW === 'number' && Number.isFinite(b.halfW) && b.halfW > 0) {
+            halfW = b.halfW;
+        }
+        if (typeof b.halfH === 'number' && Number.isFinite(b.halfH) && b.halfH > 0) {
+            halfH = b.halfH;
+        }
     }
 
     const dropsList = Array.isArray(drops) ? drops.map((d, i) => parseDropRef(d, i, id)) : [];
@@ -72,6 +84,7 @@ export function parseMonsterYaml(text: string, id: string): MonsterSpec {
         name,
         hp: requireNonNegativeNumber(hp, 'hp', id),
         moveSpeed: requirePositiveNumber(moveSpeed, 'moveSpeed', id),
+        body: { halfW, halfH },
         weaponId,
         drops: dropsList,
     };

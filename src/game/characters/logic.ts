@@ -155,10 +155,10 @@ export interface StatusHudState {
 
 /** Everything the controller needs from outside — passed in by load-character. */
 export interface CharacterRuntimeParts {
-    /** Matter body — typed as `any` to avoid pulling in matter-js types. */
     body: any;
     sprite: Phaser.GameObjects.Sprite;
-    /** Matter library reference (for Body.setVelocity / setPosition). */
+    shadow?: Phaser.GameObjects.Components.Transform;
+    debugBodyRect?: Phaser.GameObjects.Components.Transform;
     matter: any;
     weapons: WeaponsLike;
     hud: HudLike;
@@ -169,7 +169,6 @@ export interface CharacterRuntimeParts {
 export class CharacterController {
     private readonly scene: Phaser.Scene;
     private readonly spec: CharacterSpec;
-    private readonly level: Level;
     private readonly parts: CharacterRuntimeParts;
 
     // Mutable runtime state.
@@ -189,12 +188,11 @@ export class CharacterController {
 
     constructor(
         scene: Phaser.Scene,
-        level: Level,
+        _level: Level,
         spec: CharacterSpec,
         parts: CharacterRuntimeParts,
     ) {
         this.scene = scene;
-        this.level = level;
         this.spec = spec;
         this.parts = parts;
         this.hp = spec.hp;
@@ -286,26 +284,23 @@ export class CharacterController {
         }
         this.parts.matter.Body.setVelocity(this.parts.body, { x: finalVx, y: finalVy });
 
-        // ── World-bounds clamp ──────────────────────────────────────
-        const clamped = clampToBounds(
-            this.parts.body.position,
-            this.spec.body.halfW,
-            this.spec.body.halfH,
-            this.level.imageSize.width,
-            this.level.imageSize.height,
-        );
-        if (clamped) {
-            this.parts.matter.Body.setPosition(this.parts.body, clamped);
-            this.parts.matter.Body.setVelocity(this.parts.body, { x: 0, y: 0 });
-        }
-
         // ── Visual sync ─────────────────────────────────────────────
         const sprite = this.parts.sprite;
         const pos = this.parts.body.position;
-        // Body center is halfH above the feet anchor; sprite origin is
-        // (0.5, 1.0), so we shift down by halfH to keep feet aligned
-        // with the body's bottom edge as it moves.
-        sprite.setPosition(pos.x, pos.y + this.spec.body.halfH);
+        // Calculate visual offset. `left` shifts right (+) / left (-), `bottom` shifts up (-) / down (+)
+        const rawX = this.spec.sprite?.offset?.left ?? this.spec.sprite?.offset?.x ?? 0;
+        const rawY = this.spec.sprite?.offset?.bottom !== undefined 
+            ? -this.spec.sprite.offset.bottom 
+            : (this.spec.sprite?.offset?.y ?? 0);
+        const offX = rawX * (sprite.flipX ? -1 : 1);
+        const offY = rawY;
+        sprite.setPosition(pos.x + offX, pos.y + this.spec.body.halfH + offY);
+        if (this.parts.shadow) {
+            this.parts.shadow.setPosition(pos.x, pos.y + this.spec.body.halfH);
+        }
+        if (this.parts.debugBodyRect) {
+            this.parts.debugBodyRect.setPosition(pos.x, pos.y);
+        }
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
         // controller already maintains `targetX` / `targetY` from pointer
         // events, so the weapon aim and the sprite facing stay aligned.

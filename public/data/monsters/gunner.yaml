@@ -1,6 +1,9 @@
 name: Gunner
 hp: 20
 moveSpeed: 3
+body:
+  halfW: 14
+  halfH: 14
 weaponId: gunner-blast
 drops:
   - dropId: ammo-cache

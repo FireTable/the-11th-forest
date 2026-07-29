@@ -99,7 +99,7 @@ sp: 60
 moveSpeed: 4
 spRegenMs: 5000
 body:
-    halfW: 16
+    halfW: 28
     halfH: 24
 dodge:
     spCost: 15
@@ -114,6 +114,7 @@ sprite:
     texture: assets/image/characters/wanderer.png
     grid: { rows: 4, cols: 4 }
     scale: 1.2
+    offset: { left: -6, bottom: -2 }
     script:
         downsample: 4
         colors: 32

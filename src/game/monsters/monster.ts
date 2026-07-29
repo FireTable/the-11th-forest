@@ -42,6 +42,7 @@ export class Monster {
     readonly weapon: WeaponSpec;
     readonly body: MatterJS.BodyType;
     readonly rect: Phaser.GameObjects.Rectangle;
+    readonly shadow: Phaser.GameObjects.Ellipse;
     hp: number;
     state: MonsterState = 'idle';
     lastAttackAt = 0;
@@ -56,8 +57,8 @@ export class Monster {
         this.weapon = weapon;
         this.hp = spec.hp;
 
-        const w = weapon.hitWidth ?? 28;
-        const h = weapon.hitHeight ?? 28;
+        const w = spec.body.halfW * 2;
+        const h = spec.body.halfH * 2;
 
         this.body = scene.matter.add.rectangle(x, y, w, h, {
             label: 'monster',
@@ -70,9 +71,16 @@ export class Monster {
             },
         });
 
+        const matter = (Phaser as any).Physics.Matter.Matter;
+        matter.Body.setInertia(this.body, Infinity);
+
         const tint = weapon.projectile !== undefined
             ? Monster.TINT_RANGED
             : Monster.TINT_MELEE;
+        
+        // Foot shadow based on hit box size
+        this.shadow = scene.add.ellipse(x, y, w, h * 0.4, 0x000000, 0.3);
+
         this.rect = scene.add.rectangle(x, y, w, h, tint, 0.85);
         this.rect.setStrokeStyle(2, 0x111827, 1);
     }
@@ -84,6 +92,7 @@ export class Monster {
     destroy(scene: Phaser.Scene): void {
         scene.matter.world.remove(this.body);
         this.rect.destroy();
+        this.shadow.destroy();
         this.dead = true;
     }
 }
@@ -199,6 +208,7 @@ export class MonsterController {
 
             // ── Visual sync ───────────────────────────────────────────
             m.rect.setPosition(mp.x, mp.y);
+            m.shadow.setPosition(mp.x, mp.y);
             if (dist > 1) {
                 m.rect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
             }
@@ -222,6 +232,12 @@ export class MonsterController {
             if (target.hp <= 0) {
                 this.kill(target);
             }
+        }
+    }
+
+    setDebugVisible(visible: boolean): void {
+        for (const m of this.monsters) {
+            m.rect.setVisible(visible);
         }
     }
 
