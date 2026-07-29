@@ -65,6 +65,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, copyFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 
 import { PNG } from 'pngjs';
 import { colord, extend, AnyColor } from 'colord';
@@ -735,11 +736,12 @@ function main(): void {
 
     mkdirSync(outDir, { recursive: true });
     const isAppend = flags.includes('--append');
+    const useHash = flags.includes('--hash');
     let startIndex = 0;
     if (!isAppend) {
         // wipe old frame-*.png so a re-run with different tuning can't leave stale frames behind.
         for (const f of readdirSync(outDir)) {
-            if (/^frame-\d+\.png$/.test(f)) rmSync(join(outDir, f));
+            if (/^(frame-\d+|hash-[a-f0-9]+)\.png$/.test(f)) rmSync(join(outDir, f));
         }
     } else {
         // Find highest existing frame index
@@ -753,10 +755,21 @@ function main(): void {
     }
 
     frames.forEach((box, i) => {
-        const frameIndex = startIndex + i;
-        const name = `frame-${String(frameIndex).padStart(2, '0')}.png`;
         const frame = crop(workPng, box, pad);
-        writeFileSync(join(outDir, name), new Uint8Array(PNG.sync.write(frame)));
+        const frameBuffer = new Uint8Array(PNG.sync.write(frame));
+
+        let name: string;
+        if (useHash) {
+            const sha = createHash('sha256').update(frameBuffer).digest('hex');
+            // First 8 chars + Last 4 chars (12 chars hash filename)
+            const hashId = `${sha.slice(0, 8)}${sha.slice(-4)}`;
+            name = `hash-${hashId}.png`;
+        } else {
+            const frameIndex = startIndex + i;
+            name = `frame-${String(frameIndex).padStart(2, '0')}.png`;
+        }
+
+        writeFileSync(join(outDir, name), frameBuffer);
         console.log(`${name}  ${frame.width}x${frame.height}  @ ${box.x},${box.y}`);
     });
     console.log(`\n${frames.length} frames → ${outDir}`);

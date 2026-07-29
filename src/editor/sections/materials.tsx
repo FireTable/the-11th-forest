@@ -28,6 +28,15 @@ export function MaterialsSection({ level, setLevel }: Props) {
     const [folders, setFolders] = useState<MaterialFolder[]>([]);
     const [selectedMat, setSelectedMat] = useState<PlacedMaterial | null>(null);
     const [statusMsg, setStatusMsg] = useState('');
+    // Collapsed state for material folders (default all expanded)
+    const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
+
+    const toggleFolderCollapse = (folderName: string) => {
+        setCollapsedFolders((prev) => ({
+            ...prev,
+            [folderName]: !prev[folderName],
+        }));
+    };
 
     // Dialog state for material asset deletion checks
     const [deleteDialog, setDeleteDialog] = useState<{
@@ -458,46 +467,58 @@ export function MaterialsSection({ level, setLevel }: Props) {
                 {folders.length === 0 ? (
                     <div className="text-neutral-500 italic text-center py-2">No material packs found</div>
                 ) : (
-                    folders.map((f) => (
-                        <div key={f.name} className="flex flex-col gap-1.5 bg-neutral-950 p-2 rounded border border-neutral-800">
-                            <div className="font-medium text-neutral-300 capitalize text-[11px] flex justify-between items-center">
-                                <span>{f.name} ({f.images.length})</span>
-                                <label className="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-semibold">
-                                    + Append Sheet
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        disabled={uploading}
-                                        onChange={(e) => handleFolderUpload(f.name, e)}
-                                        className="hidden"
-                                    />
-                                </label>
-                            </div>
-                            <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto">
-                                {f.images.map((img) => (
+                    folders.map((f) => {
+                        const isCollapsed = !!collapsedFolders[f.name];
+                        return (
+                            <div key={f.name} className="flex flex-col gap-1.5 bg-neutral-950 p-2 rounded border border-neutral-800">
+                                <div className="font-medium text-neutral-300 capitalize text-[11px] flex justify-between items-center select-none">
                                     <div
-                                        key={img}
-                                        onClick={() => handlePlaceMaterial(img)}
-                                        className="relative aspect-square bg-neutral-900 border border-neutral-800 hover:border-cyan-500 rounded p-1 flex items-center justify-center overflow-hidden transition group cursor-pointer"
-                                        title="Click to place into scene"
+                                        onClick={() => toggleFolderCollapse(f.name)}
+                                        className="flex items-center gap-1.5 cursor-pointer hover:text-white transition"
                                     >
-                                        <img
-                                            src={`/${img}`}
-                                            alt="material tile"
-                                            className="max-w-full max-h-full object-contain group-hover:scale-110 transition"
-                                        />
-                                        <button
-                                            onClick={(e) => handleDeleteMaterialFile(img, e)}
-                                            className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-600/90 hover:bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold opacity-0 group-hover:opacity-100 transition shadow"
-                                            title="Delete asset file permanently"
-                                        >
-                                            ×
-                                        </button>
+                                        <span className="text-[10px] text-neutral-500">{isCollapsed ? '▶' : '▼'}</span>
+                                        <span>{f.name} ({f.images.length})</span>
                                     </div>
-                                ))}
+                                    <label className="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-semibold">
+                                        + Append Sheet
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            disabled={uploading}
+                                            onChange={(e) => handleFolderUpload(f.name, e)}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                </div>
+
+                                {!isCollapsed && (
+                                    <div className="grid grid-cols-6 gap-1 max-h-72 overflow-y-auto pr-0.5">
+                                        {f.images.map((img) => (
+                                            <div
+                                                key={img}
+                                                onClick={() => handlePlaceMaterial(img)}
+                                                className="relative aspect-square bg-neutral-900 border border-neutral-800 hover:border-cyan-500 rounded p-0.5 flex items-center justify-center overflow-hidden transition group cursor-pointer"
+                                                title="Click to place into scene"
+                                            >
+                                                <img
+                                                    src={`/${img}`}
+                                                    alt="material tile"
+                                                    className="max-w-full max-h-full object-contain group-hover:scale-110 transition"
+                                                />
+                                                <button
+                                                    onClick={(e) => handleDeleteMaterialFile(img, e)}
+                                                    className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-600/90 hover:bg-red-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold opacity-0 group-hover:opacity-100 transition shadow"
+                                                    title="Delete asset file permanently"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
 
@@ -508,7 +529,19 @@ export function MaterialsSection({ level, setLevel }: Props) {
                     if (!open) setDeleteDialog({ open: false, imgPath: '', blocked: false, usageCount: 0 });
                 }}
             >
-                <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+                <DialogContent
+                    onKeyDown={(e) => {
+                        if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Enter') {
+                            e.preventDefault();
+                            if (deleteDialog.blocked) {
+                                setDeleteDialog({ open: false, imgPath: '', blocked: false, usageCount: 0 });
+                            } else {
+                                confirmDeleteMaterialFile();
+                            }
+                        }
+                    }}
+                    className="bg-neutral-900 border-neutral-800 text-neutral-200"
+                >
                     <DialogHeader>
                         <DialogTitle className="text-base font-semibold">
                             {deleteDialog.blocked ? '⚠️ Cannot Delete Material' : 'Confirm Asset Deletion'}
@@ -544,6 +577,7 @@ export function MaterialsSection({ level, setLevel }: Props) {
                         {deleteDialog.blocked ? (
                             <Button
                                 size="sm"
+                                autoFocus
                                 onClick={() => setDeleteDialog({ open: false, imgPath: '', blocked: false, usageCount: 0 })}
                                 className="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs"
                             >
@@ -561,6 +595,7 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                 </Button>
                                 <Button
                                     size="sm"
+                                    autoFocus
                                     variant="destructive"
                                     onClick={confirmDeleteMaterialFile}
                                     className="bg-red-600 hover:bg-red-500 text-white text-xs"

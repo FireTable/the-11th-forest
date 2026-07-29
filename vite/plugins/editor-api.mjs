@@ -158,9 +158,9 @@ async function handleUploadMaterial(req, res) {
     const rawPath = path.join(folderDir, 'temp-upload-raw.png');
     await writeFile(rawPath, buffer);
 
-    // Call split-sheet.ts CLI script to cut material tiles with --append
+    // Call split-sheet.ts CLI script to cut material tiles with --append and --hash
     const projectRoot = path.resolve(__dirname, '../..');
-    const cmd = `pnpm tsx scripts/split-sheet.ts "${rawPath}" "${folderDir}" --append --no-recompose`;
+    const cmd = `pnpm tsx scripts/split-sheet.ts "${rawPath}" "${folderDir}" --append --hash --no-recompose`;
     
     try {
         await execAsync(cmd, { cwd: projectRoot });
