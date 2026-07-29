@@ -4,14 +4,14 @@
  * Automatically detects background color (Magenta, Green screen, Blue screen, etc.),
  * performs intelligent CIEDE2000 + Lch Hue color-keying, purges narrow crevice micro-holes,
  * applies 8-connected pixel-level edge erosion/outlining, downsamples crisp pixel-art,
- * quantizes palette with image-q NeuQuant (default 32 colors), and crops transparent frames.
+ * quantizes palette with image-q NeuQuant (optional 32 colors), and crops transparent frames.
  *
  * Usage:
  *   # Default: Auto-detect background, 2px transparent edge erosion, 2px padding
  *   pnpm tsx scripts/split-sheet.ts <sheet.png> <outDir> [--pad=2] [--outline=2] [--no-recompose]
  *
- *   # Pixelize & Quantize (32 colors default, optional --dither for Floyd-Steinberg grid):
- *   pnpm tsx scripts/split-sheet.ts <sheet.png> <outDir> --pixelize=4 [--colors=32] [--dither] [--in-place --id=wanderer]
+ *   # Downsample & Quantize (Decoupled: --downsample=4, --colors=32, optional --dither):
+ *   pnpm tsx scripts/split-sheet.ts <sheet.png> <outDir> --downsample=4 --colors=32 [--dither] [--in-place --id=wanderer]
  *
  *   # Recompose grid:
  *   pnpm tsx scripts/split-sheet.ts --recompose <outDir> <orig.png> --rows=N --cols=M [<out.png>]
@@ -21,7 +21,8 @@
  *   - Edge Erosion (--outline): 2px (8-connected pass)
  *   - Outline Color (--outline-color): transparent (strips anti-aliasing fringe)
  *   - Padding (--pad): 2px transparent border
- *   - Quantization Palette (--colors): 32 colors (via image-q NeuQuant)
+ *   - Resolution Downsample (--downsample=N): Optional physical scale down (default 4 when passed)
+ *   - Quantization Palette (--colors=N): Optional image-q NeuQuant color reduction (default 32 when passed)
  *
  * Flowchart Diagram:
  *
@@ -53,8 +54,8 @@
  *                               │
  *                               ▼
  *   ┌────────────────────────────────────────────────────────┐
- *   │ Step 5: Pixelize & Image-Q Quantize (Optional)         │
- *   │ (Nearest-Center Downsample + NeuQuant 32-Color Palette)│
+ *   │ Step 5: Downsample & Image-Q Quantize (Optional Flags) │
+ *   │ (--downsample: Nearest-Center | --colors: NeuQuant)   │
  *   └───────────────────────────┬────────────────────────────┘
  *                               │
  *                               ▼

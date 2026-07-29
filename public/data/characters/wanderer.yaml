@@ -20,6 +20,10 @@ sprite:
     texture: assets/image/characters/wanderer.png
     grid: { rows: 4, cols: 4 }
     scale: 1.2
+    script:
+        downsample: 4
+        colors: 32
+        pad: 2
 anims:
     idle:
         frames: [0, 4]
