@@ -99,6 +99,8 @@ export class Monster {
     readonly weapon: WeaponSpec;
     readonly body: MatterJS.BodyType;
     readonly rect: Phaser.GameObjects.Rectangle;
+    readonly debugBodyRect: Phaser.GameObjects.Rectangle;
+    readonly debugHitboxRect: Phaser.GameObjects.Rectangle;
     readonly sprite?: Phaser.GameObjects.Sprite;
     readonly shadow: Phaser.GameObjects.Ellipse;
     hp: number;
@@ -119,10 +121,22 @@ export class Monster {
         this.weapon = weapon;
         this.hp = spec.hp;
 
-        const w = spec.body.halfW * 2;
-        const h = spec.body.halfH * 2;
+        // Determine physical dimensions
+        let w = spec.body.halfW * 2;
+        let h = spec.body.halfH * 2;
+        let centerY = y;
 
-        this.body = scene.matter.add.rectangle(x, y, w, h, {
+        if (spec.sprite) {
+            // Get sprite dimensions dynamically
+            const cellW = 64; // Default scale 1.0 cell size
+            const cellH = 64;
+            const scale = spec.sprite.scale ?? 1.0;
+            w = cellW * scale * 0.8; // 80% width for clean collisions
+            h = cellH * scale; // Full height for sprite body
+            centerY = y - h / 2 + spec.body.halfH;
+        }
+
+        this.body = scene.matter.add.rectangle(x, centerY, w, h, {
             label: 'monster',
             collisionFilter: {
                 category: CAT.MONSTER_MELEE,
@@ -138,15 +152,23 @@ export class Monster {
             : Monster.TINT_MELEE;
         
         // Foot shadow based on hit box size
-        this.shadow = scene.add.ellipse(x, y, w, h * 0.4, 0x000000, 0.3);
+        this.shadow = scene.add.ellipse(x, y, spec.body.halfW * 2, spec.body.halfH * 0.8, 0x000000, 0.3);
 
-        this.rect = scene.add.rectangle(x, y, w, h, tint, 0.85);
-        this.rect.setStrokeStyle(2, 0x111827, 1);
+        // Feet Body Debug Rect (Green outline)
+        this.debugBodyRect = scene.add.rectangle(x, y, spec.body.halfW * 2, spec.body.halfH * 2);
+        this.debugBodyRect.setStrokeStyle(2, 0x22c55e, 1);
+        this.debugBodyRect.setDepth(9999);
+        this.debugBodyRect.setVisible(false);
+
+        // Full Hitbox Debug Rect (Purple / Red outline matching full Body)
+        this.debugHitboxRect = scene.add.rectangle(x, centerY, w, h, tint, 0.25);
+        this.debugHitboxRect.setStrokeStyle(2, tint, 1);
+        this.debugHitboxRect.setDepth(10000);
+        this.debugHitboxRect.setVisible(false);
+
+        this.rect = this.debugHitboxRect;
 
         if (spec.sprite && scene.textures.exists(textureKey(spec))) {
-            // Debug rectangle hidden when sprite texture is present
-            this.rect.setVisible(false);
-
             const spriteObj = scene.add.sprite(x, y, textureKey(spec));
             if (spec.sprite.scale) {
                 spriteObj.setScale(spec.sprite.scale);
@@ -166,9 +188,10 @@ export class Monster {
 
     destroy(scene: Phaser.Scene): void {
         scene.matter.world.remove(this.body);
-        this.rect.destroy();
+        this.debugBodyRect?.destroy();
+        this.debugHitboxRect?.destroy();
         this.sprite?.destroy();
-        this.shadow.destroy();
+        this.shadow?.destroy();
         this.dead = true;
     }
 }
@@ -328,15 +351,29 @@ export class MonsterController {
             }
 
             // ── Visual sync & animation ───────────────────────────────
-            const footY = Math.round(mp.y);
-            m.rect.setPosition(mp.x, mp.y);
-            m.rect.setDepth(footY);
-            m.shadow.setPosition(mp.x, mp.y);
+            const footY = Math.round(mp.y + (m.sprite ? m.sprite.displayHeight / 2 - m.spec.body.halfH : 0));
+            const footX = mp.x;
+            
+            // Align feet shadow and green debug rect with actual feet position
+            m.shadow.setPosition(footX, footY);
             m.shadow.setDepth(footY - 1);
+            m.debugBodyRect.setPosition(footX, footY - m.spec.body.halfH);
 
             if (m.sprite) {
-                m.sprite.setPosition(mp.x, mp.y);
+                // Calculate visual offset. `left` shifts right (+) / left (-), `bottom` shifts up (-) / down (+)
+                const rawX = m.spec.sprite?.offset?.left ?? m.spec.sprite?.offset?.x ?? 0;
+                const rawY = m.spec.sprite?.offset?.bottom !== undefined 
+                    ? -m.spec.sprite.offset.bottom 
+                    : (m.spec.sprite?.offset?.y ?? 0);
+                const offX = rawX * (m.sprite.flipX ? -1 : 1);
+                const offY = rawY;
+
+                // Align sprite with feet and apply offset
+                m.sprite.setPosition(mp.x + offX, mp.y + offY);
                 m.sprite.setDepth(footY);
+
+                // Align Editor debug rect with physics body center
+                m.debugHitboxRect.setPosition(mp.x, mp.y);
 
                 // Play corresponding animation track (idle / move / hit)
                 const isHit = time - m.lastHitAt < 250;
@@ -353,8 +390,11 @@ export class MonsterController {
                 if (dist > 1) {
                     m.sprite.setFlipX(dirToPlayer.x < 0);
                 }
-            } else if (dist > 1) {
-                m.rect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
+            } else {
+                m.debugHitboxRect.setPosition(mp.x, mp.y);
+                if (dist > 1) {
+                    m.debugHitboxRect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
+                }
             }
         }
 
@@ -369,9 +409,19 @@ export class MonsterController {
     }
 
     /** Apply damage from a player bullet to a specific monster (or AoE later). */
-    applyBulletDamage(bulletDamage: number, bulletBody: MatterJS.BodyType): void {
-        const bp = bulletBody.position;
-        const target = pickClosestMonster(bp, this.monsters, 64);
+    applyBulletDamage(bulletDamage: number, hitBody: MatterJS.BodyType): void {
+        // Find monster whose main body or compound parts match hitBody
+        const target = this.monsters.find((m) => {
+            if (m.dead || m.state === 'dying') return false;
+            if (m.body === hitBody) return true;
+            // Check compound parts if any (includes spriteHitbox sensor)
+            const parts = (m.body as any).parts;
+            if (Array.isArray(parts) && parts.includes(hitBody)) return true;
+            // Fallback: check parent
+            if ((hitBody as any).parent === m.body) return true;
+            return false;
+        }) ?? pickClosestMonster(hitBody.position, this.monsters, 200);
+
         if (target && target.state !== 'dying') {
             target.hp -= bulletDamage;
             target.lastHitAt = this.scene.time.now;
@@ -384,7 +434,8 @@ export class MonsterController {
 
     setDebugVisible(visible: boolean): void {
         for (const m of this.monsters) {
-            m.rect.setVisible(visible);
+            m.debugBodyRect.setVisible(visible);
+            m.debugHitboxRect.setVisible(visible);
         }
     }
 

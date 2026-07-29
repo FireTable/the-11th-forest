@@ -159,6 +159,7 @@ export interface CharacterRuntimeParts {
     sprite: Phaser.GameObjects.Sprite;
     shadow?: Phaser.GameObjects.Shape;
     debugBodyRect?: Phaser.GameObjects.Rectangle;
+    debugHitboxRect?: Phaser.GameObjects.Rectangle;
     matter: any;
     weapons: WeaponsLike;
     hud: HudLike;
@@ -305,6 +306,10 @@ export class CharacterController {
         if (this.parts.debugBodyRect) {
             this.parts.debugBodyRect.setPosition(pos.x, pos.y);
             this.parts.debugBodyRect.setDepth(feetY + 1);
+        }
+        if (this.parts.debugHitboxRect) {
+            this.parts.debugHitboxRect.setPosition(pos.x, pos.y + this.spec.body.halfH - sprite.displayHeight / 2);
+            this.parts.debugHitboxRect.setDepth(feetY + 2);
         }
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
         // controller already maintains `targetX` / `targetY` from pointer

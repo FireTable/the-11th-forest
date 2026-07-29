@@ -39,6 +39,7 @@ export interface CharacterRuntime {
     weaponHud: WeaponHud;
     statusHud: StatusHud;
     debugBodyRect: Phaser.GameObjects.Rectangle;
+    debugHitboxRect: Phaser.GameObjects.Rectangle;
     /** Apply HP/SP healing (clamped to [0, max]). Negative values damage. */
     heal(hpDelta: number, spDelta: number): void;
     /** Add `fraction * currentWeaponClipSize` bullets to the active weapon. */
@@ -163,6 +164,18 @@ export function loadCharacter(
     debugBodyRect.setStrokeStyle(1.5, 0x22c55e, 0.9);
     debugBodyRect.setVisible(false);
 
+    // Visual: debug hitbox rectangle (purple outline) matching full Sprite
+    const debugHitboxRect = scene.add.rectangle(
+        spawnX,
+        spawnY - spec.body.halfH,
+        spec.body.halfW * 2,
+        spec.body.halfH * 2,
+        0xa855f7,
+        0.25,
+    );
+    debugHitboxRect.setStrokeStyle(1.5, 0xa855f7, 0.9);
+    debugHitboxRect.setVisible(false);
+
     // Visual: shadow under feet based on spec.body halfW / halfH
     const shadow = scene.add.ellipse(
         spawnX,
@@ -181,9 +194,35 @@ export function loadCharacter(
     sprite.setOrigin(0.5, 1.0);
     if (spec.sprite) sprite.setScale(spec.sprite.scale);
     // Seed initial facing from the level's spawn config (default right).
-    // The controller's update loop flips this every frame from the cursor,
-    // but until the first pointermove fires we want the spawn pose to win.
     sprite.setFlipX((level.characterSpawn?.facing ?? 'right') === 'left');
+
+    if (spec.sprite) {
+        const spriteW = sprite.displayWidth;
+        const spriteH = sprite.displayHeight;
+        debugHitboxRect.setSize(spriteW, spriteH);
+
+        // Attach sensor Hitbox covering full Character Sprite
+        const spriteHitbox = matter.Bodies.rectangle(
+            spawnX,
+            spawnY - spriteH / 2,
+            spriteW,
+            spriteH,
+            {
+                isSensor: true,
+                label: 'character-hitbox',
+                collisionFilter: {
+                    category: CAT.CHARACTER,
+                    mask: 0xffff & ~CAT.BULLET,
+                },
+            },
+        );
+        const compoundBody = matter.Body.create({
+            parts: [body, spriteHitbox],
+            inertia: Infinity,
+            label: 'character',
+        });
+        scene.matter.world.add(compoundBody);
+    }
 
     const weaponsSys = new WeaponController(scene, matter, body, weapons);
     const hud = new CharacterHud(scene, spec);
@@ -195,6 +234,7 @@ export function loadCharacter(
         sprite,
         shadow,
         debugBodyRect,
+        debugHitboxRect,
         matter,
         weapons: weaponsSys,
         hud,
@@ -218,6 +258,7 @@ export function loadCharacter(
         weaponHud,
         statusHud,
         debugBodyRect,
+        debugHitboxRect,
         heal: (hp, sp) => controller.heal(hp, sp),
         refillAmmo: (f) => controller.refillAmmo(f),
         pickUpWeapon: (id) => controller.pickUpWeapon(id),

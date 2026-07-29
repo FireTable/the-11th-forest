@@ -153,6 +153,8 @@ export class LoadScene extends Scene {
             const isEditor = editorOpen === true;
             setHubsVisible(!isEditor);
             this.character.debugBodyRect.setVisible(isEditor);
+            this.character.debugHitboxRect.setVisible(isEditor);
+            this.monsterSystem.setDebugVisible(isEditor);
         };
         EventBus.on('editor-open', onEditorOpen);
         this.events.once('shutdown', () =>
@@ -233,7 +235,7 @@ export class LoadScene extends Scene {
                 if (other.label !== 'monster') continue;
                 this.monsterSystem.applyBulletDamage(
                     this.character.weapons.getActive().damage,
-                    bullet,
+                    other,
                 );
             }
         });
