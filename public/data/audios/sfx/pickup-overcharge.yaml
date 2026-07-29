@@ -1,0 +1,6 @@
+kind: sfx
+id: pickup-overcharge
+name: Pickup Overcharge
+source: assets/audio/sfx/pickup-overcharge.wav
+volume: 0.8
+prompt: Rising power-up tone

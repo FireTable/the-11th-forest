@@ -1,0 +1,6 @@
+kind: sfx
+id: monster-death
+name: Monster Death
+source: assets/audio/sfx/monster-death.wav
+volume: 0.7
+prompt: Descending death tone

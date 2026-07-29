@@ -1,0 +1,8 @@
+kind: music
+id: boss-arena
+name: Boss Arena
+source: assets/audio/music/boss-arena.mp3
+volume: 0.5
+fadeIn: 800
+fadeOut: 600
+prompt: Intense boss fight music, driving rhythm, anime action, electronic and orchestral

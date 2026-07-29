@@ -20,7 +20,8 @@
 
 import * as Phaser from 'phaser';
 
-import { CAT, PROJECTILE_MONSTER_MASK, COMBAT_PLAYER_DAMAGE_COOLDOWN_MS } from '@/lib/constants';
+import { CAT, PROJECTILE_MONSTER_MASK, COMBAT_PLAYER_DAMAGE_COOLDOWN_MS, SFX_EVENT } from '@/lib/constants';
+import { EventBus } from '@/lib/events/bus';
 import type { WeaponSpec } from '@/lib/weapons';
 import { spawnProjectile } from '@/game/weapons/weapon';
 import type { DropRef, MonsterSpec } from '@/lib/monsters';
@@ -425,6 +426,7 @@ export class MonsterController {
         if (target && target.state !== 'dying') {
             target.hp -= bulletDamage;
             target.lastHitAt = this.scene.time.now;
+            EventBus.emit(SFX_EVENT('monster-hit'));
 
             if (target.hp <= 0) {
                 this.kill(target);
@@ -463,6 +465,7 @@ export class MonsterController {
         const len = Math.hypot(dirToPlayer.x, dirToPlayer.y);
         if (len === 0) return;
         const { speed, visual: size } = weapon.projectile;
+        EventBus.emit(SFX_EVENT('monster-shoot'));
         const bullet = spawnProjectile(
             this.scene,
             this.matter,
@@ -482,6 +485,7 @@ export class MonsterController {
 
     private kill(m: Monster): void {
         m.state = 'dying';
+        EventBus.emit(SFX_EVENT('monster-death'));
 
         // Disable collision filter so dead monster doesn't block player or bullets
         m.body.collisionFilter.mask = 0;
@@ -556,6 +560,7 @@ export class MonsterController {
             this.destroyProjectile(proj);
             return;
         }
+        EventBus.emit(SFX_EVENT('player-hit'));
         this.cb.onPlayerHit(proj.damage);
         this.lastDamageAt = now;
         this.destroyProjectile(proj);
@@ -570,6 +575,7 @@ export class MonsterController {
         );
         const best = pickClosestMonster(this.playerBody.position, meleeMonsters, Infinity);
         if (!best) return;
+        EventBus.emit(SFX_EVENT('player-hit'));
         this.cb.onPlayerHit(best.weapon.damage);
         this.lastDamageAt = now;
     }

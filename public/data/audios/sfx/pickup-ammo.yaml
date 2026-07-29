@@ -1,0 +1,6 @@
+kind: sfx
+id: pickup-ammo
+name: Pickup Ammo
+source: assets/audio/sfx/pickup-ammo.wav
+volume: 0.7
+prompt: Quick metallic click

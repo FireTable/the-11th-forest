@@ -1,0 +1,8 @@
+kind: music
+id: forest-ambient
+name: Forest Ambient
+source: assets/audio/music/forest-ambient.mp3
+volume: 0.4
+fadeIn: 1500
+fadeOut: 1000
+prompt: Peaceful ambient forest, soft drones, gentle pads, mysterious mood, anime game background music

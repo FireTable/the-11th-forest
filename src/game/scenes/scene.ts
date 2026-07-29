@@ -6,6 +6,7 @@ import {
     loadCharacterAssets,
     type CharacterRuntime,
 } from '@/game/characters/character';
+import { AudioController, loadAudioAssets } from '@/game/audios/logic';
 import { createDropAnims, DropController, loadDropAssets } from '@/game/drops/drop';
 import { MaterialManager } from '@/game/materials/material';
 import {
@@ -38,8 +39,10 @@ async function getMonsterSpriteCellDims(
     };
 }
 import { PathfindingService } from '@/game/monsters/logic';
+import { MUSIC_EVENT } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
+import type { MusicSpec, SfxSpec, SoundSpec } from '@/lib/audios';
 import type { CharacterSpec } from '@/lib/characters';
 import type { DropSpec } from '@/lib/drops';
 import type { Level } from '@/lib/levels/types';
@@ -68,6 +71,9 @@ export interface SceneAssets {
     spriteCell: { width: number; height: number };
     monsterSpecs: Map<string, MonsterSpec>;
     dropSpecs: Map<string, DropSpec>;
+    /** SFX + music loaded from audios/index.yaml. */
+    sfxSpecs: Map<string, SfxSpec>;
+    musicSpecs: Map<string, MusicSpec>;
 }
 
 /**
@@ -86,6 +92,7 @@ export class LoadScene extends Scene {
     private monsterSystem!: MonsterController;
     private dropSystem!: DropController;
     private materialManager!: MaterialManager;
+    private audio!: AudioController;
 
     constructor(
         private readonly id: string,
@@ -114,6 +121,14 @@ export class LoadScene extends Scene {
         );
         // Load drop spritesheet assets
         loadDropAssets(this, this.assets.dropSpecs.values());
+        // Audio assets — every SFX + music track gets queued here.
+        loadAudioAssets(
+            this,
+            [
+                ...this.assets.sfxSpecs.values(),
+                ...this.assets.musicSpecs.values(),
+            ] as Iterable<SoundSpec>,
+        );
         MaterialManager.preloadMaterials(this, this.level.materials);
     }
 
@@ -245,6 +260,17 @@ export class LoadScene extends Scene {
             }
         });
 
+        // Wire AudioController (subscribes to EventBus sfx:*/music:* events).
+        this.audio = new AudioController(
+            this,
+            this.assets.sfxSpecs.values(),
+            this.assets.musicSpecs.values(),
+        );
+        // Honk the level's chosen music, if any.
+        if (this.level.music) {
+            EventBus.emit(MUSIC_EVENT(this.level.music));
+        }
+
         // Center camera on world so the viewport shows the middle of the
         // level when the browser window is smaller than the image.
         this.cameras.main.centerOn(
@@ -267,5 +293,9 @@ export class LoadScene extends Scene {
         setCurrentLevel(payload);
         EventBus.emit('level-loaded', payload);
         EventBus.emit('current-scene-ready', this);
+    }
+
+    shutdown(): void {
+        this.audio?.destroy();
     }
 }

@@ -15,6 +15,8 @@
 
 import type * as Phaser from 'phaser';
 
+import { SFX_EVENT } from '@/lib/constants';
+import { EventBus } from '@/lib/events/bus';
 import type { WeaponSpec } from '@/lib/weapons';
 
 import {
@@ -103,6 +105,7 @@ export class WeaponController {
                 for (let i = this.bullets.length - 1; i >= 0; i--) {
                     if (this.bullets[i].body === bulletBody) {
                         this.destroyBullet(i);
+                        EventBus.emit(SFX_EVENT('bullet-wall'));
                         break;
                     }
                 }
@@ -276,6 +279,7 @@ export class WeaponController {
         const projectile = slot.spec.projectile;
         if (!projectile) return; // melee-only weapons don't fire
         const { speed, visual: size } = projectile;
+        EventBus.emit(SFX_EVENT('player-shoot'));
         // Spread only when n > 1 (shotgun-style). Single-shot weapons fire straight.
         const spreadDeg = n > 1 ? 16 : 0;
         for (let i = 0; i < n; i++) {

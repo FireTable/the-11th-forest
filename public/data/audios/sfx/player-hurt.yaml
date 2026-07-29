@@ -1,0 +1,6 @@
+kind: sfx
+id: player-hurt
+name: Player Hurt
+source: assets/audio/sfx/player-hurt.wav
+volume: 0.6
+prompt: Low hurt grunt

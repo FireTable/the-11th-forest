@@ -1,0 +1,6 @@
+kind: sfx
+id: player-shoot
+name: Player Shoot
+source: assets/audio/sfx/player-shoot.wav
+volume: 0.5
+prompt: Short pew, pistol shot

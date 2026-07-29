@@ -185,3 +185,18 @@ export const COMBAT_PLAYER_DAMAGE_COOLDOWN_MS = 100;
 
 /** Max trail positions kept per bullet for the bullet trail. */
 export const RENDER_BULLET_TRAIL_LENGTH = 6;
+
+// ─── Audio: EventBus event-name helpers ─────────────────────────────────
+//
+// AudioController subscribes to these. Other modules emit them; nobody
+// imports the audio module directly. Naming follows `sfx:<id>` /
+// `music:<id>` so the event name is a 1:1 map from the YAML id.
+
+export const SFX_EVENT = (id: string): string => `sfx:${id}`;
+export const MUSIC_EVENT = (id: string): string => `music:${id}`;
+export const MUSIC_STOP = 'music:stop';
+export const MUSIC_PAUSE = 'music:pause';
+export const MUSIC_RESUME = 'music:resume';
+
+/** Default cross-fade when a music stop / switch lacks an explicit fadeOut. */
+export const AUDIO_DEFAULT_FADE_MS = 250;

@@ -12,7 +12,8 @@
 import * as Phaser from 'phaser';
 
 import type { CharacterRuntime } from '@/game/characters/character';
-import { CAT } from '@/lib/constants';
+import { CAT, SFX_EVENT } from '@/lib/constants';
+import { EventBus } from '@/lib/events/bus';
 import type { DropSpec } from '@/lib/drops';
 import type { DropSpawn } from '@/lib/levels/types';
 
@@ -215,10 +216,30 @@ export class DropController {
     }
 
     private applyEffect(spec: DropSpec): void {
+        // Emit SFX BEFORE applying effect so the audio engine can play
+        // before the pickup animation / freeze-frame finishes.
+        const sfxId = sfxIdForDrop(spec);
+        if (sfxId) EventBus.emit(SFX_EVENT(sfxId));
         planDropEffect(spec, {
             heal: (hp, sp) => this.character.heal(hp, sp),
             refillAmmo: (f) => this.character.refillAmmo(f),
             onWeaponPickup: (id) => this.cb.onWeaponPickup(id),
         });
+    }
+}
+
+/** Map a drop spec id to the SFX id played when picked up. */
+function sfxIdForDrop(spec: DropSpec): string | null {
+    switch (spec.id) {
+        case 'hp-shard':
+            return 'pickup-hp';
+        case 'sp-fragment':
+            return 'pickup-sp';
+        case 'ammo-cache':
+            return 'pickup-ammo';
+        case 'overcharge-core':
+            return 'pickup-overcharge';
+        default:
+            return null;
     }
 }

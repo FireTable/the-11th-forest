@@ -1,12 +1,14 @@
 import { AUTO, Game, Scale } from 'phaser';
 
 import { LoadScene } from '@/game/scenes/scene';
+import { fetchAudioIndex, fetchAudioMusic, fetchAudioSfx } from '@/lib/audios';
 import { fetchCharacter, fetchCharacterIndex } from '@/lib/characters';
 import { fetchDrop } from '@/lib/drops';
 import { collectDropIds, fetchLevel, fetchLevelIndex } from '@/lib/levels';
 import { fetchMonster } from '@/lib/monsters';
 import { fetchWeapon } from '@/lib/weapons';
 
+import type { MusicSpec, SfxSpec } from '@/lib/audios';
 import type { CharacterSpec } from '@/lib/characters';
 import type { DropSpec } from '@/lib/drops';
 import type { MonsterSpec } from '@/lib/monsters';
@@ -24,6 +26,8 @@ interface ResolvedScene {
     spriteCell: { width: number; height: number };
     monsters: Map<string, MonsterSpec>;
     drops: Map<string, DropSpec>;
+    sfx: Map<string, SfxSpec>;
+    music: Map<string, MusicSpec>;
 }
 
 // Scene id resolution: ?scene=<id> URL param wins; otherwise the first
@@ -78,6 +82,18 @@ async function resolveScene(): Promise<ResolvedScene> {
         .map((wid) => weaponsById.get(wid)!)
         .filter(Boolean);
 
+    // Audio: index defines which SFX + music are available globally; we
+    // pre-fetch every spec so the controller can list by id immediately.
+    const audioIndex = await fetchAudioIndex();
+    const sfxEntries = await Promise.all(
+        audioIndex.sfx.map(async (id) => [id, await fetchAudioSfx(id)] as const),
+    );
+    const musicEntries = await Promise.all(
+        audioIndex.music.map(async (id) => [id, await fetchAudioMusic(id)] as const),
+    );
+    const sfx = new Map<string, SfxSpec>(sfxEntries);
+    const music = new Map<string, MusicSpec>(musicEntries);
+
     // Compute sprite-sheet cell dims by reading the texture's natural
     // size and dividing by the spec's grid layout. Browsers expose this
     // via Image() — no extra deps. Skipped when the spec has no sprite.
@@ -92,6 +108,8 @@ async function resolveScene(): Promise<ResolvedScene> {
         spriteCell,
         monsters: monsterSpecMap,
         drops: new Map(dropEntries),
+        sfx,
+        music,
     };
 }
 
@@ -153,6 +171,8 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
             spriteCell: scene.spriteCell,
             monsterSpecs: scene.monsters,
             dropSpecs: scene.drops,
+            sfxSpecs: scene.sfx,
+            musicSpecs: scene.music,
         })],
     });
 };

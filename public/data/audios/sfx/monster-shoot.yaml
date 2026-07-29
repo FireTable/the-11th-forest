@@ -1,0 +1,6 @@
+kind: sfx
+id: monster-shoot
+name: Monster Shoot
+source: assets/audio/sfx/monster-shoot.wav
+volume: 0.5
+prompt: Short alien zap

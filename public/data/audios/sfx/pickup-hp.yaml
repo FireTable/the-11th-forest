@@ -1,0 +1,6 @@
+kind: sfx
+id: pickup-hp
+name: Pickup HP
+source: assets/audio/sfx/pickup-hp.wav
+volume: 0.8
+prompt: Short bright chirp, healing pickup

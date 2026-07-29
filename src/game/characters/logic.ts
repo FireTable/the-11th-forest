@@ -29,7 +29,9 @@ import {
     KEY_THREE,
     KEY_TWO,
     KEY_W,
+    SFX_EVENT,
 } from '@/lib/constants';
+import { EventBus } from '@/lib/events/bus';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 
@@ -220,7 +222,10 @@ export class CharacterController {
 
     /** Apply HP/SP healing (clamped to [0, max]). Negative values damage. */
     heal(hpDelta: number, spDelta: number): void {
-        if (hpDelta !== 0) this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
+        if (hpDelta !== 0) {
+            this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
+            if (hpDelta < 0) EventBus.emit(SFX_EVENT('player-hurt'));
+        }
         if (spDelta !== 0) this.sp = Math.max(0, Math.min(this.spec.sp, this.sp + spDelta));
     }
 
@@ -271,6 +276,7 @@ export class CharacterController {
             this.dodgeVy = dodge.vy;
             this.dodgeActiveUntil = now + this.spec.dodge.durationMs;
             this.lastDodgeEndAt = now + this.spec.dodge.durationMs;
+            EventBus.emit(SFX_EVENT('dodge'));
         }
 
         // ── Velocity resolution ─────────────────────────────────────

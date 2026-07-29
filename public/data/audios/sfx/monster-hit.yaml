@@ -1,0 +1,6 @@
+kind: sfx
+id: monster-hit
+name: Monster Hit
+source: assets/audio/sfx/monster-hit.wav
+volume: 0.7
+prompt: Mid impact thud

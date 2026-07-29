@@ -1,6 +1,7 @@
 title: The 11th Forest — Sacred Forest Sanctuary
 background: assets/image/scenes/sacred-forest-sanctuary.png
 imageSize: 2752x1536
+music: forest-ambient
 airWalls:
   - id: wall-1
     kind: short
