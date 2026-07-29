@@ -3,16 +3,11 @@
  * --------------------------------------------------------------------------
  * Zod schema for the levels module.
  *
- * Two legacy migrations baked in:
- *
- *   1. Legacy air walls (`x`/`y`/`width`/`height`) are accepted as
- *      alternate input — a `z.union` + `transform` rewrites them into
- *      4-vertex polygons via `rectToPoints`. The OUTPUT type only ever
- *      has `points`, never the legacy rect form.
- *
- *   2. Spawn-point coordinates are canonical `x` + `y` (flat) but
- *      `at: [x, y]` (legacy) is still accepted via a discriminated
- *      union — the parser normalises to flat `x`/`y` in the output.
+ * Legacy rect air walls (`x`/`y`/`width`/`height`) are still accepted
+ * on input and migrated to 4-vertex polygons via `rectToPoints` —
+ * older hand-drawn levels predate the polygon editor. Spawn points
+ * use flat `{x, y}` (the earlier `at: [x, y]` form was removed when
+ * every level YAML was rewritten).
  *
  * Single source of truth — `./types.ts` derives types via `z.infer`.
  */
@@ -20,66 +15,6 @@
 import { z } from 'zod';
 
 import { rectToPoints } from '@/lib/editor/polygon';
-
-// ─── Spawn point (flat OR legacy `at: [x, y]`) ────────────────────────────
-//
-// Each spawn schema is a self-contained union of two object shapes,
-// transformed to the canonical flat {x, y}. We can't use `.extend()`
-// on a transformed schema (ZodPipe doesn't expose it), so each schema
-// inlines its own union.
-
-// ─── Spawn point (flat OR legacy `at: [x, y]`) ────────────────────────────
-//
-// Each spawn schema accepts EITHER flat {x, y} OR legacy {at: [x, y]} on
-// input and normalizes to flat {x, y} on output. The legacy shape is
-// tolerated so older level YAMLs keep loading.
-//
-// Implementation note: we can't easily get Zod 4 to infer the post-
-// transform type from a union input (the spread collapses to {x, y}).
-// So each spawn schema is written by hand instead of via a helper.
-
-export const CharacterSpawnSchema = z
-    .union([
-        z
-            .object({ facing: z.enum(['left', 'right']), x: z.number(), y: z.number() })
-            .strict(),
-        z
-            .object({ facing: z.enum(['left', 'right']), at: z.tuple([z.number(), z.number()]) })
-            .strict(),
-    ])
-    .transform((v) => {
-        if ('at' in v) {
-            const { at, ...rest } = v;
-            return { ...rest, x: Math.round(at[0]), y: Math.round(at[1]) };
-        }
-        return { ...v, x: Math.round(v.x), y: Math.round(v.y) };
-    });
-
-export const MonsterSpawnSchema = z
-    .union([
-        z.object({ type: z.string().min(1), x: z.number(), y: z.number() }).strict(),
-        z.object({ type: z.string().min(1), at: z.tuple([z.number(), z.number()]) }).strict(),
-    ])
-    .transform((v) => {
-        if ('at' in v) {
-            const { at, ...rest } = v;
-            return { ...rest, x: Math.round(at[0]), y: Math.round(at[1]) };
-        }
-        return { ...v, x: Math.round(v.x), y: Math.round(v.y) };
-    });
-
-export const DropSpawnSchema = z
-    .union([
-        z.object({ type: z.string().min(1), x: z.number(), y: z.number() }).strict(),
-        z.object({ type: z.string().min(1), at: z.tuple([z.number(), z.number()]) }).strict(),
-    ])
-    .transform((v) => {
-        if ('at' in v) {
-            const { at, ...rest } = v;
-            return { ...rest, x: Math.round(at[0]), y: Math.round(at[1]) };
-        }
-        return { ...v, x: Math.round(v.x), y: Math.round(v.y) };
-    });
 
 // ─── AirWall (polygon OR legacy rect) ────────────────────────────────────
 
@@ -122,7 +57,34 @@ export const AirWallSchema = z
         };
     });
 
-// ─── Spawn entries ────────────────────────────────────────────────────────
+// ─── Spawn entries (flat x, y only) ──────────────────────────────────────
+
+export const CharacterSpawnSchema = z
+    .object({
+        facing: z.enum(['left', 'right']),
+        x: z.number(),
+        y: z.number(),
+    })
+    .strict()
+    .transform((v) => ({ ...v, x: Math.round(v.x), y: Math.round(v.y) }));
+
+export const MonsterSpawnSchema = z
+    .object({
+        type: z.string().min(1),
+        x: z.number(),
+        y: z.number(),
+    })
+    .strict()
+    .transform((v) => ({ ...v, x: Math.round(v.x), y: Math.round(v.y) }));
+
+export const DropSpawnSchema = z
+    .object({
+        type: z.string().min(1),
+        x: z.number(),
+        y: z.number(),
+    })
+    .strict()
+    .transform((v) => ({ ...v, x: Math.round(v.x), y: Math.round(v.y) }));
 
 // ─── PlacedMaterial ───────────────────────────────────────────────────────
 
@@ -164,7 +126,7 @@ export const LevelSchema = z
     .strict()
     .transform((v) => {
         const [w, h] = v.imageSize.split('x');
-        const result = {
+        return {
             title: v.title,
             background: v.background,
             imageSize: { width: Number(w), height: Number(h) },
@@ -176,7 +138,6 @@ export const LevelSchema = z
             ...(v.dropSpawns !== undefined ? { dropSpawns: v.dropSpawns } : {}),
             ...(v.materials !== undefined ? { materials: v.materials } : {}),
         };
-        return result;
     });
 
 // ─── LevelIndex ───────────────────────────────────────────────────────────

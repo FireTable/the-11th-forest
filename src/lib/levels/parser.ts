@@ -6,10 +6,8 @@
  * Lives apart from loader.ts so tests can hit parsing logic without
  * touching fetch or fs.
  *
- * Validation is delegated to `./schema.ts` (Zod). The schema handles
- * two legacy migrations:
- *   - air wall `x/y/width/height` → 4-vertex `points` polygon
- *   - spawn `at: [x, y]` → flat `x`, `y`
+ * Validation is delegated to `./schema.ts` (Zod). Legacy rect air
+ * walls (`x/y/width/height`) are still migrated to 4-vertex polygons.
  *
  * Errors are re-thrown as plain Errors prefixed `Level ${id}:` to
  * preserve the existing caller-facing format.
