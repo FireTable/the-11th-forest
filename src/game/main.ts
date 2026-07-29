@@ -3,7 +3,7 @@ import { AUTO, Game, Scale } from 'phaser';
 import { LoadScene } from '@/game/scenes/scene';
 import { fetchCharacter, fetchCharacterIndex } from '@/lib/characters';
 import { fetchDrop } from '@/lib/drops';
-import { fetchLevel, fetchLevelIndex } from '@/lib/levels';
+import { collectDropIds, fetchLevel, fetchLevelIndex } from '@/lib/levels';
 import { fetchMonster } from '@/lib/monsters';
 import { fetchWeapon } from '@/lib/weapons';
 
@@ -60,8 +60,7 @@ async function resolveScene(): Promise<ResolvedScene> {
         }
     }
 
-    const dropIds = new Set<string>();
-    level.dropSpawns?.forEach((d) => dropIds.add(d.type));
+    const dropIds = collectDropIds(level, monsterSpecMap);
 
     const dropEntries = await Promise.all(
         [...dropIds].map(async (did) => [did, await fetchDrop(did)] as const),
