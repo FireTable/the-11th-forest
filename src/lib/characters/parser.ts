@@ -2,211 +2,60 @@
  * src/lib/characters/parser.ts
  * --------------------------------------------------------------------------
  * Pure sync parsing + validation. No I/O.
+ *
+ * Validation is delegated to `./schema.ts` (Zod). Errors are re-thrown
+ * as plain Errors prefixed `Character ${id}:` to preserve the existing
+ * caller-facing format.
+ *
+ * The YAML `id` field is validated against the filename-derived id
+ * (mismatch throws). Other than that, the parser is a thin wrapper
+ * around `schema.safeParse`.
  */
 
 import { load as parseYaml } from 'js-yaml';
+import type { ZodError } from 'zod';
 
-import type { AnimSpec, CharacterIndex, CharacterSpec, SpriteSpec } from './types';
+import type { CharacterIndex, CharacterSpec } from './types';
+import { CharacterIndexSchema, CharacterSpecSchema } from './schema';
 
-function requireNonNegativeFinite(value: unknown, label: string, id: string): number {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-        throw new Error(`Character ${id}: ${label} must be a non-negative finite number`);
-    }
-    return value;
+function pathOf(issue: { path: ReadonlyArray<PropertyKey> }): string {
+    return issue.path.map(String).join('.');
 }
 
-function requirePositiveFinite(value: unknown, label: string, id: string): number {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-        throw new Error(`Character ${id}: ${label} must be a positive finite number`);
-    }
-    return value;
-}
-
-function parseBody(raw: unknown, id: string): { halfW: number; halfH: number } {
-    if (typeof raw !== 'object' || raw === null) {
-        throw new Error(`Character ${id}: body must be an object with halfW, halfH`);
-    }
-    const b = raw as Record<string, unknown>;
-    return {
-        halfW: requirePositiveFinite(b.halfW, 'body.halfW', id),
-        halfH: requirePositiveFinite(b.halfH, 'body.halfH', id),
-    };
-}
-
-function parseDodge(raw: unknown, id: string): {
-    spCost: number; speed: number; durationMs: number; cooldownMs: number;
-} {
-    if (typeof raw !== 'object' || raw === null) {
-        throw new Error(`Character ${id}: dodge must be an object with spCost, speed, durationMs, cooldownMs`);
-    }
-    const d = raw as Record<string, unknown>;
-    return {
-        spCost: requireNonNegativeFinite(d.spCost, 'dodge.spCost', id),
-        speed: requirePositiveFinite(d.speed, 'dodge.speed', id),
-        durationMs: requirePositiveFinite(d.durationMs, 'dodge.durationMs', id),
-        cooldownMs: requirePositiveFinite(d.cooldownMs, 'dodge.cooldownMs', id),
-    };
+function rethrow(zerr: ZodError, id: string): never {
+    const summary = zerr.issues
+        .map((i) => `${pathOf(i)}: ${i.message}`)
+        .join('; ');
+    throw new Error(`Character ${id}: ${summary}`);
 }
 
 export function parseCharacterYaml(text: string, id: string): CharacterSpec {
-    const raw = parseYaml(text) as Record<string, unknown> | null;
+    const raw = parseYaml(text);
     if (raw === null || typeof raw !== 'object') {
         throw new Error(`Character ${id}: empty or non-object YAML`);
     }
-    const {
-        id: yamlId,
-        name,
-        hp,
-        sp,
-        moveSpeed,
-        spRegenMs,
-        body,
-        dodge,
-        hotbar,
-        sprite,
-        anims,
-    } = raw;
-
-    if (typeof name !== 'string' || name.length === 0) {
-        throw new Error(`Character ${id}: name required`);
-    }
-    if (yamlId !== undefined && yamlId !== id) {
+    const result = CharacterSpecSchema.safeParse(raw);
+    if (!result.success) throw rethrow(result.error, id);
+    if (result.data.id !== undefined && result.data.id !== id) {
         throw new Error(
-            `Character ${id}: yaml id "${yamlId}" doesn't match filename — keep them in sync`,
+            `Character ${id}: yaml id "${result.data.id}" doesn't match filename — keep them in sync`,
         );
     }
-
-    const spec: CharacterSpec = {
-        id,
-        name,
-        hp: requireNonNegativeFinite(hp, 'hp', id),
-        sp: requireNonNegativeFinite(sp, 'sp', id),
-        moveSpeed: requirePositiveFinite(moveSpeed, 'moveSpeed', id),
-        spRegenMs: requirePositiveFinite(spRegenMs, 'spRegenMs', id),
-        body: parseBody(body, id),
-        dodge: parseDodge(dodge, id),
-        hotbar: parseHotbar(hotbar, id),
-    };
-    if (sprite !== undefined) spec.sprite = parseSprite(sprite, id);
-    if (anims !== undefined) spec.anims = parseAnims(anims, id);
-    return spec;
-}
-
-function parseSprite(raw: unknown, id: string): SpriteSpec {
-    if (typeof raw !== 'object' || raw === null) {
-        throw new Error(
-            `Character ${id}: sprite must be an object with texture, grid, scale`,
-        );
-    }
-    const s = raw as Record<string, unknown>;
-    if (typeof s.texture !== 'string' || s.texture.length === 0) {
-        throw new Error(`Character ${id}: sprite.texture must be a non-empty string`);
-    }
-    const res: SpriteSpec = {
-        texture: s.texture,
-        grid: parseSpriteGrid(s.grid, id),
-        scale: requirePositiveFinite(s.scale, 'sprite.scale', id),
-    };
-    if (typeof s.offset === 'object' && s.offset !== null) {
-        const off = s.offset as Record<string, unknown>;
-        const left = typeof off.left === 'number' && Number.isFinite(off.left) ? off.left : undefined;
-        const bottom = typeof off.bottom === 'number' && Number.isFinite(off.bottom) ? off.bottom : undefined;
-        const x = typeof off.x === 'number' && Number.isFinite(off.x) ? off.x : undefined;
-        const y = typeof off.y === 'number' && Number.isFinite(off.y) ? off.y : undefined;
-        if (left !== undefined || bottom !== undefined || x !== undefined || y !== undefined) {
-            res.offset = { left, bottom, x, y };
-        }
-    }
-    return res;
-}
-
-function parseSpriteGrid(raw: unknown, id: string): SpriteSpec['grid'] {
-    if (typeof raw !== 'object' || raw === null) {
-        throw new Error(
-            `Character ${id}: sprite.grid required ({rows, cols} of the sheet)`,
-        );
-    }
-    const g = raw as Record<string, unknown>;
-    return {
-        rows: requirePositiveFinite(g.rows, 'sprite.grid.rows', id),
-        cols: requirePositiveFinite(g.cols, 'sprite.grid.cols', id),
-    };
-}
-
-function parseAnims(raw: unknown, id: string): Record<string, AnimSpec> {
-    if (typeof raw !== 'object' || raw === null) {
-        throw new Error(`Character ${id}: anims must be an object`);
-    }
-    const r = raw as Record<string, unknown>;
-    const out: Record<string, AnimSpec> = {};
-    for (const [key, value] of Object.entries(r)) {
-        out[key] = parseAnimSpec(value, key, id);
-    }
-    return out;
-}
-
-function parseAnimSpec(raw: unknown, key: string, id: string): AnimSpec {
-    if (typeof raw !== 'object' || raw === null) {
-        throw new Error(`Character ${id}: anims.${key} must be an object`);
-    }
-    const a = raw as Record<string, unknown>;
-    if (!Array.isArray(a.frames) || a.frames.length !== 2) {
-        throw new Error(`Character ${id}: anims.${key}.frames must be a tuple [start, end]`);
-    }
-    const [start, end] = a.frames;
-    if (
-        typeof start !== 'number' ||
-        typeof end !== 'number' ||
-        !Number.isInteger(start) ||
-        !Number.isInteger(end) ||
-        start < 0 ||
-        end < start
-    ) {
-        throw new Error(
-            `Character ${id}: anims.${key}.frames[0] (${start}) must be >= 0 and <= frames[1] (${end})`,
-        );
-    }
-    if (typeof a.repeat !== 'number' || !Number.isInteger(a.repeat)) {
-        throw new Error(
-            `Character ${id}: anims.${key}.repeat must be an integer (-1 = loop, 0 = once)`,
-        );
-    }
-    return {
-        frames: [start, end],
-        frameRate: requirePositiveFinite(a.frameRate, `anims.${key}.frameRate`, id),
-        repeat: a.repeat,
-    };
-}
-
-function parseHotbar(raw: unknown, id: string): string[] {
-    if (!Array.isArray(raw) || raw.length === 0) {
-        throw new Error(`Character ${id}: hotbar must be a non-empty array of weapon IDs`);
-    }
-    const out: string[] = [];
-    for (let i = 0; i < raw.length; i++) {
-        const v = raw[i];
-        if (typeof v !== 'string' || v.length === 0) {
-            throw new Error(`Character ${id}: hotbar[${i}] must be a non-empty weapon ID string`);
-        }
-        out.push(v);
-    }
-    return out;
+    // Loader's id (from filename) wins over whatever the YAML had.
+    return { ...result.data, id };
 }
 
 export function parseCharacterIndex(text: string): CharacterIndex {
-    const raw = parseYaml(text) as Record<string, unknown> | null;
+    const raw = parseYaml(text);
     if (raw === null || typeof raw !== 'object') {
         throw new Error('Character index: empty or non-object YAML');
     }
-    const { characters } = raw;
-    if (!Array.isArray(characters)) throw new Error('Character index: `characters` must be an array');
-    const ids: string[] = [];
-    for (let i = 0; i < characters.length; i++) {
-        const c = characters[i];
-        if (typeof c !== 'string' || c.length === 0) {
-            throw new Error(`Character index: characters[${i}] must be a non-empty string`);
-        }
-        ids.push(c);
+    const result = CharacterIndexSchema.safeParse(raw);
+    if (!result.success) {
+        const summary = result.error.issues
+            .map((i) => `${pathOf(i)}: ${i.message}`)
+            .join('; ');
+        throw new Error(`Character index: ${summary}`);
     }
-    return { characters: ids };
+    return result.data;
 }

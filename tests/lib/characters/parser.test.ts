@@ -4,6 +4,7 @@ import { parseCharacterIndex, parseCharacterYaml } from '@/lib/characters/parser
 
 describe('parseCharacterYaml', () => {
     const validYaml = `
+id: wanderer
 name: Wanderer
 hp: 100
 sp: 60
@@ -180,7 +181,7 @@ anims:
     it('rejects anims with reversed frame range', () => {
         const yamlText =
             validYaml + 'anims:\n  idle:\n    frames: [5, 1]\n    frameRate: 6\n    repeat: -1\n';
-        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/frames\[0\].*<=.*frames\[1\]/);
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/frames\[1\].*>=.*frames\[0\]/);
     });
 
     it('rejects anims with non-positive frameRate', () => {
