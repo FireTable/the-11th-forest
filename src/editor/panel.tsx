@@ -115,10 +115,19 @@ export function EditorPanel() {
         }
     }
 
+    function toggleOpen() {
+        const next = !open;
+        setOpen(next);
+        // Hubs are Phaser GameObjects drawn on the canvas; React can't
+        // touch them directly. Notify the scene via EventBus so the
+        // hubs' root containers get hidden / shown alongside the panel.
+        EventBus.emit('editor-open', next);
+    }
+
     return (
         <>
             <Button
-                onClick={() => setOpen((o) => !o)}
+                onClick={toggleOpen}
                 className="fixed bottom-4 left-4 z-[101] bg-cyan-500 hover:bg-cyan-400 text-black font-semibold shadow-lg gap-2"
             >
                 {open ? (

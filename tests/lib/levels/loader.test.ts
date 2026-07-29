@@ -215,6 +215,60 @@ monsters:
 `;
         expect(() => parseLevelYaml(yamlText, 't')).toThrow(/at/);
     });
+
+    it('parses characterSpawn with at + facing', () => {
+        const yamlText = `
+title: t
+background: a.png
+imageSize: 100x100
+promptFile: p.yaml
+airWalls: []
+characterSpawn:
+  at: [200, 300]
+  facing: left
+`;
+        const level = parseLevelYaml(yamlText, 't');
+        expect(level.characterSpawn).toEqual({ x: 200, y: 300, facing: 'left' });
+    });
+
+    it('omits characterSpawn when absent', () => {
+        const yamlText = `
+title: Plain
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls: []
+`;
+        const level = parseLevelYaml(yamlText, 'plain');
+        expect(level.characterSpawn).toBeUndefined();
+    });
+
+    it('rejects characterSpawn with invalid facing', () => {
+        const yamlText = `
+title: t
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls: []
+characterSpawn:
+  at: [10, 20]
+  facing: sideways
+`;
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/facing/);
+    });
+
+    it('rejects characterSpawn without at', () => {
+        const yamlText = `
+title: t
+background: a.png
+imageSize: 1x1
+promptFile: p.yaml
+airWalls: []
+characterSpawn:
+  facing: right
+`;
+        expect(() => parseLevelYaml(yamlText, 't')).toThrow(/at/);
+    });
 });
 
 describe('parseLevelIndex', () => {

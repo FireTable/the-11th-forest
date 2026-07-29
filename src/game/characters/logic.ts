@@ -180,8 +180,10 @@ export class CharacterController {
     private dodgeVx = 0;
     private dodgeVy = 0;
     private firing = false;
-    private targetX = 0;
-    private targetY = 0;
+    // null until the first pointermove — lets the spawn-time flipX hold
+    // instead of immediately snapping to wherever the cursor happens to be.
+    private targetX: number | null = null;
+    private targetY: number | null = null;
 
     private readonly cleanupFns: Array<() => void> = [];
 
@@ -197,8 +199,9 @@ export class CharacterController {
         this.parts = parts;
         this.hp = spec.hp;
         this.sp = spec.sp;
-        this.targetX = level.imageSize.width / 2;
-        this.targetY = level.imageSize.height / 2;
+        // Spawn-time target stays null — the first real pointermove will
+        // populate it. Until then, the sprite keeps the flipX that
+        // loadCharacter() set from level.characterSpawn.facing.
 
         this.bindKeyboard();
         this.bindPointer();
@@ -306,7 +309,11 @@ export class CharacterController {
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
         // controller already maintains `targetX` / `targetY` from pointer
         // events, so the weapon aim and the sprite facing stay aligned.
-        sprite.setFlipX(this.targetX < pos.x);
+        // Until the first real pointermove arrives we leave the flipX that
+        // loadCharacter() set from level.characterSpawn.facing — comparing
+        // `null < pos.x` would always be true and flip the sprite on the
+        // very first tick, undoing the spawn-time facing.
+        if (this.targetX !== null) sprite.setFlipX(this.targetX < pos.x);
 
         // ── Animation state machine ─────────────────────────────────
         this.driveAnims(intent.vx !== 0 || intent.vy !== 0, now < this.dodgeActiveUntil);
@@ -322,8 +329,8 @@ export class CharacterController {
         // ── Weapon update ───────────────────────────────────────────
         this.parts.weapons.update(
             now,
-            this.targetX,
-            this.targetY,
+            this.targetX ?? pos.x,
+            this.targetY ?? pos.y,
             this.firing && now >= this.dodgeActiveUntil,
             this.spec.body.halfH,
         );

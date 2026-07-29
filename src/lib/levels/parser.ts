@@ -29,6 +29,7 @@ import {
     type AirWall,
     type AirWallKind,
     type AirWallVertex,
+    type CharacterSpawn,
     type DropSpawn,
     type Level,
     type LevelIndex,
@@ -125,7 +126,7 @@ export function parseLevelYaml(text: string, id: string): Level {
         throw new Error(`Level ${id}: empty or non-object YAML`);
     }
 
-    const { title, background, imageSize, promptFile, airWalls, character, monsters, dropSpawns } =
+    const { title, background, imageSize, promptFile, airWalls, character, characterSpawn, monsters, dropSpawns } =
         raw;
     if (typeof title !== 'string' || title.length === 0) throw new Error(`Level ${id}: title required`);
     if (typeof background !== 'string' || background.length === 0) throw new Error(`Level ${id}: background required`);
@@ -148,6 +149,10 @@ export function parseLevelYaml(text: string, id: string): Level {
             throw new Error(`Level ${id}: character must be a non-empty string`);
         }
         result.character = character;
+    }
+
+    if (characterSpawn !== undefined) {
+        result.characterSpawn = parseCharacterSpawn(characterSpawn, id);
     }
 
     if (monsters !== undefined) {
@@ -200,6 +205,20 @@ function parseDropSpawn(raw: unknown, idx: number, id: string): DropSpawn {
     }
     const at = parsePoint(d.at, 'dropSpawns', idx, id);
     return { type: d.type, x: at.x, y: at.y };
+}
+
+function parseCharacterSpawn(raw: unknown, id: string): CharacterSpawn {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(`Level ${id}: characterSpawn must be an object`);
+    }
+    const s = raw as Record<string, unknown>;
+    const point = parsePoint(s.at, 'characterSpawn', 0, id);
+    if (s.facing !== 'left' && s.facing !== 'right') {
+        throw new Error(
+            `Level ${id}: characterSpawn.facing must be 'left' or 'right', got ${JSON.stringify(s.facing)}`,
+        );
+    }
+    return { x: point.x, y: point.y, facing: s.facing };
 }
 
 /**

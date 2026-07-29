@@ -123,8 +123,10 @@ export function loadCharacter(
     spec: CharacterSpec,
     weapons: WeaponSpec[],
 ): CharacterRuntime {
-    const spawnX = level.imageSize.width / 2;
-    const spawnY = level.imageSize.height / 2;
+    // Per-level override (characterSpawn) takes priority over the image-center
+    // default. Levels without a spawn entry still default to center / right.
+    const spawnX = level.characterSpawn?.x ?? level.imageSize.width / 2;
+    const spawnY = level.characterSpawn?.y ?? level.imageSize.height / 2;
 
     const body = scene.matter.add.rectangle(
         // Body center sits halfH above the spawn point so the body's
@@ -152,6 +154,10 @@ export function loadCharacter(
     const sprite = scene.add.sprite(spawnX, spawnY, textureKey(spec));
     sprite.setOrigin(0.5, 1.0);
     if (spec.sprite) sprite.setScale(spec.sprite.scale);
+    // Seed initial facing from the level's spawn config (default right).
+    // The controller's update loop flips this every frame from the cursor,
+    // but until the first pointermove fires we want the spawn pose to win.
+    sprite.setFlipX((level.characterSpawn?.facing ?? 'right') === 'left');
 
     const matter = (Phaser as any).Physics.Matter.Matter;
     const weaponsSys = new WeaponController(scene, matter, body, weapons);

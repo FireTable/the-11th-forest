@@ -43,6 +43,7 @@ export type Level = {
     // Optional: spawn config for entities (Phase 1+). Each field references
     // a separate /data/<thing>/<id>.yaml by id; missing fields default sensibly.
     character?: string; // character id from /data/characters/
+    characterSpawn?: CharacterSpawn; // optional override of the default center / right-facing spawn
     monsters?: MonsterSpawn[];
     dropSpawns?: DropSpawn[];
 };
@@ -50,6 +51,12 @@ export type Level = {
 export type SpawnPoint = {
     x: number;
     y: number;
+};
+
+/** Where + which way the player character spawns. Defaults to image center,
+ *  facing right (matches the wanderer sprite's natural direction). */
+export type CharacterSpawn = SpawnPoint & {
+    facing: 'left' | 'right';
 };
 
 export type MonsterSpawn = SpawnPoint & {

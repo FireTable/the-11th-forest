@@ -105,6 +105,21 @@ export class LoadScene extends Scene {
         // Spawn the player character (WASD + Shift dodge + hotbar).
         this.character = loadCharacter(this, this.level, this.assets.character, this.assets.weapons);
 
+        // Editor panel hides the on-canvas HUDs so the level / walls are
+        // unencumbered for editing. EditorPanel emits via EventBus since
+        // it lives in React and can't reach Phaser GameObjects directly.
+        const setHubsVisible = (visible: boolean) => {
+            this.character.hud.setVisible(visible);
+            this.character.weaponHud.setVisible(visible);
+            this.character.statusHud.setVisible(visible);
+        };
+        const onEditorOpen = (editorOpen: unknown) =>
+            setHubsVisible(editorOpen !== true);
+        EventBus.on('editor-open', onEditorOpen);
+        this.events.once('shutdown', () =>
+            EventBus.removeListener('editor-open', onEditorOpen),
+        );
+
         // Wire monster controller — self-spawns from level.monsters.
         this.monsterSystem = new MonsterController(
             this,

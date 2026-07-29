@@ -55,4 +55,9 @@ export class BaseHud {
     destroy(): void {
         this.root.destroy();
     }
+
+    /** Toggle visibility of the HUD and all its children. */
+    setVisible(visible: boolean): void {
+        this.root.setVisible(visible);
+    }
 }
