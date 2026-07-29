@@ -243,6 +243,7 @@ export class WeaponController {
         for (const b of this.bullets) {
             const bp = b.body.position;
             b.rect.setPosition(bp.x, bp.y);
+            b.rect.setDepth(Math.round(bp.y));
             b.rect.setRotation(Math.atan2(b.body.velocity.y, b.body.velocity.x));
             pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
         }

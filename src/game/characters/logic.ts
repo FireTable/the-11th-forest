@@ -157,8 +157,8 @@ export interface StatusHudState {
 export interface CharacterRuntimeParts {
     body: any;
     sprite: Phaser.GameObjects.Sprite;
-    shadow?: Phaser.GameObjects.Components.Transform;
-    debugBodyRect?: Phaser.GameObjects.Components.Transform;
+    shadow?: Phaser.GameObjects.Shape;
+    debugBodyRect?: Phaser.GameObjects.Rectangle;
     matter: any;
     weapons: WeaponsLike;
     hud: HudLike;
@@ -295,11 +295,16 @@ export class CharacterController {
         const offX = rawX * (sprite.flipX ? -1 : 1);
         const offY = rawY;
         sprite.setPosition(pos.x + offX, pos.y + this.spec.body.halfH + offY);
+        // Dynamic Y-Sorting depth for character
+        const feetY = Math.round(pos.y + this.spec.body.halfH);
+        sprite.setDepth(feetY);
         if (this.parts.shadow) {
             this.parts.shadow.setPosition(pos.x, pos.y + this.spec.body.halfH);
+            this.parts.shadow.setDepth(feetY - 1);
         }
         if (this.parts.debugBodyRect) {
             this.parts.debugBodyRect.setPosition(pos.x, pos.y);
+            this.parts.debugBodyRect.setDepth(feetY + 1);
         }
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
         // controller already maintains `targetX` / `targetY` from pointer

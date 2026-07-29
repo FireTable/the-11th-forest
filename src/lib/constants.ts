@@ -21,6 +21,16 @@ export const CAT = {
     MONSTER_PROJECTILE: 0x0020,
 } as const;
 
+// ─── Rendering Depths / Z-Indices ─────────────────────────────────────
+export const DEPTH = {
+    BACKGROUND_IMAGE: 0,
+    MATERIAL_BACKGROUND: 10,
+    // Y-sorting range for characters, monsters, bullets, and y-sort materials (y-coord + offset)
+    FOREGROUND_MATERIAL: 10000,
+    SELECTION_BOX: 15000,
+    HUD: 20000,
+} as const;
+
 /** Categories that block the player's body (walls). */
 export const WALL_PLAYER_MASK: number = CAT.WALL_TALL | CAT.WALL_SHORT;
 

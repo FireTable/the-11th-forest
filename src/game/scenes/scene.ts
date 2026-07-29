@@ -7,6 +7,7 @@ import {
     type CharacterRuntime,
 } from '@/game/characters/character';
 import { DropController } from '@/game/drops/drop';
+import { MaterialManager } from '@/game/materials/material';
 import { MonsterController, rollDrops } from '@/game/monsters/monster';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
@@ -55,6 +56,7 @@ export class LoadScene extends Scene {
     private character!: CharacterRuntime;
     private monsterSystem!: MonsterController;
     private dropSystem!: DropController;
+    private materialManager!: MaterialManager;
 
     constructor(
         private readonly id: string,
@@ -75,6 +77,7 @@ export class LoadScene extends Scene {
             this.assets.spriteCell.width,
             this.assets.spriteCell.height,
         );
+        MaterialManager.preloadMaterials(this, this.level.materials);
     }
 
     create(): void {
@@ -201,9 +204,11 @@ export class LoadScene extends Scene {
             this.level.imageSize.height / 2,
         );
 
-        // Per-frame monster tick.
+        // Per-frame monster tick & material Y-sorting.
+        this.materialManager = new MaterialManager(this, this.level);
         this.events.on('update', () => {
             this.monsterSystem.update(this.time.now);
+            this.materialManager.update();
         });
 
         // Tell the editor panel which scene this is. Both the EventBus

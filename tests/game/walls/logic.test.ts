@@ -32,6 +32,22 @@ describe('wallMask', () => {
         expect(mask & CAT.CHARACTER).toBeTruthy();
         expect(mask & CAT.BULLET).toBe(0);
     });
+
+    it('both masks block MONSTER_MELEE (regression: melee monsters walked through walls)', () => {
+        // Matter collision needs BOTH bodies to opt in — the monster's
+        // mask includes WALL_TALL/WALL_SHORT, but the wall must also
+        // include MONSTER_MELEE or the pair never collides.
+        expect(wallMask('tall') & CAT.MONSTER_MELEE).toBeTruthy();
+        expect(wallMask('short') & CAT.MONSTER_MELEE).toBeTruthy();
+    });
+
+    it('short mask still lets monster projectiles pass over (half-wall behavior)', () => {
+        // The desired "half-wall" semantic: bullets + monster projectiles
+        // should fly over short walls; only the character + monster
+        // melee body gets blocked.
+        expect(wallMask('short') & CAT.BULLET).toBe(0);
+        expect(wallMask('short') & CAT.MONSTER_PROJECTILE).toBe(0);
+    });
 });
 
 describe('triangulate', () => {

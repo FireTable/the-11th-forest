@@ -468,48 +468,88 @@ interface Box {
     h: number;
 }
 
-/** Alpha-occupancy projection of a sub-rect onto one axis. */
-function project(png: PNG, box: Box, axis: 'x' | 'y', minAlpha: number): boolean[] {
-    const len = axis === 'x' ? box.w : box.h;
-    const occupied = new Array<boolean>(len).fill(false);
-    for (let y = box.y; y < box.y + box.h; y++) {
-        for (let x = box.x; x < box.x + box.w; x++) {
-            if (png.data[((png.width * y + x) << 2) + 3] <= minAlpha) continue;
-            occupied[axis === 'x' ? x - box.x : y - box.y] = true;
-        }
-    }
-    return occupied;
-}
-
-/** Shrink a box to its opaque content. */
-function tighten(png: PNG, box: Box): Box {
-    const cols = runs(project(png, box, 'x', 8), 1);
-    const rows = runs(project(png, box, 'y', 8), 1);
-    if (!cols.length || !rows.length) return box;
-    const x0 = cols[0][0];
-    const x1 = cols[cols.length - 1][1];
-    const y0 = rows[0][0];
-    const y1 = rows[rows.length - 1][1];
-    return { x: box.x + x0, y: box.y + y0, w: x1 - x0, h: y1 - y0 };
-}
-
 /**
- * Find frame boxes: horizontal bands of content, then columns within
- * each band. `minRun` rejects speckle; `minArea` rejects stray marks
- * (the Gemini sparkle watermark).
+ * Find frame boxes using 2D 8-Connected Component BFS.
+ * Identifies each isolated island of opaque pixels independently,
+ * eliminating the issue where vertically-overlapping items get merged together.
  */
-export function findFrames(png: PNG, minRun = 8, minArea = 2000): Box[] {
-    const sheet: Box = { x: 0, y: 0, w: png.width, h: png.height };
-    const out: Box[] = [];
-    for (const [y0, y1] of runs(project(png, sheet, 'y', 8), minRun)) {
-        const band: Box = { x: 0, y: y0, w: png.width, h: y1 - y0 };
-        for (const [x0, x1] of runs(project(png, band, 'x', 8), minRun)) {
-            const box = tighten(png, { x: x0, y: band.y, w: x1 - x0, h: band.h });
-            if (box.w * box.h >= minArea) out.push(box);
+export function findFrames(png: PNG, _minRun = 8, minArea = 500): Box[] {
+    const { width: w, height: h, data } = png;
+    const visited = new Uint8Array(w * h);
+    const boxes: Box[] = [];
+
+    // Helper: is pixel opaque (alpha > 10)?
+    const isOpaque = (x: number, y: number): boolean => {
+        return data[((y * w + x) << 2) + 3] > 10;
+    };
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            if (visited[idx] || !isOpaque(x, y)) continue;
+
+            // Start BFS to flood-fill this connected component
+            let minX = x;
+            let maxX = x;
+            let minY = y;
+            let maxY = y;
+            let pixelCount = 0;
+
+            // BFS Queue using flat Array (efficient for modest component sizes)
+            const queue: number[] = [idx];
+            visited[idx] = 1;
+
+            let head = 0;
+            while (head < queue.length) {
+                const currIdx = queue[head++];
+                const cx = currIdx % w;
+                const cy = Math.floor(currIdx / w);
+
+                pixelCount++;
+                if (cx < minX) minX = cx;
+                if (cx > maxX) maxX = cx;
+                if (cy < minY) minY = cy;
+                if (cy > maxY) maxY = cy;
+
+                // Check 8-connected neighbors (allows diagonal pixel connections)
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = cx + dx;
+                        const ny = cy + dy;
+                        if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                            const nIdx = ny * w + nx;
+                            if (!visited[nIdx] && isOpaque(nx, ny)) {
+                                visited[nIdx] = 1;
+                                queue.push(nIdx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            const bw = maxX - minX + 1;
+            const bh = maxY - minY + 1;
+
+            // Reject noise speckles smaller than minArea pixels or tiny 2x2 specks
+            if (pixelCount >= 40 && bw * bh >= minArea) {
+                boxes.push({ x: minX, y: minY, w: bw, h: bh });
+            }
         }
     }
-    return out;
+
+    // Sort boxes from top to bottom, then left to right
+    boxes.sort((a, b) => {
+        const rowDiff = Math.floor(a.y / 64) - Math.floor(b.y / 64);
+        if (rowDiff !== 0) return rowDiff;
+        return a.x - b.x;
+    });
+
+    return boxes;
 }
+
+
+
 
 /**
  * Clean Pixel-Art Downsampler.
@@ -694,13 +734,27 @@ function main(): void {
     const frames = findFrames(workPng, 8, minArea);
 
     mkdirSync(outDir, { recursive: true });
-    // ponytail: wipe old frame-*.png so a re-run with different tuning
-    // can't leave stale frames behind.
-    for (const f of readdirSync(outDir)) {
-        if (/^frame-\d+\.png$/.test(f)) rmSync(join(outDir, f));
+    const isAppend = flags.includes('--append');
+    let startIndex = 0;
+    if (!isAppend) {
+        // wipe old frame-*.png so a re-run with different tuning can't leave stale frames behind.
+        for (const f of readdirSync(outDir)) {
+            if (/^frame-\d+\.png$/.test(f)) rmSync(join(outDir, f));
+        }
+    } else {
+        // Find highest existing frame index
+        for (const f of readdirSync(outDir)) {
+            const m = f.match(/^frame-(\d+)\.png$/);
+            if (m) {
+                const idx = parseInt(m[1], 10);
+                if (idx >= startIndex) startIndex = idx + 1;
+            }
+        }
     }
+
     frames.forEach((box, i) => {
-        const name = `frame-${String(i).padStart(2, '0')}.png`;
+        const frameIndex = startIndex + i;
+        const name = `frame-${String(frameIndex).padStart(2, '0')}.png`;
         const frame = crop(workPng, box, pad);
         writeFileSync(join(outDir, name), new Uint8Array(PNG.sync.write(frame)));
         console.log(`${name}  ${frame.width}x${frame.height}  @ ${box.x},${box.y}`);

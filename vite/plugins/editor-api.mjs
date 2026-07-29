@@ -32,15 +32,16 @@ const ID_PATTERN = /^[a-z][a-z0-9-]*$/;
  * Diverging these two was the original bug — characterSpawn and other
  * optional fields were silently dropped here. Same shape as the client
  * implementation: every Level field emitted in the documented YAML
- * order, undefined optional fields omitted, characterSpawn mapped to
- * { at: [x, y], facing }.
+ * order, undefined optional fields omitted, characterSpawn / monsters /
+ * dropSpawns mapped to { at: [x, y], ... } so the parser accepts them
+ * back and js-yaml doesn't have to quote the bare `y`/`n` keys.
  */
 function serializeLevelYaml(level) {
     const payload = {
         title: level.title,
         background: level.background,
         imageSize: `${level.imageSize.width}x${level.imageSize.height}`,
-        promptFile: level.promptFile,
+        prompt: level.prompt,
         airWalls: level.airWalls,
     };
     if (level.character !== undefined) payload.character = level.character;
@@ -50,8 +51,19 @@ function serializeLevelYaml(level) {
             facing: level.characterSpawn.facing,
         };
     }
-    if (level.monsters !== undefined) payload.monsters = level.monsters;
-    if (level.dropSpawns !== undefined) payload.dropSpawns = level.dropSpawns;
+    if (level.monsters !== undefined) {
+        payload.monsters = level.monsters.map((m) => ({
+            type: m.type,
+            at: [m.x, m.y],
+        }));
+    }
+    if (level.dropSpawns !== undefined) {
+        payload.dropSpawns = level.dropSpawns.map((d) => ({
+            type: d.type,
+            at: [d.x, d.y],
+        }));
+    }
+    if (level.materials !== undefined) payload.materials = level.materials;
     return stringifyYaml(payload, {
         lineWidth: -1,
         sortKeys: false,
@@ -98,6 +110,83 @@ async function handleSaveLevel(req, res) {
     return sendJson(res, 200, { ok: true, path: path.relative(path.resolve(__dirname, '../..'), outPath) });
 }
 
+async function handleListMaterials(res) {
+    const materialsDir = path.join(PUBLIC_DIR, 'assets/image/materials');
+    try {
+        const { readdir, stat } = await import('node:fs/promises');
+        const entries = await readdir(materialsDir, { withFileTypes: true });
+        const folders = [];
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                const folderName = entry.name;
+                const folderPath = path.join(materialsDir, folderName);
+                const files = await readdir(folderPath);
+                const images = files.filter((f) => /\.(png|jpe?g|webp)$/i.test(f) && f !== 'raw.png');
+                folders.push({
+                    name: folderName,
+                    images: images.map((f) => `assets/image/materials/${folderName}/${f}`),
+                });
+            }
+        }
+        return sendJson(res, 200, { folders });
+    } catch {
+        return sendJson(res, 200, { folders: [] });
+    }
+}
+
+async function handleUploadMaterial(req, res) {
+    const { folder, fileData } = await readJsonBody(req);
+    if (typeof folder !== 'string' || !ID_PATTERN.test(folder)) {
+        return sendJson(res, 400, { error: `invalid folder name: ${JSON.stringify(folder)}` });
+    }
+    if (typeof fileData !== 'string' || !fileData.startsWith('data:image/')) {
+        return sendJson(res, 400, { error: 'invalid image fileData (expected base64 data-URL)' });
+    }
+
+    const { mkdir, writeFile, rm } = await import('node:fs/promises');
+    const { exec } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execAsync = promisify(exec);
+
+    const base64 = fileData.split(',', 2)[1];
+    const buffer = Buffer.from(base64, 'base64');
+
+    const folderDir = path.join(PUBLIC_DIR, 'assets/image/materials', folder);
+    await mkdir(folderDir, { recursive: true });
+
+    // Temporary upload path (will be cleaned up after slicing)
+    const rawPath = path.join(folderDir, 'temp-upload-raw.png');
+    await writeFile(rawPath, buffer);
+
+    // Call split-sheet.ts CLI script to cut material tiles with --append
+    const projectRoot = path.resolve(__dirname, '../..');
+    const cmd = `pnpm tsx scripts/split-sheet.ts "${rawPath}" "${folderDir}" --append --no-recompose`;
+    
+    try {
+        await execAsync(cmd, { cwd: projectRoot });
+    } catch (e) {
+        console.warn('split-sheet warning/error:', e.message);
+    } finally {
+        // Clean up raw upload file and recomposed image if exists
+        await rm(rawPath, { force: true });
+        await rm(path.join(folderDir, 'raw.png'), { force: true });
+        await rm(path.join(folderDir, 'recomposed.png'), { force: true });
+    }
+
+    return sendJson(res, 200, { ok: true, folder });
+}
+
+async function handleDeleteMaterialItem(req, res) {
+    const { imagePath } = await readJsonBody(req);
+    if (typeof imagePath !== 'string' || !imagePath.startsWith('assets/image/materials/')) {
+        return sendJson(res, 400, { error: 'invalid imagePath' });
+    }
+    const fullPath = path.join(PUBLIC_DIR, imagePath);
+    const { rm } = await import('node:fs/promises');
+    await rm(fullPath, { force: true });
+    return sendJson(res, 200, { ok: true });
+}
+
 export function editorApiPlugin() {
     return {
         name: 'editor-api',
@@ -106,6 +195,32 @@ export function editorApiPlugin() {
                 if (req.method !== 'POST') return next();
                 try {
                     await handleSaveLevel(req, res);
+                } catch (e) {
+                    const status = e instanceof BadRequest ? 400 : 500;
+                    sendJson(res, status, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/list-materials', async (req, res, next) => {
+                if (req.method !== 'GET' && req.method !== 'POST') return next();
+                try {
+                    await handleListMaterials(res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/upload-material', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleUploadMaterial(req, res);
+                } catch (e) {
+                    const status = e instanceof BadRequest ? 400 : 500;
+                    sendJson(res, status, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/delete-material-item', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleDeleteMaterialItem(req, res);
                 } catch (e) {
                     const status = e instanceof BadRequest ? 400 : 500;
                     sendJson(res, status, { error: String(e?.message ?? e) });

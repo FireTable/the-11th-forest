@@ -17,13 +17,21 @@ export function wallCategory(kind: AirWallKind): number {
 
 /**
  * Collision mask for a wall: which OTHER categories it blocks. tall
- * blocks character, player bullets, AND monster projectiles; short
- * blocks character only — bullets + projectiles pass over it.
+ * blocks character, player bullets, monster melee, AND monster projectiles;
+ * short blocks character + monster melee — bullets + projectiles pass
+ * over it (the "half-wall" semantic for cover / line-of-sight tricks).
+ *
+ * MONSTER_MELEE is in BOTH masks so melee monsters can't walk through
+ * walls the player is blocked by. Matter collision requires both
+ * bodies to opt in — the monster's mask already lists WALL_TALL /
+ * WALL_SHORT, but the wall's mask must reciprocate or the pair never
+ * collides and the monster walks through.
  */
 export function wallMask(kind: AirWallKind): number {
+    const melee = CAT.CHARACTER | CAT.MONSTER_MELEE;
     return kind === 'tall'
-        ? CAT.CHARACTER | CAT.BULLET | CAT.MONSTER_PROJECTILE
-        : CAT.CHARACTER;
+        ? melee | CAT.BULLET | CAT.MONSTER_PROJECTILE
+        : melee;
 }
 
 /**

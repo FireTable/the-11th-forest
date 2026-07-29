@@ -30,6 +30,21 @@ export type ImageSize = {
     height: number;
 };
 
+export type MaterialMode = 'background' | 'y-sort' | 'foreground';
+
+export type PlacedMaterial = {
+    id: string;
+    texture: string; // Relative to public/ (e.g. assets/image/materials/ruins/item-1.png)
+    x: number;
+    y: number;
+    scale?: number;
+    rotation?: number; // In degrees 0..360
+    flipX?: boolean;
+    flipY?: boolean;
+    mode?: MaterialMode;
+    depthOffset?: number;
+};
+
 export type Level = {
     title: string;
     // Background asset path (relative to public/, resolved by the loader).
@@ -44,6 +59,7 @@ export type Level = {
     characterSpawn?: CharacterSpawn; // optional override of the default center / right-facing spawn
     monsters?: MonsterSpawn[];
     dropSpawns?: DropSpawn[];
+    materials?: PlacedMaterial[];
 };
 
 export type SpawnPoint = {

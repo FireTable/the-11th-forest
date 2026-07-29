@@ -9,6 +9,7 @@ import { getCurrentLevel } from '@/lib/levels/current-level';
 import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 import { AirWallsSection } from './sections/air-walls';
+import { MaterialsSection } from './sections/materials';
 import { WallCanvas } from './wall-canvas';
 
 interface ScenePayload {
@@ -217,9 +218,7 @@ export function EditorPanel() {
                         />
                     )}
                     {level && topTab === 'scenes' && sceneSubTab === 'materials' && (
-                        <div className="text-neutral-500 italic text-center py-4">
-                            Materials editor — v2
-                        </div>
+                        <MaterialsSection level={level} setLevel={handleLevelChange} />
                     )}
                     {level && topTab === 'scenes' && sceneSubTab === 'prompts' && (
                         <div className="text-neutral-500 italic text-center py-4">

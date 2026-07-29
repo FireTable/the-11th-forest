@@ -207,8 +207,11 @@ export class MonsterController {
             }
 
             // ── Visual sync ───────────────────────────────────────────
+            const footY = Math.round(mp.y);
             m.rect.setPosition(mp.x, mp.y);
+            m.rect.setDepth(footY);
             m.shadow.setPosition(mp.x, mp.y);
+            m.shadow.setDepth(footY - 1);
             if (dist > 1) {
                 m.rect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
             }
@@ -219,6 +222,7 @@ export class MonsterController {
             const bp = proj.body.position;
             const vel = proj.body.velocity;
             proj.rect.setPosition(bp.x, bp.y);
+            proj.rect.setDepth(Math.round(bp.y));
             proj.rect.setRotation(Math.atan2(vel.y, vel.x));
         }
     }

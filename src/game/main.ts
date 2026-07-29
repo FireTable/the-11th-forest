@@ -143,7 +143,7 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
             default: 'matter',
             matter: {
                 gravity: { x: 0, y: 0 },
-                debug: true,
+                debug: false,
             },
         },
         scene: [new LoadScene(scene.id, scene.level, {

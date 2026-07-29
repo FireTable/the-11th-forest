@@ -34,6 +34,7 @@ import {
     type Level,
     type LevelIndex,
     type MonsterSpawn,
+    type PlacedMaterial,
 } from './types';
 
 const VALID_KINDS: ReadonlySet<AirWallKind> = new Set(['tall', 'short']);
@@ -126,7 +127,7 @@ export function parseLevelYaml(text: string, id: string): Level {
         throw new Error(`Level ${id}: empty or non-object YAML`);
     }
 
-    const { title, background, imageSize, prompt, airWalls, character, characterSpawn, monsters, dropSpawns } =
+    const { title, background, imageSize, prompt, airWalls, character, characterSpawn, monsters, dropSpawns, materials } =
         raw;
     if (typeof title !== 'string' || title.length === 0) throw new Error(`Level ${id}: title required`);
     if (typeof background !== 'string' || background.length === 0) throw new Error(`Level ${id}: background required`);
@@ -170,7 +171,55 @@ export function parseLevelYaml(text: string, id: string): Level {
         result.dropSpawns = dropSpawns.map((d, i) => parseDropSpawn(d, i, id));
     }
 
+    if (materials !== undefined) {
+        if (!Array.isArray(materials)) {
+            throw new Error(`Level ${id}: materials must be an array`);
+        }
+        result.materials = materials.map((m, i) => parsePlacedMaterial(m, i, id));
+    }
+
     return result;
+}
+
+function parsePlacedMaterial(raw: unknown, idx: number, id: string): PlacedMaterial {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new Error(`Level ${id}: materials[${idx}] must be an object`);
+    }
+    const m = raw as Record<string, unknown>;
+    if (typeof m.id !== 'string' || m.id.length === 0) {
+        throw new Error(`Level ${id}: materials[${idx}].id must be a non-empty string`);
+    }
+    if (typeof m.texture !== 'string' || m.texture.length === 0) {
+        throw new Error(`Level ${id}: materials[${idx}].texture must be a non-empty string`);
+    }
+    if (typeof m.x !== 'number' || !Number.isFinite(m.x) || typeof m.y !== 'number' || !Number.isFinite(m.y)) {
+        throw new Error(`Level ${id}: materials[${idx}].x and y must be finite numbers`);
+    }
+    const res: PlacedMaterial = {
+        id: m.id,
+        texture: m.texture,
+        x: Math.round(m.x),
+        y: Math.round(m.y),
+    };
+    if (typeof m.scale === 'number' && Number.isFinite(m.scale) && m.scale > 0) {
+        res.scale = m.scale;
+    }
+    if (typeof m.rotation === 'number' && Number.isFinite(m.rotation)) {
+        res.rotation = m.rotation;
+    }
+    if (typeof m.flipX === 'boolean') {
+        res.flipX = m.flipX;
+    }
+    if (typeof m.flipY === 'boolean') {
+        res.flipY = m.flipY;
+    }
+    if (m.mode === 'background' || m.mode === 'y-sort' || m.mode === 'foreground') {
+        res.mode = m.mode;
+    }
+    if (typeof m.depthOffset === 'number' && Number.isFinite(m.depthOffset)) {
+        res.depthOffset = m.depthOffset;
+    }
+    return res;
 }
 
 function parsePoint(raw: unknown, label: string, idx: number, id: string): { x: number; y: number } {
