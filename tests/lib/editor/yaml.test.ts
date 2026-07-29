@@ -9,7 +9,6 @@ const minimal: Level = {
     title: 'The 11th Forest — Sacred Forest Sanctuary',
     background: 'assets/image/scenes/sacred-forest-sanctuary.png',
     imageSize: { width: 2752, height: 1536 },
-    promptFile: 'prompts/scenes/sacred-forest-sanctuary.yaml',
     airWalls: [],
 };
 
@@ -58,9 +57,9 @@ describe('serializeLevelYaml', () => {
         expect(text).toMatch(/^airWalls: \[\]$/m);
     });
 
-    it('preserves key order (title, background, imageSize, promptFile, airWalls)', () => {
+    it('preserves key order (title, background, imageSize, airWalls)', () => {
         const text = serializeLevelYaml(minimal);
-        const keys = ['title', 'background', 'imageSize', 'promptFile', 'airWalls'];
+        const keys = ['title', 'background', 'imageSize', 'airWalls'];
         let cursor = -1;
         for (const key of keys) {
             const idx = text.indexOf(`${key}:`, cursor + 1);

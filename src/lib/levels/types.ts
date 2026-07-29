@@ -36,9 +36,7 @@ export type Level = {
     background: string;
     // Native pixel dimensions of the background image.
     imageSize: ImageSize;
-    // Pointer to the matching prompts/scenes/<id>.yaml. Same basename
-    // by convention; the loader asserts imageSize equality across both.
-    promptFile: string;
+    prompt?: string;
     airWalls: AirWall[];
     // Optional: spawn config for entities (Phase 1+). Each field references
     // a separate /data/<thing>/<id>.yaml by id; missing fields default sensibly.

@@ -14,7 +14,6 @@
  */
 
 import { config as loadEnv } from 'dotenv';
-import { readFileSync } from 'node:fs';
 
 import { fetchLevel, fetchLevelIndex } from '@/lib/levels';
 import { formatImageSize } from '@/lib/levels/types';
@@ -23,8 +22,6 @@ loadEnv(); // .env
 loadEnv({ path: '.env.local', override: true }); // .env.local
 
 async function main(): Promise<void> {
-    const { load: parseYaml } = await import('js-yaml');
-
     const index = await fetchLevelIndex();
     if (index.levels.length === 0) {
         console.error('Level index is empty — add an entry to public/data/levels/index.yaml.');
@@ -36,16 +33,9 @@ async function main(): Promise<void> {
         try {
             const level = await fetchLevel(id);
 
-            // Cross-file invariant: level.imageSize must equal prompt's imageSize.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const promptYaml = parseYaml(readFileSync(level.promptFile, 'utf8')) as any;
-            if (typeof promptYaml?.imageSize !== 'string') {
-                throw new Error(`${level.promptFile} has no imageSize`);
-            }
-            if (promptYaml.imageSize !== formatImageSize(level.imageSize)) {
-                throw new Error(
-                    `imageSize mismatch — level ${formatImageSize(level.imageSize)} vs prompt ${promptYaml.imageSize}`,
-                );
+            // Check imageSize format valid.
+            if (!formatImageSize(level.imageSize)) {
+                throw new Error(`invalid imageSize in level ${id}`);
             }
 
             console.log(`  ✓ ${id}  (${level.airWalls.length} walls)`);

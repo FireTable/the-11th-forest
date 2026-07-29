@@ -59,7 +59,14 @@ type PromptTemplate = {
 };
 
 function loadPromptTemplate(id: string): PromptTemplate {
-    const path = `prompts/scenes/${id}.yaml`;
+    const levelPath = `public/data/levels/${id}.yaml`;
+    const characterPath = `public/data/characters/${id}.yaml`;
+    let path = levelPath;
+    try {
+        readFileSync(levelPath, 'utf8');
+    } catch {
+        path = characterPath;
+    }
     const text = readFileSync(path, 'utf8');
     return parseYaml(text) as PromptTemplate;
 }

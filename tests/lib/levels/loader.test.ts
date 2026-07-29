@@ -38,7 +38,6 @@ airWalls: []
         expect(level.title).toBe('The 11th Forest — Sacred Forest Sanctuary');
         expect(level.background).toBe('assets/image/scenes/sacred-forest-sanctuary.png');
         expect(level.imageSize).toEqual({ width: 2752, height: 1536 });
-        expect(level.promptFile).toBe('prompts/scenes/sacred-forest-sanctuary.yaml');
         expect(level.airWalls).toEqual([]);
     });
 

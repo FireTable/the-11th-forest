@@ -26,7 +26,7 @@ export function serializeLevelYaml(level: Level): string {
         title: level.title,
         background: level.background,
         imageSize: formatImageSize(level.imageSize),
-        promptFile: level.promptFile,
+        prompt: level.prompt,
         airWalls: level.airWalls,
     };
     if (level.character !== undefined) payload.character = level.character;

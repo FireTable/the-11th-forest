@@ -126,12 +126,11 @@ export function parseLevelYaml(text: string, id: string): Level {
         throw new Error(`Level ${id}: empty or non-object YAML`);
     }
 
-    const { title, background, imageSize, promptFile, airWalls, character, characterSpawn, monsters, dropSpawns } =
+    const { title, background, imageSize, prompt, airWalls, character, characterSpawn, monsters, dropSpawns } =
         raw;
     if (typeof title !== 'string' || title.length === 0) throw new Error(`Level ${id}: title required`);
     if (typeof background !== 'string' || background.length === 0) throw new Error(`Level ${id}: background required`);
     if (typeof imageSize !== 'string') throw new Error(`Level ${id}: imageSize required (string "WxH")`);
-    if (typeof promptFile !== 'string') throw new Error(`Level ${id}: promptFile required`);
 
     const size = parseImageSize(imageSize);
     const walls = Array.isArray(airWalls) ? airWalls.map((w, i) => parseAirWall(w, i)) : [];
@@ -140,9 +139,11 @@ export function parseLevelYaml(text: string, id: string): Level {
         title,
         background,
         imageSize: size,
-        promptFile,
         airWalls: walls,
     };
+    if (typeof prompt === 'string') {
+        result.prompt = prompt;
+    }
 
     if (character !== undefined) {
         if (typeof character !== 'string' || character.length === 0) {

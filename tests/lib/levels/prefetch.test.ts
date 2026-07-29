@@ -9,7 +9,6 @@ function level(partial: Partial<Level> = {}): Level {
         title: 't',
         background: 'a.png',
         imageSize: { width: 1, height: 1 },
-        promptFile: 'p.yaml',
         airWalls: [],
         ...partial,
     };

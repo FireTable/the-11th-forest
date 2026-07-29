@@ -16,7 +16,6 @@ const base: Level = {
     title: 't',
     background: 'b',
     imageSize: { width: 100, height: 100 },
-    promptFile: 'p',
     airWalls: [],
 };
 
