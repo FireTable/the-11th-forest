@@ -389,7 +389,7 @@ export class CharacterController {
 
         // ── HUD ─────────────────────────────────────────────────────
         this.parts.hud.update(this.spec, this.hp, this.sp);
-        this.parts.weaponHud.draw(this.parts.weapons, now);
+        this.parts.weaponHud.draw(this.parts.weapons, this.scene.time.now);
         // Character body position center is at (feetY - halfH).
         // Distance from body.position to sprite top is: displayHeight - halfH
         const topOffset = Math.max(this.spec.body.halfH, this.parts.sprite.displayHeight - this.spec.body.halfH);

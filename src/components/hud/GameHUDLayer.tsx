@@ -33,13 +33,20 @@ export const GameHUDLayer: React.FC = () => {
         };
     }, []);
 
-    // Fallback: full viewport if canvas not ready yet
+    // Scale factor between actual rendered canvas size and native game size (e.g. 1536x864)
+    // We scale the UI container proportionally using CSS transform transform-origin: top left / bottom left / bottom right
+    const nativeW = 1536; // Level / Canvas native width
+    const nativeH = 864; // Level / Canvas native height
+    const scale = bounds.width > 0 ? bounds.width / nativeW : 1;
+
     const style: React.CSSProperties = bounds.width > 0 ? {
         position: 'absolute',
         left: `${bounds.left}px`,
         top: `${bounds.top}px`,
-        width: `${bounds.width}px`,
-        height: `${bounds.height}px`,
+        width: `${nativeW}px`,
+        height: `${nativeH}px`,
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
     } : {
         position: 'absolute',
         inset: 0,
