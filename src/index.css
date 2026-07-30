@@ -161,3 +161,20 @@
     margin: 10px 0 0 10px;
     font-size: 0.8em;
 }
+
+#game-container canvas {
+    cursor: none;
+}
+
+@keyframes crosshairBreathe {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(0.8);
+    }
+}
+
+.animate-crosshair-breathe {
+    animation: crosshairBreathe 1.2s ease-in-out infinite;
+}

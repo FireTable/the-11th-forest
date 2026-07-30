@@ -213,3 +213,15 @@ export const MUSIC_RESUME = 'music:resume';
 
 /** Default cross-fade when a music stop / switch lacks an explicit fadeOut. */
 export const AUDIO_DEFAULT_FADE_MS = 250;
+
+// ─── Aim Assist: Magnetic Snap & Acceleration Breakout Constants ───────
+export const AIM_ASSIST = {
+    /** Mouse speed threshold (px/ms) required to break magnetic target lock. */
+    BREAKOUT_SPEED: 3.5,
+    /** Duration in ms that aim assist is disabled after a fast flick breakout. */
+    BREAKOUT_DURATION_MS: 150,
+    /** Distance radius in world px to initially snap onto a monster. */
+    INITIAL_SNAP_RADIUS: 120,
+    /** Max distance radius in world px to maintain sticky tether lock on an active monster. */
+    STICKY_TETHER_RADIUS: 280,
+} as const;

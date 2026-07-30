@@ -290,11 +290,11 @@ export class MonsterController {
         this.bindCollisions();
     }
 
-    /** Get active alive monsters positions for aim assist magnet. */
-    public getActiveMonsters(): { x: number; y: number }[] {
+    /** Get active alive monsters positions (hitbox center) for aim assist magnet. */
+    public getActiveMonsters(): { id: number; x: number; y: number }[] {
         return this.monsters
             .filter((m) => !m.dead && m.state !== 'dying')
-            .map((m) => ({ x: m.body.position.x, y: m.body.position.y }));
+            .map((m, idx) => ({ id: idx, x: m.body.position.x, y: m.body.position.y }));
     }
 
     /** Per-frame: AI tick + projectile sync + cleanup. */

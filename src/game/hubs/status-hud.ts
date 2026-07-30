@@ -153,7 +153,6 @@ export class StatusHud extends BaseHud {
         const cx = 0;
         const cy = 0;
         const showReloading = !!state.reloading;
-        const showCompleted = (state.justCompletedAt ?? 0) > 0;
         const showHp = !!state.showHpBar && state.hp !== undefined && state.maxHp !== undefined;
 
         // 1. Draw Background Outer Box (Pixel Rounded Rect & Dark Border)
@@ -248,13 +247,6 @@ export class StatusHud extends BaseHud {
             this.reloadCircle.beginPath();
             this.reloadCircle.arc(reloadRingX, ringY, 5, startAngle, endAngle, false);
             this.reloadCircle.strokePath();
-        } else if (showCompleted && state.justCompletedAt && !hasDodgeRing) {
-            const since = time - state.justCompletedAt;
-            if (since < 500) {
-                const alpha = 1 - since / 500;
-                this.reloadCircle.fillStyle(0x10b981, alpha); // Flash green check
-                this.reloadCircle.fillCircle(reloadRingX, ringY, 5);
-            }
         }
 
         // Update floating combat numbers

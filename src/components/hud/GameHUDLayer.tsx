@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CharacterHUDOverlay } from './CharacterHUDOverlay';
 import { WeaponHUDOverlay } from './WeaponHUDOverlay';
+import { PixelCrosshair } from './PixelCrosshair';
 
 export const GameHUDLayer: React.FC = () => {
     const [bounds, setBounds] = useState<{ width: number; height: number; left: number; top: number }>({
@@ -56,6 +57,7 @@ export const GameHUDLayer: React.FC = () => {
         <div style={style} className="pointer-events-none overflow-hidden z-10">
             <CharacterHUDOverlay />
             <WeaponHUDOverlay />
+            <PixelCrosshair />
         </div>
     );
 };

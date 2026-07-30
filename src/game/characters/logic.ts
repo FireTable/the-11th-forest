@@ -34,6 +34,7 @@ import {
     KEY_TWO,
     KEY_W,
     SFX_EVENT,
+    AIM_ASSIST,
 } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import type { CharacterSpec } from '@/lib/characters';
@@ -355,6 +356,9 @@ export class CharacterController {
         // very first tick, undoing the spawn-time facing.
         if (this.targetX !== null) sprite.setFlipX(this.targetX < pos.x);
 
+        // Per-frame magnetic aim assist update (for moving monsters / camera)
+        this.updateAimTarget(now);
+
         // ── Animation state machine ─────────────────────────────────
         this.driveAnims(intent.vx !== 0 || intent.vy !== 0, now < this.dodgeActiveUntil);
 
@@ -521,39 +525,170 @@ export class CharacterController {
         kb.addKey(KEY_R).on('down', () => weapons.manualReload());
     }
 
+    // Pointer tracking & magnetic aim assist state
+    private rawClientX = 0;
+    private rawClientY = 0;
+    private lastClientX = 0;
+    private lastClientY = 0;
+    private lastMouseTime = 0;
+    private lockBreakoutUntil = 0;
+    private hasPointerMoved = false;
+    private currentLockedMonsterId: number | null = null;
+
+    private updateAimTarget(now: number): void {
+        if (!this.hasPointerMoved) return;
+
+        const canvas = (this.scene as any).game?.canvas as HTMLCanvasElement | undefined;
+        if (!canvas) return;
+
+        const rectEl = canvas.getBoundingClientRect();
+        const camera = this.scene.cameras.main;
+        if (!rectEl || !camera) return;
+
+        const rawWorldX =
+            camera.scrollX + (this.rawClientX - rectEl.left) * (camera.width / rectEl.width);
+        const rawWorldY =
+            camera.scrollY + (this.rawClientY - rectEl.top) * (camera.height / rectEl.height);
+
+        let finalWorldX = rawWorldX;
+        let finalWorldY = rawWorldY;
+        let isLocked = false;
+
+        const isBreakout = now < this.lockBreakoutUntil;
+        if (isBreakout) {
+            this.currentLockedMonsterId = null;
+        }
+
+        const monsters: { id: number; x: number; y: number }[] =
+            (this.scene as any).monsterSystem?.getActiveMonsters() ?? [];
+
+        if (!isBreakout && monsters.length > 0) {
+            // 1. Check if we already have a sticky locked monster that is still valid & within tether distance
+            let activeLockedMonster: { id: number; x: number; y: number } | null = null;
+            if (this.currentLockedMonsterId !== null) {
+                const found = monsters.find((m) => m.id === this.currentLockedMonsterId);
+                if (found) {
+                    const distToMouse = Math.hypot(found.x - rawWorldX, found.y - rawWorldY);
+                    if (distToMouse < AIM_ASSIST.STICKY_TETHER_RADIUS) { // Sticky tether range
+                        activeLockedMonster = found;
+                    }
+                }
+            }
+
+            // 2. If no valid sticky target, search for nearest monster within snap radius
+            if (!activeLockedMonster) {
+                let minDist: number = AIM_ASSIST.INITIAL_SNAP_RADIUS; // Initial snap radius
+                for (const m of monsters) {
+                    const d = Math.hypot(m.x - rawWorldX, m.y - rawWorldY);
+                    if (d < minDist) {
+                        minDist = d;
+                        activeLockedMonster = m;
+                    }
+                }
+            }
+
+            if (activeLockedMonster) {
+                this.currentLockedMonsterId = activeLockedMonster.id;
+                finalWorldX = activeLockedMonster.x;
+                finalWorldY = activeLockedMonster.y;
+                isLocked = true;
+
+                // Mouse Reference 100% Synchronized to Locked Monster Screen Position:
+                // When player flicks mouse to break lock, the breakout delta starts DIRECTLY from the monster's body position!
+                const monsterScreenX = rectEl.left + (activeLockedMonster.x - camera.scrollX) * (rectEl.width / camera.width);
+                const monsterScreenY = rectEl.top + (activeLockedMonster.y - camera.scrollY) * (rectEl.height / camera.height);
+                this.rawClientX = monsterScreenX;
+                this.rawClientY = monsterScreenY;
+            } else {
+                this.currentLockedMonsterId = null;
+            }
+        } else {
+            this.currentLockedMonsterId = null;
+        }
+
+        this.targetX = finalWorldX;
+        this.targetY = finalWorldY;
+
+        // Convert effective aim point to native HUD container coordinates (1536 x 864)
+        const hudX = (finalWorldX - camera.scrollX) * (1536 / camera.width);
+        const hudY = (finalWorldY - camera.scrollY) * (864 / camera.height);
+
+        EventBus.emit('aim-crosshair-update', {
+            x: hudX,
+            y: hudY,
+            isLocked,
+            visible: true,
+        });
+    }
+
     private bindPointer(): void {
         const canvas = (this.scene as any).game?.canvas as HTMLCanvasElement | undefined;
         if (!canvas) return;
-        const updateTarget = (e: PointerEvent) => {
-            const rectEl = canvas.getBoundingClientRect();
-            const camera = this.scene.cameras.main;
-            this.targetX =
-                camera.scrollX + (e.clientX - rectEl.left) * (camera.width / rectEl.width);
-            this.targetY =
-                camera.scrollY + (e.clientY - rectEl.top) * (camera.height / rectEl.height);
+
+        const onPointerEvent = (e: PointerEvent) => {
+            const now = performance.now();
+            if (!this.hasPointerMoved) {
+                this.lastClientX = e.clientX;
+                this.lastClientY = e.clientY;
+                this.rawClientX = e.clientX;
+                this.rawClientY = e.clientY;
+                this.hasPointerMoved = true;
+                this.lastMouseTime = now;
+                this.updateAimTarget(now);
+                return;
+            }
+
+            const dt = Math.max(1, now - this.lastMouseTime);
+            const dx = e.clientX - this.lastClientX;
+            const dy = e.clientY - this.lastClientY;
+            const mouseSpeed = Math.hypot(dx, dy) / dt; // px/ms
+
+            this.lastClientX = e.clientX;
+            this.lastClientY = e.clientY;
+            this.lastMouseTime = now;
+
+            // Accumulate relative delta onto rawClientX/Y so breakout starts directly from monster anchor
+            this.rawClientX += dx;
+            this.rawClientY += dy;
+
+            // Acceleration breakout: requires strong/fast mouse flick (> BREAKOUT_SPEED px/ms) to break lock
+            if (mouseSpeed > AIM_ASSIST.BREAKOUT_SPEED) {
+                this.lockBreakoutUntil = now + AIM_ASSIST.BREAKOUT_DURATION_MS;
+            }
+
+            this.updateAimTarget(now);
         };
+
         const onDown = (e: PointerEvent) => {
-            updateTarget(e);
+            onPointerEvent(e);
             this.firing = true;
         };
         const onMove = (e: PointerEvent) => {
-            // Always track the cursor, not just while firing — the sprite
-            // should face the mouse at all times so weapon aim and
-            // visual facing stay aligned.
-            updateTarget(e);
+            onPointerEvent(e);
         };
         const stop = () => {
             this.firing = false;
         };
+        const onLeave = () => {
+            this.firing = false;
+            this.hasPointerMoved = false;
+            EventBus.emit('aim-crosshair-update', {
+                x: -100,
+                y: -100,
+                isLocked: false,
+                visible: false,
+            });
+        };
+
         canvas.addEventListener('pointerdown', onDown);
         canvas.addEventListener('pointermove', onMove);
         canvas.addEventListener('pointerup', stop);
-        canvas.addEventListener('pointerleave', stop);
+        canvas.addEventListener('pointerleave', onLeave);
         this.cleanupFns.push(() => {
             canvas.removeEventListener('pointerdown', onDown);
             canvas.removeEventListener('pointermove', onMove);
             canvas.removeEventListener('pointerup', stop);
-            canvas.removeEventListener('pointerleave', stop);
+            canvas.removeEventListener('pointerleave', onLeave);
         });
     }
 }

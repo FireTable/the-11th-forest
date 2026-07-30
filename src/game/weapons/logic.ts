@@ -364,12 +364,22 @@ export class WeaponController {
             this.visualController.triggerSwing();
             EventBus.emit(SFX_EVENT(slot.spec.sfx?.shoot ?? 'player-shoot'));
 
-            // Get exact position of the weapon Box tip (blade tip) during swing
-            const bladeTipPos = this.visualController.getMuzzlePosition(handX, handY);
+            // Center melee slash arc / hitbox at character hand position (not offset to blade tip)
+            let originX = handX;
+            let originY = handY;
+
+            if (slot.spec.bullet?.spawnOffset) {
+                const [offX, offY] = slot.spec.bullet.spawnOffset;
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                const effectiveOffY = Math.cos(angle) < 0 ? -offY : offY;
+                originX += cos * offX - sin * effectiveOffY;
+                originY += sin * offX + cos * effectiveOffY;
+            }
 
             const meleeRotationOffset = slot.spec.bullet?.rotationOffset ?? slot.spec.visual?.rotationOffset ?? 0;
             const meleeBullet = spawnMeleeHitbox(this.scene, this.matter, {
-                origin: { x: bladeTipPos.x, y: bladeTipPos.y },
+                origin: { x: originX, y: originY },
                 angle,
                 range: slot.spec.range ?? 120,
                 hitWidth: slot.spec.hitWidth ?? 60,
