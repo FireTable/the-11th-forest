@@ -9,7 +9,7 @@ visual:
     texture: assets/image/weapons/assault-rifle.png
     scale: 0.16
     orbitRadius: 18
-    anchor: [0.45, 0.66]
+    anchor: [0.45, 0.5]
     recoilDistance: 6
     recoilDuration: 80
 bullet:
@@ -17,6 +17,8 @@ bullet:
     type: projectile
     speed: 700
     scale: 0.08
+    anchor: [0.5, 0.5]
+    spawnOffset: [10, -10]
 projectile:
     speed: 24
     visual:

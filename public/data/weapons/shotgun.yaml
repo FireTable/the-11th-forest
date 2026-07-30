@@ -6,27 +6,29 @@ clipSize: 2
 reloadTimeMs: 2400
 bulletsPerShot: 5
 visual:
-  texture: assets/image/weapons/shotgun.png
-  scale: 0.16
-  orbitRadius: 18
-  anchor: [0.2, 0.5]
-  recoilDistance: 10
-  recoilDuration: 120
+    texture: assets/image/weapons/shotgun.png
+    scale: 0.16
+    orbitRadius: 18
+    anchor: [0.45, 0.5]
+    recoilDistance: 10
+    recoilDuration: 120
 bullet:
-  texture: assets/image/weapons/shotgun-pellet.png
-  type: projectile
-  speed: 650
-  scale: 0.12
+    texture: assets/image/weapons/shotgun-pellet.png
+    type: projectile
+    speed: 650
+    scale: 0.11
+    anchor: [0.5, 0.5]
+    spawnOffset: [-40, -10]
 projectile:
-  speed: 22
-  visual:
-    radius: 4
-    width: 16
-    height: 4
-    color: 0x22c55e
+    speed: 22
+    visual:
+        radius: 4
+        width: 16
+        height: 4
+        color: 0xA64B39
 sfx:
-  shoot: player-shoot
-  dryFire: dry-fire
-  bulletWall: bullet-wall
-  reloadStart: reload-start
-  reloadFinish: reload-finish
+    shoot: player-shoot
+    dryFire: dry-fire
+    bulletWall: bullet-wall
+    reloadStart: reload-start
+    reloadFinish: reload-finish
