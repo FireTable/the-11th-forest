@@ -25,6 +25,7 @@ import { EventBus } from '@/lib/events/bus';
 import type { WeaponSpec } from '@/lib/weapons';
 import { spawnProjectile } from '@/game/weapons/weapon';
 import type { DropRef, MonsterSpec } from '@/lib/monsters';
+import { StatusHud } from '@/game/hubs/status-hud';
 
 import {
     chaseVelocity,
@@ -104,6 +105,7 @@ export class Monster {
     readonly debugHitboxRect: Phaser.GameObjects.Rectangle;
     readonly sprite?: Phaser.GameObjects.Sprite;
     readonly shadow: Phaser.GameObjects.Ellipse;
+    readonly statusHud: StatusHud;
     hp: number;
     state: MonsterState = 'idle';
     lastAttackAt = 0;
@@ -124,19 +126,18 @@ export class Monster {
         this.weapon = weapon;
         this.hp = spec.hp;
 
-        // Determine physical dimensions
         let w = spec.body.halfW * 2;
         let h = spec.body.halfH * 2;
-        let centerY = y;
+        let centerY = y - spec.body.halfH;
 
-        if (spec.sprite) {
-            // Get sprite dimensions dynamically
-            const cellW = 64; // Default scale 1.0 cell size
-            const cellH = 64;
+        if (spec.sprite && scene.textures.exists(textureKey(spec))) {
+            const frame = scene.textures.getFrame(textureKey(spec), 0);
             const scale = spec.sprite.scale ?? 1.0;
-            w = cellW * scale * 0.8; // 80% width for clean collisions
-            h = cellH * scale; // Full height for sprite body
-            centerY = y - h / 2 + spec.body.halfH;
+            if (frame) {
+                w = frame.width * scale * 0.8;
+                h = frame.height * scale;
+                centerY = y - h / 2;
+            }
         }
 
         this.body = scene.matter.add.rectangle(x, centerY, w, h, {
@@ -156,6 +157,9 @@ export class Monster {
         
         // Foot shadow based on hit box size
         this.shadow = scene.add.ellipse(x, y, spec.body.halfW * 2, spec.body.halfH * 0.8, 0x000000, 0.3);
+
+        // Status HUD above monster hitbox
+        this.statusHud = new StatusHud(scene, this.body);
 
         // Feet Body Debug Rect (Green outline)
         this.debugBodyRect = scene.add.rectangle(x, y, spec.body.halfW * 2, spec.body.halfH * 2);
@@ -195,6 +199,7 @@ export class Monster {
         this.debugHitboxRect?.destroy();
         this.sprite?.destroy();
         this.shadow?.destroy();
+        this.statusHud?.destroy();
         this.dead = true;
     }
 }
@@ -384,6 +389,16 @@ export class MonsterController {
                 // Align Editor debug rect with physics body center
                 m.debugHitboxRect.setPosition(mp.x, mp.y);
 
+                // Update status HUD above monster hitbox/sprite top
+                const halfH = (m.body as any).bounds
+                    ? ((m.body as any).bounds.max.y - (m.body as any).bounds.min.y) / 2
+                    : m.sprite.displayHeight / 2;
+                m.statusHud.update(
+                    { name: m.spec.name, hp: m.hp, maxHp: m.spec.hp, showHpBar: true },
+                    time,
+                    halfH,
+                );
+
                 // Play corresponding animation track (idle / move / hit)
                 const isHit = time - m.lastHitAt < 250;
                 const animTrack = isHit ? 'hit' : m.state === 'chase' ? 'move' : 'idle';
@@ -401,6 +416,12 @@ export class MonsterController {
                 }
             } else {
                 m.debugHitboxRect.setPosition(mp.x, mp.y);
+                const halfH = m.spec.body.halfH;
+                m.statusHud.update(
+                    { hp: m.hp, maxHp: m.spec.hp, showHpBar: true },
+                    time,
+                    halfH,
+                );
                 if (dist > 1) {
                     m.debugHitboxRect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
                 }
@@ -434,6 +455,7 @@ export class MonsterController {
         if (target && target.state !== 'dying') {
             target.hp -= bulletDamage;
             target.lastHitAt = this.scene.time.now;
+            target.statusHud.showFloatingNumber(bulletDamage, 'damage');
             EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'));
 
             if (target.hp <= 0) {

@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 
 import { PhaserGame } from '@/PhaserGame';
+import { GameHUDLayer } from '@/components/hud/GameHUDLayer';
 
 /**
  * Top-level React component.
@@ -21,8 +22,9 @@ const EditorPanel = lazy(() =>
 
 function App() {
     return (
-        <div id="app">
+        <div id="app" className="relative w-full h-full overflow-hidden">
             <PhaserGame />
+            <GameHUDLayer />
             <Suspense fallback={null}>
                 <EditorPanel />
             </Suspense>

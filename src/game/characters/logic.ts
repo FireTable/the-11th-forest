@@ -145,14 +145,19 @@ export interface WeaponHudLike {
  *  (above the character's head — currently shows reload progress). */
 export interface StatusHudLike {
     update(state: StatusHudState, time: number, halfH: number): void;
+    showFloatingNumber?(amount: number, type: 'damage' | 'heal'): void;
 }
 
 /** Subset of weapon-slot state StatusHud needs. */
 export interface StatusHudState {
+    name?: string;
     reloading: boolean;
     reloadStartedAt: number;
     reloadTimeMs: number;
     justCompletedAt: number;
+    hp?: number;
+    maxHp?: number;
+    showHpBar?: boolean;
 }
 
 /** Everything the controller needs from outside — passed in by load-character. */
@@ -228,7 +233,12 @@ export class CharacterController {
     /** Apply HP/SP healing (clamped to [0, max]). Negative values damage. */
     heal(hpDelta: number, spDelta: number): void {
         if (hpDelta !== 0) {
+            const oldHp = this.hp;
             this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
+            const actualDelta = this.hp - oldHp;
+            if (actualDelta !== 0 && this.parts.statusHud?.showFloatingNumber) {
+                this.parts.statusHud.showFloatingNumber(actualDelta, actualDelta > 0 ? 'heal' : 'damage');
+            }
             if (hpDelta < 0) {
                 const sfx = this.spec.sfx?.hurt;
                 if (sfx) EventBus.emit(SFX_EVENT(sfx));
@@ -380,10 +390,20 @@ export class CharacterController {
         // ── HUD ─────────────────────────────────────────────────────
         this.parts.hud.update(this.spec, this.hp, this.sp);
         this.parts.weaponHud.draw(this.parts.weapons, now);
+        // Character body position center is at (feetY - halfH).
+        // Distance from body.position to sprite top is: displayHeight - halfH
+        const topOffset = Math.max(this.spec.body.halfH, this.parts.sprite.displayHeight - this.spec.body.halfH);
+        const slotState = this.parts.weapons.getActiveSlotState();
         this.parts.statusHud.update(
-            this.parts.weapons.getActiveSlotState(),
+            {
+                name: this.spec.name,
+                ...slotState,
+                hp: this.hp,
+                maxHp: this.spec.hp,
+                showHpBar: true,
+            },
             now,
-            this.spec.body.halfH,
+            topOffset,
         );
     }
 

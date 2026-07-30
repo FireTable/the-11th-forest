@@ -42,6 +42,7 @@ function makeScreenAnchoredContainer(
 
 export class BaseHud {
     protected readonly root: Phaser.GameObjects.Container;
+    protected readonly scene: Phaser.Scene;
 
     constructor(
         scene: Phaser.Scene,
@@ -49,6 +50,7 @@ export class BaseHud {
         screenY: number,
         depth = 800,
     ) {
+        this.scene = scene;
         this.root = makeScreenAnchoredContainer(scene, screenX, screenY, depth);
     }
 
