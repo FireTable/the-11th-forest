@@ -160,14 +160,13 @@ export function spawnMeleeHitbox(
     let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
     const scale = opts.scale ?? 0.18;
     const isLeft = Math.cos(opts.angle) < 0;
-    
-    // Add Math.PI (180 degrees) so the moon crescent arc curve faces strictly OUTWARD away from the player
-    const rawRotRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
-    const rotRad = isLeft ? -rawRotRad : rawRotRad;
-    const baseRotation = opts.angle + Math.PI + rotRad;
-    const sweepArc = Math.PI / 5;
-    const startRotation = baseRotation - sweepArc;
-    const endRotation = baseRotation + sweepArc;
+
+    // rotationOffset directly controls the texture's screen-space rotation,
+    // matching ranged bullets (rotation = aim_angle + rotRad). The scaleX
+    // mirror below handles the visual flip for left swings — same approach
+    // as ranged, where the bullet naturally follows its velocity direction.
+    const rotRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
+    const baseRotation = opts.angle + rotRad;
 
     if (opts.texture && scene.textures.exists(opts.texture)) {
         // Spawn slash arc at exact weapon Box blade tip (opts.origin) facing along the swing trajectory
@@ -178,11 +177,12 @@ export function spawnMeleeHitbox(
         const targetScaleX = isLeft ? -scale * 1.5 : scale * 1.5;
 
         sprite.setScale(initScaleX, scale);
-        sprite.setRotation(startRotation);
+        sprite.setRotation(baseRotation);
         sprite.setAlpha(1.0);
+        // Tween alpha + scale only; rotation is static so rotationOffset
+        // stays visible (same as ranged bullets, which have no sweep).
         scene.tweens.add({
             targets: sprite,
-            rotation: endRotation,
             alpha: 0,
             scaleX: targetScaleX,
             scaleY: scale * 1.5,
@@ -219,6 +219,7 @@ export function spawnMeleeHitbox(
         originX: opts.origin.x,
         originY: opts.origin.y,
         maxDistance: opts.range,
+        rotationOffset: rotRad,
         isMelee: true,
         trail: [],
     };
