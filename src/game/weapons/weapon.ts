@@ -160,33 +160,39 @@ export function spawnMeleeHitbox(
     let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
     const scale = opts.scale ?? 0.18;
     const isLeft = Math.cos(opts.angle) < 0;
-    
-    // Add Math.PI (180 degrees) so the moon crescent arc curve faces strictly OUTWARD away from the player
-    const rawRotRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
-    const rotRad = isLeft ? -rawRotRad : rawRotRad;
-    const baseRotation = opts.angle + Math.PI + rotRad;
-    const sweepArc = Math.PI / 5;
-    const startRotation = baseRotation - sweepArc;
-    const endRotation = baseRotation + sweepArc;
+
+    // sweepArc: how many radians the arc sweeps during animation
+    const sweepArc = Math.PI / 5; // 36 degrees
+
+    // rotationOffset: extra rotation on the sprite around its own center (YAML-configurable)
+    // Positive = clockwise, negated when facing left to preserve mirror symmetry
+    const rotOffsetRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
+    const visualRotOffset = isLeft ? -rotOffsetRad : rotOffsetRad;
+
+    // Base angle pointing OUTWARD from player (same direction as attack)
+    // Start swept back, sweep forward through the attack direction
+    const baseAngle = opts.angle + visualRotOffset;
+    const startRotation = baseAngle - sweepArc;
+    const endRotation = baseAngle + sweepArc;
 
     if (opts.texture && scene.textures.exists(opts.texture)) {
-        // Spawn slash arc at exact weapon Box blade tip (opts.origin) facing along the swing trajectory
-        const sprite = scene.add.image(opts.origin.x, opts.origin.y, opts.texture);
-        sprite.setOrigin(0.1, 0.5);
-
-        const initScaleX = isLeft ? -scale : scale;
-        const targetScaleX = isLeft ? -scale * 1.5 : scale * 1.5;
-
-        sprite.setScale(initScaleX, scale);
+        // Spawn slash arc centered at hitbox position (hx, hy) - in front of player
+        // Center pivot (0.5, 0.5) makes rotationOffset rotate the image around its center
+        const sprite = scene.add.image(hx, hy, opts.texture);
+        sprite.setOrigin(0.5, 0.5);
+        sprite.setDepth(9999); // Always render on top so it's clearly visible
+        // Mirror via flipX when facing left — keeps scaleX always positive so rotation tween is clean
+        sprite.setFlipX(isLeft);
+        sprite.setScale(scale, scale);
         sprite.setRotation(startRotation);
         sprite.setAlpha(1.0);
         scene.tweens.add({
             targets: sprite,
             rotation: endRotation,
             alpha: 0,
-            scaleX: targetScaleX,
+            scaleX: scale * 1.5,
             scaleY: scale * 1.5,
-            duration: 180,
+            duration: 200,
             ease: 'Quad.out',
             onComplete: () => {
                 sprite.destroy();
@@ -196,11 +202,11 @@ export function spawnMeleeHitbox(
         visualObj = sprite;
     } else {
         const rect = scene.add.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, 0xc084fc, 0.7);
-        rect.setRotation(baseRotation);
+        rect.setRotation(opts.angle);
         scene.tweens.add({
             targets: rect,
             alpha: 0,
-            duration: 180,
+            duration: 200,
             onComplete: () => {
                 rect.destroy();
                 scene.matter.world.remove(body);

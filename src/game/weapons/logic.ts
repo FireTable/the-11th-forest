@@ -367,6 +367,7 @@ export class WeaponController {
             // Get exact position of the weapon Box tip (blade tip) during swing
             const bladeTipPos = this.visualController.getMuzzlePosition(handX, handY);
 
+            const meleeRotationOffset = slot.spec.bullet?.rotationOffset ?? slot.spec.visual?.rotationOffset ?? 0;
             const meleeBullet = spawnMeleeHitbox(this.scene, this.matter, {
                 origin: { x: bladeTipPos.x, y: bladeTipPos.y },
                 angle,
@@ -376,7 +377,7 @@ export class WeaponController {
                 damage: slot.spec.damage,
                 texture: slot.spec.bullet?.texture,
                 scale: slot.spec.bullet?.scale ?? 0.18,
-                rotationOffset: slot.spec.bullet?.rotationOffset ?? slot.spec.visual?.rotationOffset ?? 0,
+                rotationOffset: meleeRotationOffset,
             });
 
             this.bullets.push(meleeBullet);
