@@ -6,27 +6,27 @@ clipSize: 30
 reloadTimeMs: 1500
 bulletsPerShot: 1
 visual:
-  texture: assets/image/weapons/assault-rifle.png
-  scale: 0.16
-  orbitRadius: 18
-  anchor: [0.2, 0.5]
-  recoilDistance: 5
-  recoilDuration: 60
+    texture: assets/image/weapons/assault-rifle.png
+    scale: 0.16
+    orbitRadius: 18
+    anchor: [0.45, 0.66]
+    recoilDistance: 6
+    recoilDuration: 80
 bullet:
-  texture: assets/image/weapons/assault-bullet.png
-  type: projectile
-  speed: 700
-  scale: 0.16
+    texture: assets/image/weapons/assault-bullet.png
+    type: projectile
+    speed: 700
+    scale: 0.08
 projectile:
-  speed: 24
-  visual:
-    radius: 4
-    width: 16
-    height: 4
-    color: 0x3b82f6
+    speed: 24
+    visual:
+        radius: 4
+        width: 2
+        height: 2
+        color: 0x23C9D0
 sfx:
-  shoot: player-shoot
-  dryFire: dry-fire
-  bulletWall: bullet-wall
-  reloadStart: reload-start
-  reloadFinish: reload-finish
+    shoot: player-shoot
+    dryFire: dry-fire
+    bulletWall: bullet-wall
+    reloadStart: reload-start
+    reloadFinish: reload-finish
