@@ -151,13 +151,19 @@ export interface StatusHudLike {
 /** Subset of weapon-slot state StatusHud needs. */
 export interface StatusHudState {
     name?: string;
-    reloading: boolean;
-    reloadStartedAt: number;
-    reloadTimeMs: number;
-    justCompletedAt: number;
+    reloading?: boolean;
+    reloadStartedAt?: number;
+    reloadTimeMs?: number;
+    justCompletedAt?: number;
     hp?: number;
     maxHp?: number;
     showHpBar?: boolean;
+    sp?: number;
+    maxSp?: number;
+    showSpBar?: boolean;
+    dodgeActive?: boolean;
+    dodgeCooldownStartedAt?: number;
+    dodgeCooldownTimeMs?: number;
 }
 
 /** Everything the controller needs from outside — passed in by load-character. */
@@ -401,6 +407,12 @@ export class CharacterController {
                 hp: this.hp,
                 maxHp: this.spec.hp,
                 showHpBar: true,
+                sp: this.sp,
+                maxSp: this.spec.sp,
+                showSpBar: true,
+                dodgeActive: now < this.dodgeActiveUntil,
+                dodgeCooldownStartedAt: this.lastDodgeEndAt,
+                dodgeCooldownTimeMs: this.spec.dodge.cooldownMs,
             },
             now,
             topOffset,

@@ -29,11 +29,12 @@ export const CharacterHUDOverlay: React.FC = () => {
                 <div className="flex flex-col gap-2.5">
                     {/* HP Bar */}
                     <div className="flex flex-col gap-1">
-                        <div className="flex justify-between items-center text-[10px] font-bold">
+                        <div className="flex justify-between items-center text-xs font-bold leading-none">
                             <span className="text-red-400 flex items-center gap-1.5 drop-shadow-[1px_1px_0px_#000]">
-                                <Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" /> HP
+                                <Heart className="w-4 h-4 fill-red-500 text-red-400 shrink-0" />
+                                <span className="leading-none">HP</span>
                             </span>
-                            <span className="text-stone-200 font-mono tracking-tighter drop-shadow-[1px_1px_0px_#000]">
+                            <span className="text-stone-200 font-mono tracking-tighter drop-shadow-[1px_1px_0px_#000] leading-none">
                                 {Math.ceil(hp)} / {maxHp}
                             </span>
                         </div>
@@ -47,11 +48,15 @@ export const CharacterHUDOverlay: React.FC = () => {
 
                     {/* SP Bar */}
                     <div className="flex flex-col gap-1">
-                        <div className="flex justify-between items-center text-[10px] font-bold">
+                        <div className="flex justify-between items-center text-xs font-bold leading-none">
                             <span className="text-sky-400 flex items-center gap-1.5 drop-shadow-[1px_1px_0px_#000]">
-                                <Zap className="w-3.5 h-3.5 fill-sky-400 text-sky-300" /> SP
+                                <Zap className="w-4 h-4 fill-sky-400 text-sky-300 shrink-0" />
+                                <span className="leading-none">SP</span>
+                                <span className="ml-1 text-[9px] bg-stone-800 text-sky-300 px-1 py-0.5 border border-stone-600 rounded-[2px] leading-none uppercase tracking-tighter inline-flex items-center">
+                                    SHIFT
+                                </span>
                             </span>
-                            <span className="text-stone-200 font-mono tracking-tighter drop-shadow-[1px_1px_0px_#000]">
+                            <span className="text-stone-200 font-mono tracking-tighter drop-shadow-[1px_1px_0px_#000] leading-none">
                                 {Math.ceil(sp)} / {maxSp}
                             </span>
                         </div>
