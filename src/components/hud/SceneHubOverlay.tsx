@@ -1,8 +1,16 @@
 import React from 'react';
 import { useGameStore } from '@/store/game-store';
 
+/** Format milliseconds as `MM:SS` (zero-padded, capped at 99:59). */
+const formatElapsed = (ms: number): string => {
+    const totalSec = Math.floor(ms / 1000);
+    const mm = Math.min(99, Math.floor(totalSec / 60));
+    const ss = totalSec % 60;
+    return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+};
+
 export const SceneHubOverlay: React.FC = () => {
-    const { levelTitle, hubsVisible } = useGameStore();
+    const { levelTitle, levelElapsedMs, hubsVisible } = useGameStore();
 
     if (!hubsVisible || !levelTitle) return null;
 
@@ -17,12 +25,12 @@ export const SceneHubOverlay: React.FC = () => {
                 <div className="absolute -bottom-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400" />
 
 
-                <div className="flex flex-col items-center">
-                    <span className="text-[8px] text-amber-500 uppercase tracking-widest font-semibold leading-none mb-0.5 drop-shadow-[1px_1px_0px_#000]">
-                        CURRENT LOCATION
-                    </span>
+                <div className="flex flex-col items-center gap-0.5">
                     <span className="text-xs font-bold tracking-wider text-amber-200 uppercase drop-shadow-[1px_1px_0px_#000] leading-tight">
                         {levelTitle}
+                    </span>
+                    <span className="text-[10px] text-white uppercase tracking-widest font-semibold leading-none mt-1 drop-shadow-[1px_1px_0px_#000]">
+                        {formatElapsed(levelElapsedMs)}
                     </span>
                 </div>
             </div>

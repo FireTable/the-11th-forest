@@ -452,12 +452,29 @@ characterSpawn:
     'y': 800
     facing: left
 monsters:
+    # wave-1 — immediate single drone; gates wave-2.
     - type: drone
       x: 800
       'y': 800
+      waveId: wave-1
+    # wave-2 — drone spawns 3s after wave-1 is cleared; gates boss.
+    - type: drone
+      x: 1200
+      'y': 1000
+      waveId: wave-2
+      trigger:
+        kind: clear
+        waveId: wave-1
+        delayMs: 3000
+    # boss — gunner spawns 5s after wave-2 is cleared.
     - type: gunner
       x: 2000
       'y': 600
+      waveId: boss
+      trigger:
+        kind: clear
+        waveId: wave-2
+        delayMs: 5000
 materials:
     - id: mat-ms66o299
       texture: assets/image/materials/common/hash-77c652357d92.png
