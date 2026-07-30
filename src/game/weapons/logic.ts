@@ -91,7 +91,8 @@ export class WeaponController {
 
         this.trailGraphics = createBulletTrail(scene);
 
-        // Bullets die on contact with any wall (WALL_TALL or WALL_SHORT).
+        // Bullets die on contact with tall walls (WALL_TALL) or monsters.
+        // Short walls (WALL_SHORT) and player character hitboxes are explicitly ignored.
         scene.matter.world.on('collisionstart', (event: any) => {
             const pairs = event.pairs || [];
             for (const pair of pairs) {
@@ -102,11 +103,27 @@ export class WeaponController {
                           ? pair.bodyB
                           : null;
                 if (!bulletBody) continue;
-                for (let i = this.bullets.length - 1; i >= 0; i--) {
-                    if (this.bullets[i].body === bulletBody) {
-                        this.destroyBullet(i);
-                        EventBus.emit(SFX_EVENT('bullet-wall'));
-                        break;
+                const other = pair.bodyA === bulletBody ? pair.bodyB : pair.bodyA;
+                if (!other) continue;
+
+                const category = other.collisionFilter?.category ?? 0;
+                const isTallWall = (category & CAT.WALL_TALL) !== 0;
+                const isMonster = (category & CAT.MONSTER_MELEE) !== 0 || other.label === 'monster';
+
+                if (isTallWall) {
+                    for (let i = this.bullets.length - 1; i >= 0; i--) {
+                        if (this.bullets[i].body === bulletBody) {
+                            this.destroyBullet(i);
+                            EventBus.emit(SFX_EVENT('bullet-wall'));
+                            break;
+                        }
+                    }
+                } else if (isMonster) {
+                    for (let i = this.bullets.length - 1; i >= 0; i--) {
+                        if (this.bullets[i].body === bulletBody) {
+                            this.destroyBullet(i);
+                            break;
+                        }
                     }
                 }
             }

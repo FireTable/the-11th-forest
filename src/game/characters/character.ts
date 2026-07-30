@@ -220,6 +220,10 @@ export function loadCharacter(
             parts: [body, spriteHitbox],
             inertia: Infinity,
             label: 'character',
+            collisionFilter: {
+                category: CAT.CHARACTER,
+                mask: 0xffff & ~CAT.BULLET,
+            },
         });
         scene.matter.world.add(compoundBody);
     }

@@ -39,4 +39,14 @@ describe('weapons/logic — body label helpers', () => {
         expect(isWall({ label: 'monster' })).toBe(false);
         expect(isWall({})).toBe(false);
     });
+
+    it('tall wall vs short wall / character category distinction', () => {
+        const tallWallCat = CAT.WALL_TALL;
+        const shortWallCat = CAT.WALL_SHORT;
+        const charCat = CAT.CHARACTER;
+
+        expect((tallWallCat & CAT.WALL_TALL) !== 0).toBe(true);
+        expect((shortWallCat & CAT.WALL_TALL) !== 0).toBe(false);
+        expect((charCat & CAT.WALL_TALL) !== 0).toBe(false);
+    });
 });
