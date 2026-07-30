@@ -51,6 +51,7 @@ const SaveLevelSchema = z
             z.object({ width: z.number(), height: z.number() }),
         ]),
         prompt: z.string().optional(),
+        music: z.string().min(1).optional(),
         airWalls: z
             .array(
                 z
@@ -147,6 +148,7 @@ function serializeLevelYaml(level) {
         prompt: level.prompt,
         airWalls: level.airWalls,
     };
+    if (level.music !== undefined) payload.music = level.music;
     if (level.character !== undefined) payload.character = level.character;
     if (level.characterSpawn !== undefined) {
         payload.characterSpawn = {
@@ -230,7 +232,7 @@ async function handleSaveLevel(req, res) {
 async function handleListMaterials(res) {
     const materialsDir = path.join(PUBLIC_DIR, 'assets/image/materials');
     try {
-        const { readdir, stat } = await import('node:fs/promises');
+        const { readdir } = await import('node:fs/promises');
         const entries = await readdir(materialsDir, { withFileTypes: true });
         const folders = [];
         for (const entry of entries) {
