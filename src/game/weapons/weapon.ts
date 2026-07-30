@@ -135,10 +135,21 @@ export interface MeleeSpawnOptions {
     scale?: number;
     rotationOffset?: number;
     feetY?: number;
+    /** Matter category. Defaults to CAT.BULLET (player melee). */
+    category?: number;
+    /** Matter mask (who the hitbox collides with). Defaults to PROJECTILE_PLAYER_MASK. */
+    mask?: number;
+    /** Body label for collisionstart lookup. Defaults to 'player-bullet'. */
+    label?: string;
 }
 
 /**
  * Spawn a melee attack hitbox sensor + visual slash arc trajectory.
+ *
+ * Defaults to player-side categories/labels so existing callers (player
+ * melee) need no changes. Monsters pass `category: CAT.MONSTER_PROJECTILE`,
+ * `mask: PROJECTILE_MONSTER_MASK`, and `label: 'monster-melee'` so the
+ * MonsterController.bindCollisions handler can route hits to the player.
  */
 export function spawnMeleeHitbox(
     scene: Phaser.Scene,
@@ -148,17 +159,22 @@ export function spawnMeleeHitbox(
     const scale = opts.scale ?? 0.18;
     const isLeft = Math.cos(opts.angle) < 0;
 
-    // Position directly on character left or right side based on facing direction
-    const sideOffset = opts.range * 0.45;
+    // Position the hitbox so its far edge reaches `range` distance from
+    // the origin. For a 30-wide hitbox at range=36, sideOffset = 36 - 15
+    // = 21px from center → hitbox covers 6 to 36 px (player plasma-sword
+    // sits comfortably inside). For monsters with a longer reach this
+    // pushes the swing out to the full attack distance instead of
+    // clipping to the body.
+    const sideOffset = Math.max(0, opts.range - opts.hitWidth / 2);
     const hx = opts.origin.x + (isLeft ? -sideOffset : sideOffset);
     const hy = opts.origin.y;
 
     const body = matter.Bodies.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, {
         isSensor: true,
-        label: 'player-bullet',
+        label: opts.label ?? 'player-bullet',
         collisionFilter: {
-            category: CAT.BULLET,
-            mask: PROJECTILE_PLAYER_MASK,
+            category: opts.category ?? CAT.BULLET,
+            mask: opts.mask ?? PROJECTILE_PLAYER_MASK,
         },
     });
     scene.matter.world.add(body);

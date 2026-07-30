@@ -4,7 +4,7 @@ moveSpeed: 4
 body:
     halfW: 20
     halfH: 20
-weaponId: drone-claws
+weaponId: plasma-sword
 sfx:
     hit: monster-hit
     death: monster-death

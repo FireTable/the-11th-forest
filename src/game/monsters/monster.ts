@@ -29,7 +29,8 @@ import {
 } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import type { WeaponSpec } from '@/lib/weapons';
-import { spawnProjectile } from '@/game/weapons/weapon';
+import { spawnProjectile, spawnMeleeHitbox } from '@/game/weapons/weapon';
+import { WeaponVisualController } from '@/game/weapons/visual';
 import type { DropRef, MonsterSpec } from '@/lib/monsters';
 import { StatusHud } from '@/game/hubs/status-hud';
 
@@ -120,6 +121,12 @@ export class Monster {
      * through the `dying` state (visibility toggled instead of destroyed) so the
      * death animation can show 0 HP without re-spawning the HUD mid-tween. */
     readonly statusHud: StatusHud;
+    /** Floating weapon attachment (sprite + aim rotation + recoil/swing tweens).
+     * Mirrors `WeaponController.visualController` on the player so monsters
+     * visually hold their weapon the same way. Always created; `setWeapon`
+     * leaves the sprite null when the weapon has no `visual.texture`, but
+     * the controller is still callable for animation triggers (swing). */
+    readonly weaponVisual: WeaponVisualController;
     hp: number;
     state: MonsterState = 'idle';
     lastAttackAt = 0;
@@ -189,6 +196,13 @@ export class Monster {
         // Status HUD above monster hitbox
         this.statusHud = new StatusHud(scene, this.body);
 
+        // Weapon visual attachment — mirrors how the player carries weapons.
+        // Always created so melee (swing) and ranged (recoil) share the same
+        // animation path. `setWeapon` skips the sprite if `visual.texture`
+        // is missing, leaving only the controller (invisible but callable).
+        this.weaponVisual = new WeaponVisualController(scene);
+        this.weaponVisual.setWeapon(weapon);
+
         // Feet Body Debug Rect (Green outline)
         this.debugBodyRect = scene.add.rectangle(x, y, spec.body.halfW * 2, spec.body.halfH * 2);
         this.debugBodyRect.setStrokeStyle(2, 0x22c55e, 1);
@@ -233,6 +247,7 @@ export class Monster {
         this.sprite?.destroy();
         this.shadow?.destroy();
         this.statusHud?.destroy();
+        this.weaponVisual?.destroy?.();
         this.dead = true;
     }
 }
@@ -565,6 +580,17 @@ export class MonsterController {
                     m.debugHitboxRect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
                 }
             }
+
+            // ── Weapon visual sync (Brotato-style floating attachment) ──
+            // Aim the held weapon at the player the same way WeaponController
+            // does for the player character. Mirrors player visual behaviour.
+            if (m.weaponVisual) {
+                const halfH = m.spec.body.halfH;
+                const handX = mp.x;
+                const handY = mp.y - halfH;
+                const aimAngle = Math.atan2(dirToPlayer.y, dirToPlayer.x);
+                m.weaponVisual.update(handX, handY, footY, aimAngle);
+            }
         }
 
         // ── Projectile visual sync ────────────────────────────────────
@@ -624,21 +650,59 @@ export class MonsterController {
 
     private performAttack(m: Monster, dirToPlayer: { x: number; y: number }): void {
         const weapon = m.weapon;
-        // Melee: contact damage via collisionstart (handled in bindCollisions).
-        // No projectile to spawn — just return.
-        if (weapon.projectile === undefined) return;
+        const projectile = weapon.projectile;
+        const isMelee = projectile === undefined;
 
-        // Ranged: fire a projectile from the monster center toward the
-        // player's CURRENT position. Don't lead — player dodge makes that
-        // less rewarding than reaction aim.
+        // Melee: trigger the swing tween (same animation the player gets)
+        // AND spawn a sensor hitbox so the swing has a proper hit-zone that
+        // matches player melee behaviour (slash arc + sensor body in front
+        // of the monster). Contact damage on the body itself is also kept
+        // as a fallback for the rare case where the player walks into the
+        // monster between swings.
+        if (isMelee) {
+            m.weaponVisual.triggerSwing();
+            const swingSfx = weapon.sfx?.shoot;
+            if (swingSfx) EventBus.emit(SFX_EVENT(swingSfx));
+            const range = weapon.range;
+            const originX = m.body.position.x;
+            const originY = m.body.position.y;
+            const dx = dirToPlayer.x;
+            const dy = dirToPlayer.y;
+            const len = Math.hypot(dx, dy);
+            const angle = len > 0 ? Math.atan2(dy, dx) : 0;
+            spawnMeleeHitbox(this.scene, this.matter, {
+                origin: { x: originX, y: originY },
+                angle,
+                range,
+                hitWidth: weapon.hitWidth ?? range,
+                hitHeight: weapon.hitHeight ?? range,
+                damage: weapon.damage,
+                texture: weapon.bullet?.texture,
+                scale: weapon.bullet?.scale ?? 0.2,
+                rotationOffset: weapon.bullet?.rotationOffset,
+                feetY: originY + (m.spec.body.halfH ?? 0),
+                category: CAT.MONSTER_PROJECTILE,
+                mask: PROJECTILE_MONSTER_MASK,
+                label: 'monster-melee',
+            });
+            return;
+        }
+
+        // Ranged: trigger recoil, spawn projectile from the weapon's muzzle.
+        // Don't lead — player dodge makes reaction aim more rewarding than prediction.
         const len = Math.hypot(dirToPlayer.x, dirToPlayer.y);
         if (len === 0) return;
-        const { speed, visual: size } = weapon.projectile;
-        EventBus.emit(SFX_EVENT('monster-shoot'));
+        const { speed, visual: size } = projectile;
+        const muzzlePos = m.weaponVisual.getMuzzlePosition(
+            m.body.position.x,
+            m.body.position.y,
+        );
+        m.weaponVisual.triggerRecoil();
+        EventBus.emit(SFX_EVENT(weapon.sfx?.shoot ?? 'monster-shoot'));
         const bullet = spawnProjectile(
             this.scene,
             this.matter,
-            { x: m.body.position.x, y: m.body.position.y },
+            { x: muzzlePos.x, y: muzzlePos.y },
             { x: dirToPlayer.x, y: dirToPlayer.y },
             {
                 label: 'monster-projectile',
@@ -647,6 +711,12 @@ export class MonsterController {
                 speed,
                 damage: weapon.damage,
                 size,
+                // Render bullet as a sprite when the weapon spec has one —
+                // matches how player bullets look (e.g. assault-bullet.png).
+                texture: weapon.bullet?.texture,
+                scale: weapon.bullet?.scale,
+                anchor: weapon.bullet?.anchor,
+                rotationOffset: weapon.bullet?.rotationOffset,
             },
         );
         this.projectiles.push({ ...bullet, monster: m });
@@ -655,6 +725,10 @@ export class MonsterController {
     private kill(m: Monster): void {
         m.state = 'dying';
         EventBus.emit(SFX_EVENT(m.spec.sfx?.death ?? 'monster-death'));
+
+        // Hide the held weapon during the death animation so it doesn't
+        // float in mid-air beside the corpse.
+        m.weaponVisual?.setVisible(false);
 
         // Disable collision filter so dead monster doesn't block player or bullets
         m.body.collisionFilter.mask = 0;
@@ -748,6 +822,23 @@ export class MonsterController {
                     continue;
                 }
 
+                // ── monster-melee (swing hitbox) ↔ player ───────────────
+                // Mirrors player plasma-sword: a sensor body fires briefly
+                // in front of the monster; on overlap it damages the player.
+                const meleeBody =
+                    a.label === 'monster-melee'
+                        ? a
+                        : b.label === 'monster-melee'
+                          ? b
+                          : null;
+                if (meleeBody) {
+                    const other = meleeBody === a ? b : a;
+                    if (other === this.playerBody) {
+                        this.damagePlayerFromMelee(meleeBody as MatterJS.BodyType);
+                    }
+                    continue;
+                }
+
                 // ── monster (melee body) ↔ player ─────────────────────
                 if (
                     (a.label === 'monster' && b === this.playerBody) ||
@@ -781,6 +872,31 @@ export class MonsterController {
         this.cb.onPlayerHit(proj.damage);
         this.lastDamageAt = now;
         this.destroyProjectile(proj);
+    }
+
+    /**
+     * Apply damage to the player from a monster melee swing hitbox. The body
+     * self-destroys via the spawnMeleeHitbox tween (no projectile cleanup
+     * needed). Like projectile hits, contact damage respects the global
+     * cooldown so simultaneous melee overlaps don't double-tap.
+     */
+    private damagePlayerFromMelee(meleeBody: MatterJS.BodyType): void {
+        const now = this.scene.time.now;
+        if (now - this.lastDamageAt < COMBAT_PLAYER_DAMAGE_COOLDOWN_MS) return;
+        // Find the swinging monster — the swing body was spawned from the
+        // attacker's position, so pick the nearest melee monster.
+        const meleeMonsters = this.monsters.filter(
+            (m) => !m.dead && m.weapon.projectile === undefined,
+        );
+        const best = pickClosestMonster(
+            meleeBody.position,
+            meleeMonsters,
+            Infinity,
+        );
+        if (!best) return;
+        EventBus.emit(SFX_EVENT('player-hit'));
+        this.cb.onPlayerHit(best.weapon.damage);
+        this.lastDamageAt = now;
     }
 
     private damagePlayerFromContact(): void {
