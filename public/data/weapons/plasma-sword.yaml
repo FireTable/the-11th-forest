@@ -14,7 +14,7 @@ visual:
 bullet:
     texture: assets/image/weapons/plasma-slash-arc.png
     type: melee
-    scale: 0.18
-    rotationOffset: 90
+    scale: 0.3
+    rotationOffset: 0
 sfx:
     shoot: player-shoot

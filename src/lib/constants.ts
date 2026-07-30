@@ -29,6 +29,7 @@ export const DEPTH = {
     PROJECTILE_BASE: 20, // Min base depth for bullets so they always render OVER background materials
     // Y-sorting range for characters, monsters, bullets, and y-sort materials (PROJECTILE_BASE + y-coord + offset)
     FOREGROUND_MATERIAL: 10000,
+    MELEE_SLASH: 12000,     // Slash arc always above foreground materials
     SELECTION_BOX: 15000,
     HUD: 20000,
 } as const;

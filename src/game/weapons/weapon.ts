@@ -180,7 +180,7 @@ export function spawnMeleeHitbox(
         // Center pivot (0.5, 0.5) makes rotationOffset rotate the image around its center
         const sprite = scene.add.image(hx, hy, opts.texture);
         sprite.setOrigin(0.5, 0.5);
-        sprite.setDepth(9999); // Always render on top so it's clearly visible
+        sprite.setDepth(DEPTH.MELEE_SLASH);
         // Mirror via flipX when facing left — keeps scaleX always positive so rotation tween is clean
         sprite.setFlipX(isLeft);
         sprite.setScale(scale, scale);
