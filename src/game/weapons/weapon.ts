@@ -48,6 +48,7 @@ export interface BulletRecord {
     originX: number;
     originY: number;
     maxDistance: number;
+    rotationOffset?: number;
     isMelee?: boolean;
     trail: { x: number; y: number }[];
 }
@@ -63,6 +64,7 @@ export interface ProjectileSpawnOptions {
     scale?: number;
     color?: number;
     maxDistance?: number;
+    rotationOffset?: number;
 }
 
 /**
@@ -104,7 +106,8 @@ export function spawnProjectile(
         visualObj = rect;
     }
 
-    visualObj.setRotation(Math.atan2(direction.y, direction.x));
+    const rotRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
+    visualObj.setRotation(Math.atan2(direction.y, direction.x) + rotRad);
 
     return {
         body,
@@ -114,6 +117,7 @@ export function spawnProjectile(
         originX: origin.x,
         originY: origin.y,
         maxDistance: opts.maxDistance ?? 800,
+        rotationOffset: rotRad,
         trail: [],
     };
 }
@@ -127,6 +131,7 @@ export interface MeleeSpawnOptions {
     damage: number;
     texture?: string;
     scale?: number;
+    rotationOffset?: number;
 }
 
 /**
@@ -154,21 +159,32 @@ export function spawnMeleeHitbox(
 
     let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
     const scale = opts.scale ?? 0.18;
-    // Rotate texture by -90 degrees (-Math.PI/2) so the arc faces outward along the attack vector
-    const baseRotation = opts.angle - Math.PI / 2;
-    const startRotation = baseRotation - Math.PI / 6;
-    const endRotation = baseRotation + Math.PI / 6;
+    const isLeft = Math.cos(opts.angle) < 0;
+    
+    // Add Math.PI (180 degrees) so the moon crescent arc curve faces strictly OUTWARD away from the player
+    const rawRotRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
+    const rotRad = isLeft ? -rawRotRad : rawRotRad;
+    const baseRotation = opts.angle + Math.PI + rotRad;
+    const sweepArc = Math.PI / 5;
+    const startRotation = baseRotation - sweepArc;
+    const endRotation = baseRotation + sweepArc;
 
     if (opts.texture && scene.textures.exists(opts.texture)) {
-        const sprite = scene.add.image(hx, hy, opts.texture);
-        sprite.setScale(scale);
+        // Spawn slash arc at exact weapon Box blade tip (opts.origin) facing along the swing trajectory
+        const sprite = scene.add.image(opts.origin.x, opts.origin.y, opts.texture);
+        sprite.setOrigin(0.1, 0.5);
+
+        const initScaleX = isLeft ? -scale : scale;
+        const targetScaleX = isLeft ? -scale * 1.5 : scale * 1.5;
+
+        sprite.setScale(initScaleX, scale);
         sprite.setRotation(startRotation);
         sprite.setAlpha(1.0);
         scene.tweens.add({
             targets: sprite,
             rotation: endRotation,
             alpha: 0,
-            scaleX: scale * 1.5,
+            scaleX: targetScaleX,
             scaleY: scale * 1.5,
             duration: 180,
             ease: 'Quad.out',
@@ -180,7 +196,7 @@ export function spawnMeleeHitbox(
         visualObj = sprite;
     } else {
         const rect = scene.add.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, 0xc084fc, 0.7);
-        rect.setRotation(opts.angle);
+        rect.setRotation(baseRotation);
         scene.tweens.add({
             targets: rect,
             alpha: 0,

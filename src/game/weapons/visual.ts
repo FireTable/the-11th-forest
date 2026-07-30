@@ -54,7 +54,7 @@ export class WeaponVisualController {
         if (!this.sprite || !this.currentSpec) return;
 
         const orbitRadius = this.currentSpec.visual?.orbitRadius ?? 16;
-        
+
         // 1. Calculate Orbit Position around player center
         const totalDist = orbitRadius - this.recoilOffset;
         const weaponX = playerX + Math.cos(aimAngle) * totalDist;
@@ -62,8 +62,9 @@ export class WeaponVisualController {
 
         this.sprite.setPosition(weaponX, weaponY);
 
-        // 2. Aim Rotation & Swing Offset
-        const finalAngle = aimAngle + (this.swingOffsetAngle * Math.PI) / 180;
+        // 2. Aim Rotation, Spec Rotation Offset, & Swing Offset
+        const rotOffsetRad = ((this.currentSpec.visual?.rotationOffset ?? 0) * Math.PI) / 180;
+        const finalAngle = aimAngle + rotOffsetRad + (this.swingOffsetAngle * Math.PI) / 180;
         this.sprite.setRotation(finalAngle);
 
         // 3. Flip Y depending on aiming side (Left vs Right)

@@ -326,7 +326,7 @@ export class WeaponController {
 
             b.rect.setPosition(bp.x, bp.y);
             b.rect.setDepth(DEPTH.PROJECTILE_BASE + Math.round(bp.y) + 20);
-            b.rect.setRotation(Math.atan2(vel.y, vel.x));
+            b.rect.setRotation(Math.atan2(vel.y, vel.x) + (b.rotationOffset ?? 0));
             pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
         }
 
@@ -364,8 +364,11 @@ export class WeaponController {
             this.visualController.triggerSwing();
             EventBus.emit(SFX_EVENT(slot.spec.sfx?.shoot ?? 'player-shoot'));
 
+            // Get exact position of the weapon Box tip (blade tip) during swing
+            const bladeTipPos = this.visualController.getMuzzlePosition(handX, handY);
+
             const meleeBullet = spawnMeleeHitbox(this.scene, this.matter, {
-                origin: { x: handX, y: handY },
+                origin: { x: bladeTipPos.x, y: bladeTipPos.y },
                 angle,
                 range: slot.spec.range ?? 120,
                 hitWidth: slot.spec.hitWidth ?? 60,
@@ -373,6 +376,7 @@ export class WeaponController {
                 damage: slot.spec.damage,
                 texture: slot.spec.bullet?.texture,
                 scale: slot.spec.bullet?.scale ?? 0.18,
+                rotationOffset: slot.spec.bullet?.rotationOffset ?? slot.spec.visual?.rotationOffset ?? 0,
             });
 
             this.bullets.push(meleeBullet);
@@ -412,6 +416,7 @@ export class WeaponController {
                     scale: slot.spec.bullet?.scale,
                     color: slot.spec.projectile?.visual?.color,
                     maxDistance: slot.spec.range,
+                    rotationOffset: slot.spec.bullet?.rotationOffset,
                 },
             );
             this.bullets.push(bullet);

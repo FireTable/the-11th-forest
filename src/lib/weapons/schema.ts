@@ -56,6 +56,7 @@ export const WeaponVisualSchema = z
         recoilDistance: z.number().default(6),
         recoilDuration: z.number().default(80),
         swingAngle: z.number().default(120),
+        rotationOffset: z.number().default(0),
     })
     .strict();
 
@@ -67,6 +68,7 @@ export const WeaponPairedBulletSchema = z
         scale: z.number().gt(0).default(1),
         color: z.string().optional(),
         beamWidth: z.number().gt(0).optional(),
+        rotationOffset: z.number().default(0),
     })
     .strict();
 
