@@ -10,6 +10,7 @@ import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 import { AirWallsSection } from './sections/air-walls';
 import { BackgroundSection } from './sections/background';
+import { CharacterSection } from './sections/character';
 import { MaterialsSection } from './sections/materials';
 import { MonstersSection } from './sections/monsters';
 import { ScenesListSection } from './sections/scenes-list';
@@ -233,11 +234,7 @@ export function EditorPanel() {
                     {level && topTab === 'scenes' && sceneSubTab === 'materials' && (
                         <MaterialsSection level={level} setLevel={handleLevelChange} />
                     )}
-                    {topTab === 'characters' && (
-                        <div className="text-neutral-500 italic text-center py-4">
-                            Characters editor — coming next.
-                        </div>
-                    )}
+                    {topTab === 'characters' && <CharacterSection />}
                 </div>
                 <div className="border-t border-neutral-800 p-3 flex flex-col gap-1.5">
                     {error && <div className="text-red-400 text-[11px]">{error}</div>}

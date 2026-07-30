@@ -477,6 +477,177 @@ async function handleListMonsterTypes(res) {
     }
 }
 
+// ─── Character management ────────────────────────────────────────────────
+
+async function handleListCharacters(res) {
+    try {
+        const indexPath = path.join(PUBLIC_DIR, 'data/characters/index.yaml');
+        const text = await readFile(indexPath, 'utf8');
+        const idx = parseYaml(text) || {};
+        const ids = Array.isArray(idx.characters) ? idx.characters : [];
+        const chars = [];
+        for (const id of ids) {
+            try {
+                const ct = await readFile(
+                    path.join(PUBLIC_DIR, 'data/characters', `${id}.yaml`),
+                    'utf8',
+                );
+                const spec = parseYaml(ct) || {};
+                chars.push({ id, name: spec.name || id });
+            } catch {
+                chars.push({ id, name: id });
+            }
+        }
+        return sendJson(res, 200, { characters: chars });
+    } catch {
+        return sendJson(res, 200, { characters: [] });
+    }
+}
+
+async function handleGetCharacter(req, res) {
+    const { id } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    try {
+        const text = await readFile(
+            path.join(PUBLIC_DIR, 'data/characters', `${id}.yaml`),
+            'utf8',
+        );
+        return sendJson(res, 200, { id, spec: parseYaml(text) });
+    } catch {
+        return sendJson(res, 404, { error: `character not found: ${id}` });
+    }
+}
+
+async function handleSaveCharacter(req, res) {
+    const { id, spec } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    if (!spec || typeof spec !== 'object') {
+        return sendJson(res, 400, { error: 'spec required' });
+    }
+    // Server-side mirror of CharacterSpecSchema (minimal: only enforce
+    // the fields the editor exposes). Full validation happens when the
+    // game loads the yaml via the Zod schema.
+    if (typeof spec.id !== 'string' || spec.id !== id) {
+        return sendJson(res, 400, { error: 'spec.id must match the file id' });
+    }
+    const out = path.join(PUBLIC_DIR, 'data/characters', `${id}.yaml`);
+    await writeFile(out, stringifyYaml(spec, { lineWidth: -1, noRefs: true }), 'utf8');
+    return sendJson(res, 200, { ok: true });
+}
+
+async function handleCreateCharacter(req, res) {
+    const { id, name } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    const safeName = typeof name === 'string' && name.length > 0 ? name : id;
+
+    // Append to index.yaml.
+    const indexPath = path.join(PUBLIC_DIR, 'data/characters/index.yaml');
+    const idxText = await readFile(indexPath, 'utf8');
+    const idx = parseYaml(idxText) || { characters: [] };
+    if (!Array.isArray(idx.characters)) idx.characters = [];
+    if (!idx.characters.includes(id)) {
+        idx.characters.push(id);
+        await writeFile(
+            indexPath,
+            stringifyYaml(idx, { lineWidth: -1, noRefs: true }),
+            'utf8',
+        );
+    }
+
+    // Minimal template — the editor will fill in the rest.
+    const template = {
+        id,
+        name: safeName,
+        hp: 100,
+        sp: 100,
+        moveSpeed: 220,
+        spRegenMs: 1000,
+        body: { halfW: 28, halfH: 24 },
+        dodge: { spCost: 15, speed: 14, durationMs: 220, cooldownMs: 600 },
+        hotbar: ['assault-rifle'],
+    };
+    const out = path.join(PUBLIC_DIR, 'data/characters', `${id}.yaml`);
+    await writeFile(
+        out,
+        stringifyYaml(template, { lineWidth: -1, noRefs: true }),
+        'utf8',
+    );
+    return sendJson(res, 200, { ok: true, id });
+}
+
+/**
+ * Run scripts/split-sheet.ts against an uploaded sprite. Splits the
+ * chroma key, downsample + quantize, and writes the processed sheet to
+ * `public/assets/image/characters/<id>.png`. Returns the natural pixel
+ * size and detected grid for the editor to write back to the yaml.
+ *
+ * `options` (all optional, passed through to split-sheet.ts):
+ *   { downsample: 4, colors: 32, pad: 2, outline: 2, dither: false }
+ */
+async function handleUploadCharacterSprite(req, res) {
+    const { id, fileData, options = {} } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    if (typeof fileData !== 'string' || !fileData.startsWith('data:image/')) {
+        return sendJson(res, 400, { error: 'invalid fileData (expected base64 data-URL)' });
+    }
+
+    const base64 = fileData.split(',', 2)[1];
+    const buffer = Buffer.from(base64, 'base64');
+
+    // Save upload to a temp location for split-sheet.ts.
+    const tmpDir = path.resolve(__dirname, '../../tmp/editor-uploads');
+    await mkdir(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, `${id}-${Date.now()}.png`);
+    await writeFile(tmpPath, buffer);
+
+    // Build the split-sheet.ts flags. Default values match the wanderer
+    // production tuning so a fresh upload "just works".
+    const flags = [
+        '--in-place',
+        `--id=${id}`,
+        `--downsample=${options.downsample ?? 4}`,
+        `--colors=${options.colors ?? 32}`,
+        `--pad=${options.pad ?? 2}`,
+        `--outline=${options.outline ?? 2}`,
+    ];
+    if (options.dither) flags.push('--dither');
+
+    const projectRoot = path.resolve(__dirname, '../..');
+    const cmd = `pnpm tsx scripts/split-sheet.ts "${tmpPath}" "${path.join(PUBLIC_DIR, 'assets/image/characters')}" ${flags.join(' ')}`;
+
+    const { exec } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execAsync = promisify(exec);
+
+    try {
+        await execAsync(cmd, { cwd: projectRoot, timeout: 120_000 });
+    } catch (e) {
+        // Clean up temp even on failure.
+        await import('node:fs/promises').then((fs) => fs.rm(tmpPath, { force: true }));
+        return sendJson(res, 500, { error: `split-sheet failed: ${String(e?.message ?? e)}` });
+    }
+    await import('node:fs/promises').then((fs) => fs.rm(tmpPath, { force: true }));
+
+    // Read the processed PNG for natural size.
+    const outPath = path.join(PUBLIC_DIR, 'assets/image/characters', `${id}.png`);
+    const { PNG } = await import('pngjs');
+    const processed = PNG.sync.read(await readFile(outPath));
+
+    return sendJson(res, 200, {
+        ok: true,
+        path: `assets/image/characters/${id}.png`,
+        naturalSize: { width: processed.width, height: processed.height },
+    });
+}
+
 export function editorApiPlugin() {
     return {
         name: 'editor-api',
@@ -550,6 +721,46 @@ export function editorApiPlugin() {
                 if (req.method !== 'GET') return next();
                 try {
                     await handleListMonsterTypes(res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/list-characters', async (req, res, next) => {
+                if (req.method !== 'GET') return next();
+                try {
+                    await handleListCharacters(res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/get-character', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleGetCharacter(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/save-character', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleSaveCharacter(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/create-character', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleCreateCharacter(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/upload-character-sprite', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleUploadCharacterSprite(req, res);
                 } catch (e) {
                     sendJson(res, 500, { error: String(e?.message ?? e) });
                 }
