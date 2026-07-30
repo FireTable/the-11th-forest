@@ -9,7 +9,10 @@ import { getCurrentLevel } from '@/lib/levels/current-level';
 import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 import { AirWallsSection } from './sections/air-walls';
+import { BackgroundSection } from './sections/background';
 import { MaterialsSection } from './sections/materials';
+import { MonstersSection } from './sections/monsters';
+import { ScenesListSection } from './sections/scenes-list';
 import { WallCanvas } from './wall-canvas';
 
 interface ScenePayload {
@@ -17,16 +20,8 @@ interface ScenePayload {
     level: Level;
 }
 
-/**
- * Two-level tab tree.
- *
- * Top level routes between resource kinds (Scenes vs Characters).
- * Scene sub-tabs decide which part of the level is being edited —
- * only Air Walls needs the Konva overlay above the Phaser canvas,
- * Materials / Prompts are pure form UIs.
- */
 type TopTab = 'scenes' | 'characters';
-type SceneSubTab = 'materials' | 'air-walls' | 'prompts';
+type SceneSubTab = 'scenes' | 'background' | 'monsters' | 'air-walls' | 'materials';
 
 const TOP_TABS: { id: TopTab; label: string }[] = [
     { id: 'scenes', label: 'Scenes' },
@@ -34,41 +29,26 @@ const TOP_TABS: { id: TopTab; label: string }[] = [
 ];
 
 const SCENE_SUB_TABS: { id: SceneSubTab; label: string }[] = [
-    { id: 'materials', label: 'Materials' },
+    { id: 'scenes', label: 'Scenes' },
+    { id: 'background', label: 'Background' },
+    { id: 'monsters', label: 'Monsters' },
     { id: 'air-walls', label: 'Air walls' },
-    { id: 'prompts', label: 'Prompts' },
+    { id: 'materials', label: 'Materials' },
 ];
 
-
-
-/**
- * Editor panel. Lazy-loaded (see App.tsx) so react-konva and editor UI
- * ship in their own chunk.
- *
- * Reads its initial level from `getCurrentLevel()` (module-level cache
- * the scene writes to) and listens for subsequent `level-loaded` events.
- *
- * Walls are rendered + edited via <WallCanvas> (Konva overlay above the
- * Phaser canvas). This component owns only the side panel UI — kind
- * dropdown, delete, save, etc. — and exposes a `setLevel` callback to
- * the canvas for vertex drag / new wall commits.
- */
 export function EditorPanel() {
     const [open, setOpen] = useState(false);
     const [sceneId, setSceneId] = useState<string | null>(null);
     const [level, setLevel] = useState<Level | null>(null);
     const [topTab, setTopTab] = useState<TopTab>('scenes');
-    const [sceneSubTab, setSceneSubTab] = useState<SceneSubTab>('air-walls');
+    const [sceneSubTab, setSceneSubTab] = useState<SceneSubTab>('scenes');
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [drawing, setDrawing] = useState(false);
     const [overlayTarget, setOverlayTarget] = useState<HTMLElement | null>(null);
 
-    // Seed from cache (covers the lazy-mount race) and listen for live events.
     useEffect(() => {
-        // The Konva overlay must live INSIDE #game-container so it tracks
-        // the same display size as the Phaser canvas. Portal it in.
         setOverlayTarget(document.getElementById('game-container'));
     }, []);
     useEffect(() => {
@@ -134,12 +114,27 @@ export function EditorPanel() {
         }
     }
 
+    /**
+     * Called from BackgroundSection after it locally mutates the level
+     * (new PNG + imageSize). Background changes are part of the level
+     * so this delegates to the standard save handler.
+     */
+    async function handleBackgroundSave() {
+        await handleSave();
+    }
+
+    /**
+     * Called from ScenesListSection after a scene jump — keeps the
+     * panel in sync with what the Phaser scene now shows.
+     */
+    function handleSceneChange(id: string) {
+        setSceneId(id);
+        // Level payload arrives shortly via 'level-loaded' event.
+    }
+
     function toggleOpen() {
         const next = !open;
         setOpen(next);
-        // Hubs are Phaser GameObjects drawn on the canvas; React can't
-        // touch them directly. Notify the scene via EventBus so the
-        // hubs' root containers get hidden / shown alongside the panel.
         EventBus.emit('editor-open', next);
     }
 
@@ -182,13 +177,13 @@ export function EditorPanel() {
                     ))}
                 </nav>
                 {topTab === 'scenes' && (
-                    <nav className="flex border-b border-neutral-800 bg-neutral-900/60">
+                    <nav className="flex border-b border-neutral-800 bg-neutral-900/60 overflow-x-auto">
                         {SCENE_SUB_TABS.map((t) => (
                             <Button
                                 key={t.id}
                                 variant="ghost"
                                 onClick={() => setSceneSubTab(t.id)}
-                                className={`flex-1 rounded-none border-b-2 ${
+                                className={`flex-shrink-0 rounded-none border-b-2 px-3 ${
                                     sceneSubTab === t.id
                                         ? 'border-cyan-400 text-cyan-400'
                                         : 'border-transparent text-neutral-500 hover:text-neutral-300'
@@ -200,10 +195,31 @@ export function EditorPanel() {
                     </nav>
                 )}
                 <div className="flex-1 overflow-y-auto p-3">
-                    {!level && (
+                    {topTab === 'scenes' && sceneSubTab === 'scenes' && (
+                        <ScenesListSection
+                            currentSceneId={sceneId}
+                            onSceneChange={handleSceneChange}
+                        />
+                    )}
+                    {!level && topTab === 'scenes' && sceneSubTab !== 'scenes' && (
                         <div className="text-neutral-500 italic text-center py-4">
                             Waiting for scene…
                         </div>
+                    )}
+                    {level && topTab === 'scenes' && sceneSubTab === 'background' && (
+                        <BackgroundSection
+                            sceneId={sceneId!}
+                            level={level}
+                            setLevel={handleLevelChange}
+                            onAfterSave={handleBackgroundSave}
+                        />
+                    )}
+                    {level && topTab === 'scenes' && sceneSubTab === 'monsters' && (
+                        <MonstersSection
+                            sceneId={sceneId!}
+                            level={level}
+                            setLevel={handleLevelChange}
+                        />
                     )}
                     {level && topTab === 'scenes' && sceneSubTab === 'air-walls' && (
                         <AirWallsSection
@@ -217,14 +233,9 @@ export function EditorPanel() {
                     {level && topTab === 'scenes' && sceneSubTab === 'materials' && (
                         <MaterialsSection level={level} setLevel={handleLevelChange} />
                     )}
-                    {level && topTab === 'scenes' && sceneSubTab === 'prompts' && (
-                        <div className="text-neutral-500 italic text-center py-4">
-                            Prompts editor — v2
-                        </div>
-                    )}
                     {topTab === 'characters' && (
                         <div className="text-neutral-500 italic text-center py-4">
-                            Characters editor — v2
+                            Characters editor — coming next.
                         </div>
                     )}
                 </div>
@@ -239,12 +250,6 @@ export function EditorPanel() {
                     </Button>
                 </div>
             </aside>
-            {/* Konva overlay above the Phaser canvas. Portaled into
-                #game-container so it tracks the same display size as
-                the Phaser canvas.
-                Renders air-walls visually in all Scenes sub-tabs, but only
-                enables pointer events / interactions when on the 'air-walls' tab.
-                Other tabs (Materials, Prompts) pass pointer events through to Phaser. */}
             {level && overlayTarget && open && topTab === 'scenes' &&
                 createPortal(
                     <WallCanvas
@@ -260,10 +265,6 @@ export function EditorPanel() {
     );
 }
 
-// Internal helper kept here so the section can avoid reaching into Level.
-// (Re-exported pattern — small enough to inline; no test target yet.)
-// ponytail: keep kind-only mutations here to avoid duplicating the
-// list-walking pattern in AirWallsSection for the wall-row dropdown.
 export function handleWallKindChange(
     setLevel: (next: Level) => void,
     level: Level,

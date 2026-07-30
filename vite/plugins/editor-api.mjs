@@ -23,8 +23,8 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { writeFile } from 'node:fs/promises';
-import { dump as stringifyYaml } from 'js-yaml';
+import { writeFile, readFile, mkdir } from 'node:fs/promises';
+import { dump as stringifyYaml, load as parseYaml } from 'js-yaml';
 import { z } from 'zod';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -81,6 +81,15 @@ const SaveLevelSchema = z
                         type: z.string().min(1),
                         x: z.number(),
                         y: z.number(),
+                        trigger: z
+                            .object({
+                                kind: z.enum(['time', 'clear']),
+                                delayMs: z.number().gte(0).default(0),
+                                waveId: z.string().min(1).optional(),
+                            })
+                            .strict()
+                            .optional(),
+                        waveId: z.string().min(1).optional(),
                     })
                     .strict(),
             )
@@ -158,11 +167,16 @@ function serializeLevelYaml(level) {
         };
     }
     if (level.monsters !== undefined) {
-        payload.monsters = level.monsters.map((m) => ({
-            type: m.type,
-            x: m.x,
-            y: m.y,
-        }));
+        payload.monsters = level.monsters.map((m) => {
+            const out = { type: m.type, x: m.x, y: m.y };
+            if (m.waveId !== undefined) out.waveId = m.waveId;
+            if (m.trigger !== undefined) {
+                const trig = { kind: m.trigger.kind, delayMs: m.trigger.delayMs };
+                if (m.trigger.waveId !== undefined) trig.waveId = m.trigger.waveId;
+                out.trigger = trig;
+            }
+            return out;
+        });
     }
     if (level.dropSpawns !== undefined) {
         payload.dropSpawns = level.dropSpawns.map((d) => ({
@@ -306,6 +320,163 @@ async function handleDeleteMaterialItem(req, res) {
     return sendJson(res, 200, { ok: true });
 }
 
+// ─── Scene management (list / create / replace bg / save monsters) ──────
+
+/**
+ * Read every level yaml and return {id, title}. Cheap because the files
+ * are small and the dev server caches Vite's fs reads.
+ */
+async function handleListScenes(res) {
+    const indexPath = path.join(PUBLIC_DIR, 'data/levels/index.yaml');
+    const indexText = await readFile(indexPath, 'utf8');
+    const index = parseYaml(indexText);
+    const ids = Array.isArray(index?.levels) ? index.levels : [];
+    const scenes = [];
+    for (const id of ids) {
+        try {
+            const text = await readFile(
+                path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`),
+                'utf8',
+            );
+            const level = parseYaml(text) || {};
+            scenes.push({ id, title: level.title || id });
+        } catch {
+            scenes.push({ id, title: id });
+        }
+    }
+    return sendJson(res, 200, { scenes });
+}
+
+const EMPTY_LEVEL_TEMPLATE = (id, title) => `title: ${title}
+background: assets/image/scenes/${id}.png
+imageSize: 2752x1536
+airWalls: []
+monsters: []
+dropSpawns: []
+materials: []
+`;
+
+async function handleCreateScene(req, res) {
+    const { id, title } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    const safeTitle = typeof title === 'string' && title.length > 0
+        ? title.replace(/[\r\n]/g, ' ')
+        : id;
+
+    // 1. Append to index.yaml (idempotent: skip if already present).
+    const indexPath = path.join(PUBLIC_DIR, 'data/levels/index.yaml');
+    const indexText = await readFile(indexPath, 'utf8');
+    const index = parseYaml(indexText) || { levels: [] };
+    if (!Array.isArray(index.levels)) index.levels = [];
+    if (!index.levels.includes(id)) {
+        index.levels.push(id);
+        await writeFile(indexPath, stringifyYaml(index, { lineWidth: -1, noRefs: true }), 'utf8');
+    }
+
+    // 2. Write the level yaml (overwrites if present).
+    const levelPath = path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`);
+    await writeFile(levelPath, EMPTY_LEVEL_TEMPLATE(id, safeTitle), 'utf8');
+
+    return sendJson(res, 200, { ok: true, id });
+}
+
+/**
+ * Receive a base64-encoded image, write to
+ * `public/assets/image/scenes/<id>.png`, and report the natural pixel
+ * size so the caller can decide whether `level.imageSize` needs to be
+ * updated. The server does NOT auto-update the level yaml — that's the
+ * editor's job, after the user confirms the size change.
+ */
+async function handleUploadSceneImage(req, res) {
+    const { id, fileData } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    if (typeof fileData !== 'string' || !fileData.startsWith('data:image/')) {
+        return sendJson(res, 400, { error: 'invalid fileData (expected base64 data-URL)' });
+    }
+
+    const base64 = fileData.split(',', 2)[1];
+    const buffer = Buffer.from(base64, 'base64');
+    const scenesDir = path.join(PUBLIC_DIR, 'assets/image/scenes');
+    await mkdir(scenesDir, { recursive: true });
+    const outPath = path.join(scenesDir, `${id}.png`);
+    await writeFile(outPath, buffer);
+
+    // Read natural size via pngjs (already in devDeps via split-sheet.ts).
+    const { PNG } = await import('pngjs');
+    const png = PNG.sync.read(buffer);
+    const naturalSize = { width: png.width, height: png.height };
+
+    // Also report the existing level's imageSize so the caller can diff.
+    let previousSize = null;
+    try {
+        const text = await readFile(
+            path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`),
+            'utf8',
+        );
+        const level = parseYaml(text);
+        if (typeof level?.imageSize === 'string') {
+            const m = level.imageSize.match(/^(\d+)x(\d+)$/);
+            if (m) previousSize = { width: Number(m[1]), height: Number(m[2]) };
+        }
+    } catch {
+        // level may not exist yet; that's fine
+    }
+
+    return sendJson(res, 200, {
+        ok: true,
+        path: `assets/image/scenes/${id}.png`,
+        naturalSize,
+        previousSize,
+        sizeChanged:
+            !previousSize ||
+            previousSize.width !== naturalSize.width ||
+            previousSize.height !== naturalSize.height,
+    });
+}
+
+/**
+ * Replace just the `monsters:` array in a level yaml. Cheaper than the
+ * full save-level round-trip — monster waves change often during level
+ * design while the rest of the level is stable.
+ */
+async function handleSaveMonsters(req, res) {
+    const { id, monsters } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    if (!Array.isArray(monsters)) {
+        return sendJson(res, 400, { error: 'monsters must be an array' });
+    }
+
+    const levelPath = path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`);
+    const text = await readFile(levelPath, 'utf8');
+    const level = parseYaml(text) || {};
+    level.monsters = monsters;
+    await writeFile(levelPath, stringifyYaml(level, { lineWidth: -1, noRefs: true }), 'utf8');
+
+    return sendJson(res, 200, { ok: true, count: monsters.length });
+}
+
+/**
+ * List every monster id from public/data/monsters/index.yaml. The
+ * Monsters sub-tab uses this to populate its type dropdown.
+ */
+async function handleListMonsterTypes(res) {
+    try {
+        const indexPath = path.join(PUBLIC_DIR, 'data/monsters/index.yaml');
+        const text = await readFile(indexPath, 'utf8');
+        const idx = parseYaml(text) || {};
+        const types = Array.isArray(idx.monsters) ? idx.monsters : [];
+        return sendJson(res, 200, { types });
+    } catch {
+        return sendJson(res, 200, { types: [] });
+    }
+}
+
 export function editorApiPlugin() {
     return {
         name: 'editor-api',
@@ -339,6 +510,46 @@ export function editorApiPlugin() {
                 if (req.method !== 'POST') return next();
                 try {
                     await handleDeleteMaterialItem(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/list-scenes', async (req, res, next) => {
+                if (req.method !== 'GET') return next();
+                try {
+                    await handleListScenes(res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/create-scene', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleCreateScene(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/upload-scene-image', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleUploadSceneImage(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/save-monsters', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleSaveMonsters(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/list-monster-types', async (req, res, next) => {
+                if (req.method !== 'GET') return next();
+                try {
+                    await handleListMonsterTypes(res);
                 } catch (e) {
                     sendJson(res, 500, { error: String(e?.message ?? e) });
                 }

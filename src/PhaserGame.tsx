@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef } from 'react';
 import StartGame from '@/game/main';
 import { EventBus } from '@/lib/events/bus';
+import { setPhaserGame } from '@/lib/phaser-game';
 
 export interface IRefPhaserGame
 {
@@ -53,6 +54,9 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
         startGameOnce("game-container").then((g) => {
             if (!mounted) return; // StrictMode second mount already won
             game.current = g;
+            // Publish for the editor's in-process restart path
+            // (src/lib/phaser-game.ts). Runs once after StartGame resolves.
+            setPhaserGame(g);
             if (typeof ref === 'function')
             {
                 ref({ game: g, scene: null });

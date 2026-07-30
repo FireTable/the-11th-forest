@@ -34,3 +34,5 @@ dist-ssr
 
 # Claude working notes (plans, scratch)
 .claude
+# Public backup (created before editor changes for safe rollback)
+public-bk/
