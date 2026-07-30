@@ -10,5 +10,5 @@ projectile:
     height: 4
     color: 0xef4444
 sfx:
-  shoot: monster-shoot
+  shoot: gunner-shoot
   bulletWall: bullet-wall

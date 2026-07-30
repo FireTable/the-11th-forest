@@ -1,0 +1,5 @@
+kind: sfx
+id: pistol-shoot
+name: pistol-shoot
+source: assets/audio/sfx/pistol-shoot.wav
+volume: 0.5

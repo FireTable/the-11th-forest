@@ -6,13 +6,23 @@
 # import the audio module; they just EventBus.emit().
 
 sfx:
+  # Per-weapon shoot sounds — each weapon has its own unique fire SFX.
+  - pistol-shoot
+  - smg-shoot
+  - assault-rifle-shoot
+  - shotgun-shoot
+  - laser-cannon-shoot
+  - rocket-launcher-shoot
+  - arcana-staff-shoot
+  - plasma-sword-shoot
+  - gunner-shoot
+  # Common / generic
   - pickup-hp
   - pickup-sp
   - pickup-ammo
   - pickup-overcharge
   - pickup-weapon
   - pickup-generic
-  - player-shoot
   - dry-fire
   - bullet-wall
   - reload-start
@@ -20,7 +30,6 @@ sfx:
   - weapon-switch
   - monster-hit
   - monster-death
-  - monster-shoot
   - monster-aggro
   - player-hit
   - player-hurt

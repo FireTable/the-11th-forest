@@ -1,0 +1,5 @@
+kind: sfx
+id: laser-cannon-shoot
+name: laser-cannon-shoot
+source: assets/audio/sfx/laser-cannon-shoot.wav
+volume: 0.5

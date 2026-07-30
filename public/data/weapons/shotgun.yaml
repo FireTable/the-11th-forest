@@ -27,7 +27,7 @@ projectile:
         height: 4
         color: 0xA64B39
 sfx:
-    shoot: player-shoot
+    shoot: shotgun-shoot
     dryFire: dry-fire
     bulletWall: bullet-wall
     reloadStart: reload-start

@@ -13,7 +13,7 @@ projectile:
     height: 4
     color: 0x22c55e
 sfx:
-  shoot: player-shoot
+  shoot: smg-shoot
   dryFire: dry-fire
   bulletWall: bullet-wall
   reloadStart: reload-start

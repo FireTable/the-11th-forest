@@ -1,0 +1,5 @@
+kind: sfx
+id: rocket-launcher-shoot
+name: rocket-launcher-shoot
+source: assets/audio/sfx/rocket-launcher-shoot.wav
+volume: 0.5

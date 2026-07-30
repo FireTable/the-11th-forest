@@ -1,0 +1,5 @@
+kind: sfx
+id: shotgun-shoot
+name: shotgun-shoot
+source: assets/audio/sfx/shotgun-shoot.wav
+volume: 0.5

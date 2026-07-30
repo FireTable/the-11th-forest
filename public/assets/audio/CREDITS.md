@@ -1,53 +1,49 @@
 # Audio Credits
 
-## SFX — OpenGameArt "60 Sci-Fi SFX" pack
+## SFX — Mixkit Free Sound Effects
 
-- **Source:** <https://opengameart.org/content/60-cc0-sci-fi-sfx>
-- **Author:** rubberduck
-- **License:** CC0 1.0 Universal (Public Domain Dedication)
-- **Original format:** OGG Vorbis, 22 sfx with 2-3 variations each (60 total)
-- **Files:** `sfx_NNa.ogg` from the pack — selected by spectrogram + duration match to the SFX ids this game uses
+- **Source:** <https://mixkit.co/free-sound-effects/>
+- **License:** Mixkit Stock Audio Free License — royalty-free, no attribution required, commercial & personal use OK
+- **Original format:** MP3 preview; converted to mono WAV at 44.1 kHz 16-bit via ffmpeg
+- **Author / asset:** <https://mixkit.co/>
 
-The selected files were converted to mono WAV at 44.1 kHz via ffmpeg. The original ogg archive is preserved at the OpenGameArt URL; this directory contains only the in-use subset.
+### SFX → Mixkit source mapping
 
-## SFX — OpenGameArt "8-Bit Sound Effects Library"
-
-- **Source:** <https://opengameart.org/content/8-bit-sound-effects-library>
-- **Author:** Little Robot Sound Factory (<https://www.littlerobotsoundfactory.com>)
-- **License:** CC-BY 3.0 (attribution required — keep this section in CREDITS)
-- **Original format:** WAV 16-bit mono 44.1 kHz (no conversion needed)
-- **Files:** 40 SFX across categories — Shoot, Hit, Pickup, Collect_Point, Menu_Navigate
-
-### SFX → source pack mapping
-
-| This game's SFX id | Source pack |
+| This game's SFX id | Mixkit page |
 | ------------------ | ----------- |
-| **player-shoot** | 8-Bit: `Shoot_00.wav` |
-| **monster-shoot** | 8-Bit: `Shoot_02.wav` |
-| **monster-hit** | 8-Bit: `Hit_02.wav` |
-| **player-hit** | 8-Bit: `Hit_00.wav` |
-| **bullet-wall** | 8-Bit: `Hit_01.wav` |
-| **pickup-generic** | 8-Bit: `Pickup_00.wav` |
-| **pickup-hp** | 8-Bit: `Collect_Point_00.wav` |
-| **pickup-sp** | 8-Bit: `Collect_Point_01.wav` |
-| **pickup-ammo** | 8-Bit: `Collect_Point_02.wav` |
-| **pickup-overcharge** | 8-Bit: `Pickup_03.wav` |
-| **pickup-weapon** | 8-Bit: `Pickup_02.wav` |
-| **weapon-switch** | 8-Bit: `Menu_Navigate_02.wav` |
-| dry-fire | OGA 60: `sfx_17a` |
-| reload-start | OGA 60: `sfx_09a` |
-| reload-finish | OGA 60: `sfx_09b` |
-| monster-death | OGA 60: `sfx_04a` |
-| monster-aggro | OGA 60: `sfx_11a` (truncated to 1.0s) |
-| player-hurt | OGA 60: `sfx_04b` |
-| dodge | OGA 60: `sfx_22a` |
-| footstep | OGA 60: `sfx_09a` |
-| low-hp-heartbeat | OGA 60: `sfx_13a` |
+| **pistol-shoot** | [Short laser gun shot](https://mixkit.co/free-sound-effects/discover/short-laser-gun-shot/) |
+| **smg-shoot** | [Laser game whip](https://mixkit.co/free-sound-effects/discover/laser-game-whip/) |
+| **assault-rifle-shoot** | [Laser weapon shot](https://mixkit.co/free-sound-effects/discover/laser-weapon-shot/) |
+| **shotgun-shoot** | [Cinematic laser gun thunder](https://mixkit.co/free-sound-effects/discover/cinematic-laser-gun-thunder/) |
+| **laser-cannon-shoot** | [Laser cannon shot](https://mixkit.co/free-sound-effects/discover/laser-cannon-shot/) |
+| **rocket-launcher-shoot** | [Laser gun impact destruction](https://mixkit.co/free-sound-effects/discover/laser-gun-impact-destruction/) |
+| **arcana-staff-shoot** | [Magic sparkle touch](https://mixkit.co/free-sound-effects/sparkle/) |
+| **plasma-sword-shoot** | [Cinematic laser swoosh](https://mixkit.co/free-sound-effects/discover/cinematic-laser-swoosh/) |
+| **gunner-shoot** | [Sci-fi laser in space sound](https://mixkit.co/free-sound-effects/discover/sci-fi-laser-in-space-sound/) |
+| **pickup-hp** | [Crystal chime](https://mixkit.co/free-sound-effects/discover/crystal-chime/) |
+| **pickup-sp** | [Relaxing bell chime](https://mixkit.co/free-sound-effects/discover/relaxing-bell-chime/) |
+| **pickup-ammo** | [Positive notification](https://mixkit.co/free-sound-effects/discover/positive-notification/) |
+| **pickup-overcharge** | [Winning a coin, video game](https://mixkit.co/free-sound-effects/discover/winning-a-coin-video-game/) |
+| **pickup-weapon** | [Achievement completed](https://mixkit.co/free-sound-effects/discover/achievement-completed/) |
+| **pickup-generic** | [Magical coin win](https://mixkit.co/free-sound-effects/discover/magical-coin-win/) |
+| **bullet-wall** | [Impact of a blow](https://mixkit.co/free-sound-effects/impact/) |
+| **dry-fire** | [Game click](https://mixkit.co/free-sound-effects/click/) |
+| **reload-start** | [Software interface start](https://mixkit.co/free-sound-effects/discover/software-interface-start/) |
+| **reload-finish** | [Happy bells notification](https://mixkit.co/free-sound-effects/discover/happy-bells-notification/) |
+| **weapon-switch** | [Software interface back](https://mixkit.co/free-sound-effects/discover/software-interface-back/) |
+| **monster-hit** | [Fast impact blow](https://mixkit.co/free-sound-effects/discover/fast-impact-blow/) |
+| **player-hit** | [Glass hitting a metal](https://mixkit.co/free-sound-effects/impact/) |
+| **player-hurt** | [Deep heartbeat impact](https://mixkit.co/free-sound-effects/impact/) |
+| **monster-death** | [Epic movie impact](https://mixkit.co/free-sound-effects/impact/) |
+| **monster-aggro** | [Golem stomp](https://mixkit.co/free-sound-effects/impact/) |
+| **dodge** | [Air woosh](https://mixkit.co/free-sound-effects/whoosh/) |
+| **footstep** | [Footsteps in the forest](https://mixkit.co/free-sound-effects/footstep/) |
+| **low-hp-heartbeat** | [Slow heartbeat](https://mixkit.co/free-sound-effects/heartbeat/) |
 
 ## Music — MiniMax music-2.6
 
 - **Tool:** `mmx music generate` (local MiniMax CLI)
 - **License:** Generated by this project's tooling; ownership of the project's assets.
-- **Tracks:** `forest-ambient.mp3` (1.7 MB, 110s) + `boss-arena.mp3` (2.6 MB, 161s), both instrumental at 128 kbps / 44.1 kHz / stereo.
+- **Tracks:** `forest-ambient.mp3` + `boss-arena.mp3`, both instrumental.
 
 The `prompt` field on each music YAML is the exact prompt used; re-run `mmx music generate --prompt "..."` to regenerate.
