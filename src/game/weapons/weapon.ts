@@ -219,7 +219,6 @@ export function spawnMeleeHitbox(
         originX: opts.origin.x,
         originY: opts.origin.y,
         maxDistance: opts.range,
-        rotationOffset: rotRad,
         isMelee: true,
         trail: [],
     };

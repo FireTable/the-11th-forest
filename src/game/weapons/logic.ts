@@ -326,14 +326,8 @@ export class WeaponController {
 
             b.rect.setPosition(bp.x, bp.y);
             b.rect.setDepth(DEPTH.PROJECTILE_BASE + Math.round(bp.y) + 20);
-            // Melee bullets (sensors, no velocity) keep the rotation set at
-            // spawn time — the per-frame update would otherwise overwrite
-            // it with setRotation(0) since atan2(0, 0) = 0 and rotationOffset
-            // is only meaningful when there's a velocity direction to add to.
-            if (!b.isMelee) {
-                b.rect.setRotation(Math.atan2(vel.y, vel.x) + (b.rotationOffset ?? 0));
-                pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
-            }
+            b.rect.setRotation(Math.atan2(vel.y, vel.x) + (b.rotationOffset ?? 0));
+            pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
         }
 
         // 6. Head indicator is drawn by StatusHud — character.ts wires it
