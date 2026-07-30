@@ -3,4 +3,4 @@ id: player-hit
 name: Player Hit
 source: assets/audio/sfx/player-hit.wav
 volume: 0.5
-prompt: Short hiss, projectile grazing player
+prompt: Soft player damage thud, anime style, brief but clear impact, no harsh screech

@@ -2,5 +2,5 @@ kind: sfx
 id: reload-start
 name: Reload Start
 source: assets/audio/sfx/reload-start.wav
-volume: 0.5
-prompt: Magazine click, reload start
+volume: 0.7
+prompt: Quick magazine sliding out of pistol, anime action, mechanical click and slide

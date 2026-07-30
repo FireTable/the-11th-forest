@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { clampToBounds, dodgeIntent, moveIntent } from '@/game/characters/logic';
+import { clampToBounds, dodgeIntent, moveIntent, resolveHurtSfx } from '@/game/characters/logic';
 
 describe('characters/logic — moveIntent', () => {
     it('returns zero when no key pressed', () => {
@@ -103,5 +103,31 @@ describe('characters/logic — clampToBounds', () => {
     it('preserves coords on the in-bounds axis', () => {
         const r = clampToBounds({ x: -50, y: 500 }, 16, 24, 1000, 1000);
         expect(r).toEqual({ x: 16, y: 500 });
+    });
+});
+describe('characters/logic — resolveHurtSfx', () => {
+    it('returns female variant when gender=female and hurtFemale set', () => {
+        expect(resolveHurtSfx({ gender: 'female', sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' } })).toBe('f');
+    });
+
+    it('returns male variant when gender=male and hurtMale set', () => {
+        expect(resolveHurtSfx({ gender: 'male', sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' } })).toBe('m');
+    });
+
+    it('falls back to hurt when gender set but per-gender field missing', () => {
+        expect(resolveHurtSfx({ gender: 'female', sfx: { hurt: 'n' } })).toBe('n');
+        expect(resolveHurtSfx({ gender: 'male', sfx: { hurt: 'n' } })).toBe('n');
+    });
+
+    it('returns null when no sfx block configured', () => {
+        expect(resolveHurtSfx({ gender: 'female' })).toBeNull();
+    });
+
+    it('returns null when sfx block empty', () => {
+        expect(resolveHurtSfx({ gender: 'female', sfx: {} })).toBeNull();
+    });
+
+    it('returns hurt when no gender set (gender-neutral fallback)', () => {
+        expect(resolveHurtSfx({ sfx: { hurt: 'n' } })).toBe('n');
     });
 });

@@ -30,7 +30,8 @@ sfx:
   - monster-death
   - monster-aggro
   - player-hit
-  - player-hurt
+  - player-hurt-female
+  - player-hurt-male
   - dodge
   - footstep
   - low-hp-heartbeat

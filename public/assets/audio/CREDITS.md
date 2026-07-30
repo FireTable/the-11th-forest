@@ -1,44 +1,32 @@
 # Audio Credits
 
-## SFX — Mixkit Free Sound Effects
+## SFX — Mixkit Free Sound Effects (kept after 2026-07-31 A/B)
 
 - **Source:** <https://mixkit.co/free-sound-effects/>
 - **License:** Mixkit Stock Audio Free License — royalty-free, no attribution required, commercial & personal use OK
 - **Original format:** MP3 preview; converted to mono WAV at 44.1 kHz 16-bit via ffmpeg
-- **Author / asset:** <https://mixkit.co/>
 
-### SFX → Mixkit source mapping
+### SFX → Mixkit source mapping (currently shipped)
 
 | This game's SFX id | Mixkit page |
 | ------------------ | ----------- |
-| **pistol-shoot** | [Short laser gun shot](https://mixkit.co/free-sound-effects/discover/short-laser-gun-shot/) |
-| **smg-shoot** | [Laser game whip](https://mixkit.co/free-sound-effects/discover/laser-game-whip/) |
 | **assault-rifle-shoot** | [Laser weapon shot](https://mixkit.co/free-sound-effects/discover/laser-weapon-shot/) |
-| **shotgun-shoot** | [Cinematic laser gun thunder](https://mixkit.co/free-sound-effects/discover/cinematic-laser-gun-thunder/) |
 | **laser-cannon-shoot** | [Laser cannon shot](https://mixkit.co/free-sound-effects/discover/laser-cannon-shot/) |
-| **rocket-launcher-shoot** | [Laser gun impact destruction](https://mixkit.co/free-sound-effects/discover/laser-gun-impact-destruction/) |
 | **arcana-staff-shoot** | [Magic sparkle touch](https://mixkit.co/free-sound-effects/sparkle/) |
 | **plasma-sword-shoot** | [Cinematic laser swoosh](https://mixkit.co/free-sound-effects/discover/cinematic-laser-swoosh/) |
-| **gunner-shoot** | [Sci-fi laser in space sound](https://mixkit.co/free-sound-effects/discover/sci-fi-laser-in-space-sound/) |
-| **pickup-hp** | [Crystal chime](https://mixkit.co/free-sound-effects/discover/crystal-chime/) |
 | **pickup-sp** | [Relaxing bell chime](https://mixkit.co/free-sound-effects/discover/relaxing-bell-chime/) |
-| **pickup-ammo** | [Positive notification](https://mixkit.co/free-sound-effects/discover/positive-notification/) |
-| **pickup-overcharge** | [Winning a coin, video game](https://mixkit.co/free-sound-effects/discover/winning-a-coin-video-game/) |
 | **pickup-weapon** | [Achievement completed](https://mixkit.co/free-sound-effects/discover/achievement-completed/) |
-| **pickup-generic** | [Magical coin win](https://mixkit.co/free-sound-effects/discover/magical-coin-win/) |
-| **bullet-wall** | [Impact of a blow](https://mixkit.co/free-sound-effects/impact/) |
-| **dry-fire** | [Game click](https://mixkit.co/free-sound-effects/click/) |
-| **reload-start** | [Software interface start](https://mixkit.co/free-sound-effects/discover/software-interface-start/) |
-| **reload-finish** | [Happy bells notification](https://mixkit.co/free-sound-effects/discover/happy-bells-notification/) |
-| **weapon-switch** | [Software interface back](https://mixkit.co/free-sound-effects/discover/software-interface-back/) |
-| **monster-hit** | [Fast impact blow](https://mixkit.co/free-sound-effects/discover/fast-impact-blow/) |
-| **player-hit** | [Glass hitting a metal](https://mixkit.co/free-sound-effects/impact/) |
-| **player-hurt** | [Deep heartbeat impact](https://mixkit.co/free-sound-effects/impact/) |
-| **monster-death** | [Epic movie impact](https://mixkit.co/free-sound-effects/impact/) |
-| **monster-aggro** | [Golem stomp](https://mixkit.co/free-sound-effects/impact/) |
 | **dodge** | [Air woosh](https://mixkit.co/free-sound-effects/whoosh/) |
-| **footstep** | [Footsteps in the forest](https://mixkit.co/free-sound-effects/footstep/) |
-| **low-hp-heartbeat** | [Slow heartbeat](https://mixkit.co/free-sound-effects/heartbeat/) |
+
+## SFX — ElevenLabs Sound Effects (AI-generated, 2026-07-31)
+
+- **Source:** [ElevenLabs Sound Effects API](https://elevenlabs.io/sound-effects) — `eleven_text_to_sound_v2`
+- **License:** Generated under the **free tier** — **non-commercial use only**. Upgrade to ElevenLabs Starter ($5/mo) before any public release, or regenerate the tracks commercially.
+- **Workflow:** `pnpm tsx scripts/elevenlabs-sfx.ts` — reads `public/data/audios/index.yaml` for the sfx id list, then reads each `public/data/audios/sfx/<id>.yaml` `prompt:` field as the AI prompt (single source of truth, no duplication). Output goes to `.playground/sfx/elevenlabs/<id>.mp3`. Each clip is 0.5–1.8 s, mono WAV at 44.1 kHz 16-bit (converted from MP3 via ffmpeg) once copied into `public/assets/audio/sfx/`.
+- **Aesthetic:** Anime / iyashikei ("二次元 + 治愈") — every prompt includes "anime style", "soft", "magical sparkle" etc. to avoid harsh electronic textures.
+- **Per-gender hurt voices:** `player-hurt-female` (soft anime-girl wince) and `player-hurt-male` (low male grunt) — picked at runtime via `CharacterSpec.gender` + `sfx.hurtFemale` / `sfx.hurtMale` (see `src/lib/characters/schema.ts` + `src/game/characters/logic.ts:resolveHurtSfx`).
+
+To regenerate a single sound, edit the `prompt:` in its YAML and delete the matching `.playground/sfx/elevenlabs/<id>.mp3`, then re-run the script. To regenerate everything, delete the `.playground/sfx/elevenlabs/` folder.
 
 ## Music — MiniMax music-2.6
 

@@ -100,7 +100,7 @@ moveSpeed: 4
 spRegenMs: 5000
 sfx:
     dodge: dodge
-    hurt: player-hurt
+    hurtFemale: player-hurt-female
     footstep: footstep
     footstepThrottleMs: 200
     lowHpHeartbeat: low-hp-heartbeat

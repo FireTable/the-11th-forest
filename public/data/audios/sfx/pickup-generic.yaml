@@ -3,4 +3,4 @@ id: pickup-generic
 name: Pickup Generic
 source: assets/audio/sfx/pickup-generic.wav
 volume: 0.7
-prompt: Short neutral blip, default pickup
+prompt: Generic soft pickup chime, gentle anime sparkle, single short bright note

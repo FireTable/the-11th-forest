@@ -1,0 +1,6 @@
+kind: sfx
+id: player-hurt-male
+name: Player Hurt (Male)
+source: assets/audio/sfx/player-hurt-male.wav
+volume: 0.6
+prompt: Short low male anime hurt grunt, brief sharp exhale with low vocal weight, no scream, single short impact wince

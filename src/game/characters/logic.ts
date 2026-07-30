@@ -99,6 +99,32 @@ export function dodgeIntent(
     };
 }
 
+/**
+ * Pick the SFX id for a "player got hit" event. Pure helper so tests
+ * can verify the gender routing without booting a Phaser scene.
+ *
+ * Lookup order:
+ *   1. gender === 'female'  →  sfx.hurtFemale
+ *   2. gender === 'male'    →  sfx.hurtMale
+ *   3. fallback             →  sfx.hurt (legacy / gender-neutral)
+ *
+ * Returns null when nothing is configured (caller skips the SFX emit).
+ */
+export function resolveHurtSfx(spec: {
+    gender?: 'male' | 'female';
+    sfx?: {
+        hurt?: string;
+        hurtMale?: string;
+        hurtFemale?: string;
+    };
+}): string | null {
+    const sfx = spec.sfx;
+    if (!sfx) return null;
+    if (spec.gender === 'female') return sfx.hurtFemale ?? sfx.hurt ?? null;
+    if (spec.gender === 'male') return sfx.hurtMale ?? sfx.hurt ?? null;
+    return sfx.hurt ?? null;
+}
+
 /** Clamp `pos` to the world rectangle. Returns null when already inside. */
 export function clampToBounds(
     pos: { x: number; y: number },
@@ -251,7 +277,7 @@ export class CharacterController {
                 this.parts.statusHud.showFloatingNumber(actualDelta, actualDelta > 0 ? 'heal' : 'damage');
             }
             if (hpDelta < 0) {
-                const sfx = this.spec.sfx?.hurt;
+                const sfx = resolveHurtSfx(this.spec);
                 if (sfx) EventBus.emit(SFX_EVENT(sfx));
             }
         }

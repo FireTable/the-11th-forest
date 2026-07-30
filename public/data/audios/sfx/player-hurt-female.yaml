@@ -1,0 +1,6 @@
+kind: sfx
+id: player-hurt-female
+name: Player Hurt (Female)
+source: assets/audio/sfx/player-hurt-female.wav
+volume: 0.6
+prompt: Very soft anime girl sigh of pain, single quiet vocal exhale like a small "hah", gentle breathy and brief, no impact no beep no alarm no synth

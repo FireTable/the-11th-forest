@@ -3,4 +3,4 @@ id: low-hp-heartbeat
 name: Low HP Heartbeat
 source: assets/audio/sfx/low-hp-heartbeat.wav
 volume: 0.5
-prompt: Heartbeat throbs, low health warning
+prompt: Slow low HP heartbeat pulse, anime tension, soft deep thump, single beat

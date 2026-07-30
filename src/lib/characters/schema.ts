@@ -83,6 +83,12 @@ export const CharacterSfxSchema = z
     .object({
         dodge: z.string().min(1).optional(),
         hurt: z.string().min(1).optional(),
+        /** SFX id for the male variant of `hurt`. Picked when
+         *  CharacterSpec.gender === 'male' and this field is set. */
+        hurtMale: z.string().min(1).optional(),
+        /** SFX id for the female variant of `hurt`. Picked when
+         *  CharacterSpec.gender === 'female' and this field is set. */
+        hurtFemale: z.string().min(1).optional(),
         footstep: z.string().min(1).optional(),
         footstepThrottleMs: z.number().gt(0).optional(),
         lowHpHeartbeat: z.string().min(1).optional(),
@@ -107,6 +113,10 @@ export const CharacterSpecSchema = z
         sp: z.number().gte(0),
         moveSpeed: z.number().gt(0),
         spRegenMs: z.number().gt(0),
+        /** Voice identity for the `hurt` SFX. When set, CharacterController
+         *  picks `sfx.hurtFemale` / `sfx.hurtMale`; otherwise falls back to
+         *  the gender-neutral `sfx.hurt`. */
+        gender: z.enum(['male', 'female']).optional(),
         body: BodySchema,
         dodge: DodgeSchema,
         hotbar: z.array(z.string().min(1)).min(1),
