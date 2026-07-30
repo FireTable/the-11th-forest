@@ -225,3 +225,38 @@ export const AIM_ASSIST = {
     /** Max distance radius in world px to maintain sticky tether lock on an active monster. */
     STICKY_TETHER_RADIUS: 280,
 } as const;
+
+// ─── Drops: Parabolic Arc & Magnet Absorption Constants ─────────────────
+export const DROP_CONFIG = {
+    /** Whether to play sprite animations (false = display static frame 0). */
+    ENABLE_ANIMATION: false,
+
+    /** Parabolic arc jump configuration for dropped items */
+    PARABOLA: {
+        /** Arc animation duration in ms */
+        DURATION: 450,
+        /** Minimum random offset horizontal jump distance (px) */
+        POP_RADIUS_MIN: 24,
+        /** Maximum random offset horizontal jump distance (px) */
+        POP_RADIUS_MAX: 48,
+        /** Arc height peak offset (px) */
+        ARC_HEIGHT: 32,
+        /** Parabola trajectory line stroke color (gray) */
+        LINE_COLOR: 0x9ca3af,
+        /** Parabola trajectory line alpha */
+        LINE_ALPHA: 0.4,
+        /** Parabola trajectory line width (px) */
+        LINE_WIDTH: 1.5,
+    },
+
+    /** Magnet attraction configuration when character gets near drops */
+    MAGNET: {
+        /** Attraction sensing radius around character (px) */
+        RADIUS: 120,
+        /** Lerp speed factor for flying towards character (0 ~ 1) */
+        FLY_SPEED: 0.18,
+        /** Minimum distance to trigger actual pickup (px) */
+        PICKUP_DISTANCE: 16,
+    },
+} as const;
+

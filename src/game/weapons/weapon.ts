@@ -134,6 +134,7 @@ export interface MeleeSpawnOptions {
     texture?: string;
     scale?: number;
     rotationOffset?: number;
+    feetY?: number;
 }
 
 /**
@@ -171,7 +172,10 @@ export function spawnMeleeHitbox(
         // Spawn full circle / melee graphic centered directly at character left/right
         const sprite = scene.add.image(hx, hy, opts.texture);
         sprite.setOrigin(0.5, 0.5);
-        sprite.setDepth(DEPTH.MELEE_SLASH);
+        // Dynamic depth: Calculate character feetY + 5 so it rests BETWEEN character sprite (feetY) and handheld weapon (feetY + 10)
+        const feetY = opts.feetY ?? (opts.origin.y + 32);
+        const effectDepth = Math.round(feetY) + 5;
+        sprite.setDepth(effectDepth);
         sprite.setFlipX(isLeft);
         sprite.setScale(scale, scale);
         sprite.setRotation(visualRotation);
@@ -192,6 +196,9 @@ export function spawnMeleeHitbox(
         visualObj = sprite;
     } else {
         const rect = scene.add.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, 0xc084fc, 0.7);
+        const feetY = opts.feetY ?? (opts.origin.y + 32);
+        const effectDepth = Math.round(feetY) + 5;
+        rect.setDepth(effectDepth);
         scene.tweens.add({
             targets: rect,
             alpha: 0,
@@ -203,8 +210,6 @@ export function spawnMeleeHitbox(
         });
         visualObj = rect;
     }
-
-    visualObj.setDepth(DEPTH.PROJECTILE_BASE + Math.round(hy) + 50);
 
     return {
         body,

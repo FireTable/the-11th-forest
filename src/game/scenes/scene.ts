@@ -283,10 +283,11 @@ export class LoadScene extends Scene {
             this.level.imageSize.height / 2,
         );
 
-        // Per-frame monster tick & material Y-sorting.
+        // Per-frame monster tick & material Y-sorting & drop update.
         this.materialManager = new MaterialManager(this, this.level);
         this.events.on('update', () => {
             this.monsterSystem.update(this.time.now);
+            this.dropSystem.update();
             this.materialManager.update();
         });
 

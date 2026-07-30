@@ -388,6 +388,7 @@ export class WeaponController {
                 texture: slot.spec.bullet?.texture,
                 scale: slot.spec.bullet?.scale ?? 0.18,
                 rotationOffset: meleeRotationOffset,
+                feetY: origin.y + this.lastHalfH,
             });
 
             this.bullets.push(meleeBullet);
