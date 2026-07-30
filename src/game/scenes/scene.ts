@@ -20,7 +20,8 @@ async function getMonsterSpriteCellDims(
     spec: MonsterSpec,
 ): Promise<{ width: number; height: number }> {
     const sprite = spec.sprite;
-    if (!sprite?.grid) return { width: 0, height: 0 };
+    const grid = sprite?.grid;
+    if (!sprite || !grid) return { width: 0, height: 0 };
     const url = sprite.texture.startsWith('/')
         ? sprite.texture
         : `/${sprite.texture}`;
@@ -34,8 +35,8 @@ async function getMonsterSpriteCellDims(
         },
     );
     return {
-        width: Math.floor(natural.width / sprite.grid.cols),
-        height: Math.floor(natural.height / sprite.grid.rows),
+        width: Math.floor(natural.width / grid.cols),
+        height: Math.floor(natural.height / grid.rows),
     };
 }
 import { PathfindingService } from '@/game/monsters/logic';
