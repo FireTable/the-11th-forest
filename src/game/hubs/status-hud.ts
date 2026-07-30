@@ -83,9 +83,17 @@ export class StatusHud extends BaseHud {
             .text(0, -2, '', {
                 fontFamily: 'monospace',
                 fontSize: '10px',
-                color: '#e2e8f0',
-                stroke: '#0f172a',
-                strokeThickness: 2,
+                color: '#ffffff',
+                stroke: '#000000',
+                strokeThickness: 4,
+                shadow: {
+                    offsetX: 1,
+                    offsetY: 1,
+                    color: '#000000',
+                    blur: 0,
+                    stroke: true,
+                    fill: true,
+                },
             })
             .setOrigin(0.5, 1);
         this.root.add(this.nameLabel);
@@ -95,6 +103,8 @@ export class StatusHud extends BaseHud {
                 fontFamily: 'monospace',
                 fontSize: HUD_FONT_LABEL,
                 color: HUD_STATUS_LABEL_COLOR,
+                stroke: '#000000',
+                strokeThickness: 3,
             })
             .setOrigin(0.5, 1);
         this.root.add(this.label);
@@ -117,8 +127,16 @@ export class StatusHud extends BaseHud {
                 fontSize: isHeal ? '12px' : '14px',
                 color: colorStr,
                 fontStyle: 'bold',
-                stroke: '#0f172a',
-                strokeThickness: 3,
+                stroke: '#000000',
+                strokeThickness: 4,
+                shadow: {
+                    offsetX: 1,
+                    offsetY: 1,
+                    color: '#000000',
+                    blur: 0,
+                    stroke: true,
+                    fill: true,
+                },
             })
             .setOrigin(0, 0.5);
 

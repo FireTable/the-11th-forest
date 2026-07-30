@@ -1,4 +1,4 @@
-import { Scene } from 'phaser';
+import * as Phaser from 'phaser';
 
 import {
     createCharacterAnims,
@@ -40,7 +40,7 @@ async function getMonsterSpriteCellDims(
     };
 }
 import { PathfindingService } from '@/game/monsters/logic';
-import { MUSIC_EVENT } from '@/lib/constants';
+import { DEPTH, MUSIC_EVENT, PIXEL_LIGHTING_CONFIG } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
 import type { MusicSpec, SfxSpec, SoundSpec } from '@/lib/audios';
@@ -90,7 +90,7 @@ export interface SceneAssets {
  */
 import { loadWeaponAssets } from '@/game/weapons/weapon';
 
-export class LoadScene extends Scene {
+export class LoadScene extends Phaser.Scene {
     private character!: CharacterRuntime;
     private monsterSystem!: MonsterController;
     private dropSystem!: DropController;
@@ -140,7 +140,12 @@ export class LoadScene extends Scene {
     create(): void {
         // World size === image size, so the background displays at native
         // dimensions and air-wall coords align 1:1 with image pixel space.
-        this.add.image(0, 0, 'background').setOrigin(0, 0);
+        const bg = this.add.image(0, 0, 'background').setOrigin(0, 0);
+        const isPixelLightingEnabled =
+            this.level.pixelLighting ?? PIXEL_LIGHTING_CONFIG.ENABLE;
+        if (isPixelLightingEnabled) {
+            bg.setTint(PIXEL_LIGHTING_CONFIG.BACKGROUND_TINT);
+        }
 
         // Lock the physics world to the level image bounds so the
         // character can't run off-screen. thickness=200 is generous so
@@ -285,6 +290,63 @@ export class LoadScene extends Scene {
 
         // Per-frame monster tick & material Y-sorting & drop update.
         this.materialManager = new MaterialManager(this, this.level);
+
+        // Optional Pixel Art Light & PostFX pipeline (enabled via PIXEL_LIGHTING_CONFIG.ENABLE or level YAML)
+        if (isPixelLightingEnabled) {
+            // 1. Add Phaser 4 PointLight around player
+            const playerLight = (this.add as any).pointlight(
+                this.character.body.position.x,
+                this.character.body.position.y,
+                PIXEL_LIGHTING_CONFIG.LIGHT_COLOR,
+                PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS,
+                PIXEL_LIGHTING_CONFIG.LIGHT_INTENSITY,
+                PIXEL_LIGHTING_CONFIG.LIGHT_ATTENUATION,
+            );
+            playerLight.setDepth?.(DEPTH.LIGHT);
+
+            // Update light position every frame following the player character
+            this.events.on('update', () => {
+                if (this.character?.body?.position && playerLight) {
+                    playerLight.setPosition(
+                        this.character.body.position.x,
+                        this.character.body.position.y,
+                    );
+                }
+            });
+
+            // 2. Apply Phaser 4 native filters: Pixelate + Quantize
+            const cameraAny = this.cameras.main as any;
+            if (cameraAny.filters?.internal) {
+                if (
+                    PIXEL_LIGHTING_CONFIG.PIXELATE_AMOUNT > 0 &&
+                    cameraAny.filters.internal.addPixelate
+                ) {
+                    cameraAny.filters.internal.addPixelate(
+                        PIXEL_LIGHTING_CONFIG.PIXELATE_AMOUNT,
+                    );
+                }
+                if (
+                    PIXEL_LIGHTING_CONFIG.USE_QUANTIZE &&
+                    cameraAny.filters.internal.addQuantize
+                ) {
+                    cameraAny.filters.internal.addQuantize({
+                        steps: [...PIXEL_LIGHTING_CONFIG.QUANTIZE_STEPS],
+                        dither: PIXEL_LIGHTING_CONFIG.QUANTIZE_DITHER,
+                        mode: 0,
+                    });
+                }
+            }
+
+            this.events.on('update', () => {
+                if (this.character?.body?.position && playerLight) {
+                    playerLight.setPosition(
+                        this.character.body.position.x,
+                        this.character.body.position.y,
+                    );
+                }
+            });
+        }
+
         this.events.on('update', () => {
             this.monsterSystem.update(this.time.now);
             this.dropSystem.update();

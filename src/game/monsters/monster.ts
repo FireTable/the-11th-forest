@@ -40,6 +40,9 @@ import {
     distBetween,
     pickClosestMonster,
     PathfindingService,
+    calcSeparationForce,
+    getSurroundOffset,
+    getPathLookAheadPoint,
 } from './logic';
 
 // ─── Entity ──────────────────────────────────────────────────────────────
@@ -111,7 +114,8 @@ export class Monster {
     readonly debugHitboxRect: Phaser.GameObjects.Rectangle;
     readonly sprite?: Phaser.GameObjects.Sprite;
     readonly shadow: Phaser.GameObjects.Ellipse;
-    readonly statusHud: StatusHud;
+    readonly hitboxWidth: number;
+    readonly hitboxHeight: number;
     hp: number;
     state: MonsterState = 'idle';
     lastAttackAt = 0;
@@ -123,6 +127,11 @@ export class Monster {
     /** Waypoints for pathfinding navigation. */
     path: { x: number; y: number }[] | null = null;
     currentWaypointIdx = 0;
+    /** Stuck detection and emergency pathing recovery fields. */
+    stuckCheckPos = { x: 0, y: 0 };
+    stuckTicks = 0;
+    lastStuckCheckAt = 0;
+    noLoSUntil = 0;
     /** Visual tint per weapon kind — derived from weapon (ranged/melee). */
     static readonly TINT_MELEE = 0xef4444;
     static readonly TINT_RANGED = 0xa855f7;
@@ -131,6 +140,7 @@ export class Monster {
         this.spec = spec;
         this.weapon = weapon;
         this.hp = spec.hp;
+        this.stuckCheckPos = { x, y };
 
         let w = spec.body.halfW * 2;
         let h = spec.body.halfH * 2;
@@ -146,8 +156,16 @@ export class Monster {
             }
         }
 
+        this.hitboxWidth = w;
+        this.hitboxHeight = h;
+
         this.body = scene.matter.add.rectangle(x, centerY, w, h, {
             label: 'monster',
+            friction: 0,
+            frictionStatic: 0,
+            frictionAir: 0.02,
+            restitution: 0,
+            chamfer: { radius: Math.min(8, Math.min(w, h) / 4) },
             collisionFilter: {
                 category: CAT.MONSTER_MELEE,
                 mask: CAT.CHARACTER | CAT.BULLET | (CAT.WALL_TALL | CAT.WALL_SHORT),
@@ -197,6 +215,11 @@ export class Monster {
 
     position(): { x: number; y: number } {
         return this.body.position;
+    }
+
+    /** Calculate clearance radius using full physical Hitbox dimensions x 2. */
+    getHitboxRadius(): number {
+        return Math.hypot(this.hitboxWidth, this.hitboxHeight) * 2;
     }
 
     destroy(scene: Phaser.Scene): void {
@@ -303,12 +326,14 @@ export class MonsterController {
         const playerMovedDist = distBetween(this.lastPlayerPos, pp);
         const shouldRecalcPaths =
             this.pathfinder &&
-            (playerMovedDist > 32 || time - this.lastPathCalcAt > 600);
+            (playerMovedDist > 16 || time - this.lastPathCalcAt > 150);
 
         if (shouldRecalcPaths) {
             this.lastPathCalcAt = time;
             this.lastPlayerPos = { x: pp.x, y: pp.y };
         }
+
+        const totalMonsters = this.monsters.length;
 
         for (let i = this.monsters.length - 1; i >= 0; i--) {
             const m = this.monsters[i];
@@ -320,14 +345,51 @@ export class MonsterController {
             const dist = distBetween(mp, pp);
             const dirToPlayer = dirTo(mp, pp);
 
-            // Recalculate A* path if needed
-            if (shouldRecalcPaths && dist > m.weapon.range && this.pathfinder) {
-                const path = this.pathfinder.findPath(mp, pp);
-                if (path && path.length > 1) {
-                    m.path = path;
-                    m.currentWaypointIdx = 1; // 0 is start cell
+            // Compute surround target offset around player to prevent crowding single-file
+            const surroundOffset = getSurroundOffset(i, totalMonsters, Math.min(28, m.weapon.range * 0.45));
+            const targetPos = { x: pp.x + surroundOffset.x, y: pp.y + surroundOffset.y };
+
+            // Dynamic clearance radius based on exact physical Hitbox dimensions
+            const monsterBodyRadius = m.getHitboxRadius();
+
+            // Per-monster Active Stuck Detector (checks every 120ms)
+            let isStuckEmergency = false;
+            if (time - m.lastStuckCheckAt >= 120) {
+                m.lastStuckCheckAt = time;
+                const movedDist = distBetween(mp, m.stuckCheckPos);
+                if (m.state === 'chase' && movedDist < 3.0) {
+                    m.stuckTicks++;
+                    if (m.stuckTicks >= 1) {
+                        isStuckEmergency = true;
+                        m.noLoSUntil = time + 2000; // Disable direct LoS shortcut for 2s
+                        if (this.pathfinder) {
+                            const newPath = this.pathfinder.findPath(mp, targetPos);
+                            if (newPath && newPath.length > 1) {
+                                m.path = newPath;
+                                m.currentWaypointIdx = 1;
+                            }
+                        }
+                    }
                 } else {
-                    m.path = null;
+                    m.stuckTicks = 0;
+                }
+                m.stuckCheckPos = { x: mp.x, y: mp.y };
+            }
+
+            // Recalculate A* path if needed globally
+            if (shouldRecalcPaths && dist > m.weapon.range && this.pathfinder) {
+                const canUseLoS = time >= m.noLoSUntil;
+                if (canUseLoS && this.pathfinder.hasLineOfSight(mp, targetPos, monsterBodyRadius)) {
+                    m.path = [mp, targetPos];
+                    m.currentWaypointIdx = 1;
+                } else {
+                    const path = this.pathfinder.findPath(mp, targetPos);
+                    if (path && path.length > 1) {
+                        m.path = path;
+                        m.currentWaypointIdx = 1; // 0 is start cell
+                    } else {
+                        m.path = null;
+                    }
                 }
             }
 
@@ -355,26 +417,78 @@ export class MonsterController {
             }
 
             // ── Velocity ──────────────────────────────────────────────
-            let vx = 0;
-            let vy = 0;
+            let desiredVx = 0;
+            let desiredVy = 0;
             if (m.state === 'chase') {
-                let targetDir = dirToPlayer;
-                // Follow Waypoints if available
-                if (m.path && m.currentWaypointIdx < m.path.length) {
-                    const targetWp = m.path[m.currentWaypointIdx];
-                    const distToWp = distBetween(mp, targetWp);
-                    if (distToWp < 16) {
-                        m.currentWaypointIdx++;
-                    }
-                    if (m.currentWaypointIdx < m.path.length) {
-                        targetDir = dirTo(mp, m.path[m.currentWaypointIdx]);
+                let targetDir = dirTo(mp, targetPos);
+
+                // Direct Line of Sight shortcut check (guarded by stuck timer & monster body size x 2)
+                const canUseLoS = time >= m.noLoSUntil;
+                const hasLoS = canUseLoS && (this.pathfinder?.hasLineOfSight(mp, targetPos, monsterBodyRadius) ?? false);
+
+                if (!hasLoS && m.path && m.currentWaypointIdx < m.path.length) {
+                    const checkLoS = (p1: { x: number; y: number }, p2: { x: number; y: number }) =>
+                        this.pathfinder?.hasLineOfSight(p1, p2, monsterBodyRadius * 0.7) ?? false;
+                    const lookAhead = getPathLookAheadPoint(mp, m.path, m.currentWaypointIdx, 12, checkLoS);
+                    m.currentWaypointIdx = lookAhead.nextIdx;
+                    targetDir = dirTo(mp, lookAhead.target);
+                }
+
+                // Base chase vector
+                const cv = chaseVelocity(targetDir, m.spec.moveSpeed);
+                desiredVx = cv.vx;
+                desiredVy = cv.vy;
+
+                // Soft Separation vector from other monsters (anti-clumping & anti-stacking)
+                const sep = calcSeparationForce(m, this.monsters, 42, m.spec.moveSpeed * 0.7);
+                desiredVx += sep.x;
+                desiredVy += sep.y;
+
+                // Anti-blocking Detour: check if an ally directly ahead is stationary / attacking
+                for (const ally of this.monsters) {
+                    if (ally === m || ally.dead) continue;
+                    const allyPos = ally.body.position;
+                    const distToAlly = distBetween(mp, allyPos);
+                    if (distToAlly < 28) {
+                        const dirToAlly = dirTo(mp, allyPos);
+                        const dot = targetDir.x * dirToAlly.x + targetDir.y * dirToAlly.y;
+                        // Ally is directly in front (dot > 0.6) and is attacking or stopped
+                        if (dot > 0.6 && (ally.state === 'attack' || ally.state === 'idle')) {
+                            // Tangential detour vector perpendicular to targetDir
+                            const sign = (i % 2 === 0) ? 1 : -1;
+                            const detourX = -targetDir.y * sign * m.spec.moveSpeed * 0.6;
+                            const detourY = targetDir.x * sign * m.spec.moveSpeed * 0.6;
+                            desiredVx += detourX;
+                            desiredVy += detourY;
+                            break;
+                        }
                     }
                 }
-                const cv = chaseVelocity(targetDir, m.spec.moveSpeed);
-                vx = cv.vx;
-                vy = cv.vy;
+
+                // Emergency Escape Impulse if monster is stuck against wall corner
+                if (isStuckEmergency || m.stuckTicks >= 2) {
+                    const escapeAngle = (i * 1.57 + time * 0.005) % (Math.PI * 2);
+                    desiredVx += Math.cos(escapeAngle) * m.spec.moveSpeed * 1.2;
+                    desiredVy += Math.sin(escapeAngle) * m.spec.moveSpeed * 1.2;
+                }
+
+                // Cap total desired velocity to preserve move speed limit
+                const speed = Math.hypot(desiredVx, desiredVy);
+                const maxAllowedSpeed = m.spec.moveSpeed * 1.15;
+                if (speed > maxAllowedSpeed) {
+                    desiredVx = (desiredVx / speed) * maxAllowedSpeed;
+                    desiredVy = (desiredVy / speed) * maxAllowedSpeed;
+                }
             }
-            this.matter.Body.setVelocity(m.body, { x: vx, y: vy });
+
+            // Smooth Inertial Velocity Steering (LERP) for organic curved turns
+            const currVx = m.body.velocity.x;
+            const currVy = m.body.velocity.y;
+            const lerpFactor = 0.22; // Smooth curve interpolation factor
+            const finalVx = currVx + (desiredVx - currVx) * lerpFactor;
+            const finalVy = currVy + (desiredVy - currVy) * lerpFactor;
+
+            this.matter.Body.setVelocity(m.body, { x: finalVx, y: finalVy });
 
             // ── Attack tick ──────────────────────────────────────────
             if (

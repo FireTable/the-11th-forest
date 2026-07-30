@@ -77,7 +77,7 @@ export class PathfindingService {
     constructor(
         levelSize: { width: number; height: number },
         airWalls: readonly { points: readonly [number, number][] }[],
-        cellSize = 24,
+        cellSize = 16,
     ) {
         this.cellSize = cellSize;
         this.gridWidth = Math.ceil(levelSize.width / cellSize);
@@ -108,7 +108,94 @@ export class PathfindingService {
         };
     }
 
-    /** Synchronous pure A* pathfinding. Returns array of world positions or null. */
+    /** Helper for single raycast check on grid. */
+    private checkSingleRay(start: { x: number; y: number }, end: { x: number; y: number }): boolean {
+        const p1 = this.worldToGrid(start);
+        const p2 = this.worldToGrid(end);
+
+        let x0 = p1.x;
+        let y0 = p1.y;
+        const x1 = p2.x;
+        const y1 = p2.y;
+
+        const dx = Math.abs(x1 - x0);
+        const dy = Math.abs(y1 - y0);
+        const sx = x0 < x1 ? 1 : -1;
+        const sy = y0 < y1 ? 1 : -1;
+        let err = dx - dy;
+
+        while (true) {
+            const gx = Math.max(0, Math.min(this.gridWidth - 1, x0));
+            const gy = Math.max(0, Math.min(this.gridHeight - 1, y0));
+            if (this.grid[gy][gx] === 1) return false;
+
+            if (x0 === x1 && y0 === y1) break;
+
+            const e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x0 += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y0 += sy;
+            }
+        }
+        return true;
+    }
+
+    /** Check line-of-sight raycast between two world positions with body corridor clearance. */
+    hasLineOfSight(start: { x: number; y: number }, end: { x: number; y: number }, bodyRadius = 10): boolean {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const len = Math.hypot(dx, dy);
+        if (len === 0) return true;
+
+        // Check center ray
+        if (!this.checkSingleRay(start, end)) return false;
+
+        if (bodyRadius <= 0) return true;
+
+        // Normal perpendicular vector for offset parallel rays
+        const nx = (-dy / len) * bodyRadius;
+        const ny = (dx / len) * bodyRadius;
+
+        // Check left and right parallel rays
+        const leftStart = { x: start.x + nx, y: start.y + ny };
+        const leftEnd = { x: end.x + nx, y: end.y + ny };
+        if (!this.checkSingleRay(leftStart, leftEnd)) return false;
+
+        const rightStart = { x: start.x - nx, y: start.y - ny };
+        const rightEnd = { x: end.x - nx, y: end.y - ny };
+        if (!this.checkSingleRay(rightStart, rightEnd)) return false;
+
+        return true;
+    }
+
+    /** Smooths raw A* path by skipping intermediate waypoints using line-of-sight raycasts. */
+    private smoothPath(rawPath: { x: number; y: number }[]): { x: number; y: number }[] {
+        if (rawPath.length <= 2) return rawPath;
+
+        const smoothed: { x: number; y: number }[] = [rawPath[0]];
+        let curr = 0;
+
+        while (curr < rawPath.length - 1) {
+            let next = rawPath.length - 1;
+            // Look ahead for the farthest reachable waypoint with clear line of sight
+            while (next > curr + 1) {
+                if (this.hasLineOfSight(rawPath[curr], rawPath[next])) {
+                    break;
+                }
+                next--;
+            }
+            smoothed.push(rawPath[next]);
+            curr = next;
+        }
+
+        return smoothed;
+    }
+
+    /** Synchronous pure A* pathfinding with string-pulling smoothing. Returns world positions or null. */
     findPath(
         start: { x: number; y: number },
         end: { x: number; y: number },
@@ -118,6 +205,11 @@ export class PathfindingService {
 
         if (startG.x === endG.x && startG.y === endG.y) {
             return [end];
+        }
+
+        // Fast path: direct line of sight bypasses grid search completely
+        if (this.hasLineOfSight(start, end)) {
+            return [start, end];
         }
 
         const openList: AStarNode[] = [];
@@ -171,7 +263,8 @@ export class PathfindingService {
                     rawPath.unshift({ x: curr.x, y: curr.y });
                     curr = curr.parent;
                 }
-                return rawPath.map((p) => this.gridToWorld(p));
+                const worldPoints = rawPath.map((p) => this.gridToWorld(p));
+                return this.smoothPath(worldPoints);
             }
 
             openList.splice(currentIdx, 1);
@@ -191,9 +284,17 @@ export class PathfindingService {
                     continue;
                 }
 
+                // Prevent diagonal corner cutting into walls
+                if (n.x !== 0 && n.y !== 0) {
+                    if (this.grid[current.y][nx] === 1 || this.grid[ny][current.x] === 1) {
+                        continue;
+                    }
+                }
+
                 if (closedSet.has(getKey(nx, ny))) continue;
 
-                const gScore = current.g + n.cost;
+                const stepCost = this.grid[ny][nx] === 2 ? n.cost * 2.5 : n.cost;
+                const gScore = current.g + stepCost;
                 let neighborNode = openList.find((node) => node.x === nx && node.y === ny);
 
                 if (!neighborNode) {
@@ -233,15 +334,60 @@ export class PathfindingService {
     }
 
     private rasterizeAirWalls(airWalls: readonly { points: readonly [number, number][] }[]): void {
+        const half = this.cellSize / 2;
+        const offsets = [
+            { x: 0, y: 0 },
+            { x: -half * 0.7, y: -half * 0.7 },
+            { x: half * 0.7, y: -half * 0.7 },
+            { x: -half * 0.7, y: half * 0.7 },
+            { x: half * 0.7, y: half * 0.7 },
+        ];
+
+        // 1. Mark solid walls (value 1)
         for (let gy = 0; gy < this.gridHeight; gy++) {
-            const worldY = gy * this.cellSize + this.cellSize / 2;
+            const worldY = gy * this.cellSize + half;
             for (let gx = 0; gx < this.gridWidth; gx++) {
-                const worldX = gx * this.cellSize + this.cellSize / 2;
+                const worldX = gx * this.cellSize + half;
+                let isBlocked = false;
                 for (const wall of airWalls) {
-                    if (wall.points.length >= 3 && this.pointInPolygon(worldX, worldY, wall.points)) {
-                        this.grid[gy][gx] = 1;
-                        break;
+                    if (wall.points.length < 3) continue;
+                    for (const off of offsets) {
+                        if (this.pointInPolygon(worldX + off.x, worldY + off.y, wall.points)) {
+                            isBlocked = true;
+                            break;
+                        }
                     }
+                    if (isBlocked) break;
+                }
+                if (isBlocked) {
+                    this.grid[gy][gx] = 1;
+                }
+            }
+        }
+
+        // 2. Mark 1-cell safety buffer zone around solid walls (value 2)
+        for (let gy = 0; gy < this.gridHeight; gy++) {
+            for (let gx = 0; gx < this.gridWidth; gx++) {
+                if (this.grid[gy][gx] === 1) continue;
+
+                let isNearWall = false;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const ny = gy + dy;
+                        const nx = gx + dx;
+                        if (ny >= 0 && ny < this.gridHeight && nx >= 0 && nx < this.gridWidth) {
+                            if (this.grid[ny][nx] === 1) {
+                                isNearWall = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (isNearWall) break;
+                }
+
+                if (isNearWall) {
+                    this.grid[gy][gx] = 2; // Buffer zone (16px)
                 }
             }
         }
@@ -272,4 +418,101 @@ export function pickClosestMonster<M extends { dead: boolean; body: { position: 
         }
     }
     return best;
+}
+
+/**
+ * Calculate separation (repulsion) vector to prevent monsters from stacking or blocking each other.
+ */
+export function calcSeparationForce<M extends { dead: boolean; body: { position: { x: number; y: number } } }>(
+    current: M,
+    allMonsters: readonly M[],
+    radius = 32,
+    maxForce = 1.0,
+): { x: number; y: number } {
+    if (current.dead) return { x: 0, y: 0 };
+    const myPos = current.body.position;
+    let pushX = 0;
+    let pushY = 0;
+    let count = 0;
+
+    for (const other of allMonsters) {
+        if (other === current || other.dead) continue;
+        const otherPos = other.body.position;
+        const dx = myPos.x - otherPos.x;
+        const dy = myPos.y - otherPos.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 0 && dist < radius) {
+            const factor = 1 - dist / radius;
+            pushX += (dx / dist) * factor;
+            pushY += (dy / dist) * factor;
+            count++;
+        }
+    }
+
+    if (count === 0) return { x: 0, y: 0 };
+
+    const len = Math.hypot(pushX, pushY);
+    if (len === 0) return { x: 0, y: 0 };
+
+    const scale = Math.min(len, 1) * maxForce;
+    return {
+        x: (pushX / len) * scale,
+        y: (pushY / len) * scale,
+    };
+}
+
+/**
+ * Calculate surround slot position around player for a monster index to avoid single-file bottlenecks.
+ */
+export function getSurroundOffset(monsterIndex: number, totalMonsters: number, radius = 28): { x: number; y: number } {
+    if (totalMonsters <= 1) return { x: 0, y: 0 };
+    const angle = (monsterIndex / totalMonsters) * Math.PI * 2;
+    return {
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
+    };
+}
+
+/**
+ * Look-ahead target interpolation along a waypoint path for smooth curve steering (Pure Pursuit).
+ */
+export function getPathLookAheadPoint(
+    currentPos: { x: number; y: number },
+    path: readonly { x: number; y: number }[],
+    currentIdx: number,
+    lookAheadDist = 12,
+    checkLoS?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => boolean,
+): { target: { x: number; y: number }; nextIdx: number } {
+    if (!path || path.length === 0) return { target: currentPos, nextIdx: currentIdx };
+    if (currentIdx >= path.length) return { target: path[path.length - 1], nextIdx: path.length - 1 };
+
+    let idx = currentIdx;
+    while (idx < path.length - 1 && distBetween(currentPos, path[idx]) < 12) {
+        idx++;
+    }
+
+    const currWp = path[idx];
+    const distToWp = distBetween(currentPos, currWp);
+
+    if (distToWp >= lookAheadDist || idx >= path.length - 1) {
+        return { target: currWp, nextIdx: idx };
+    }
+
+    const nextWp = path[idx + 1];
+    const segDir = dirTo(currWp, nextWp);
+    const remain = lookAheadDist - distToWp;
+    const candidate = {
+        x: currWp.x + segDir.x * remain,
+        y: currWp.y + segDir.y * remain,
+    };
+
+    if (checkLoS && !checkLoS(currentPos, candidate)) {
+        return { target: currWp, nextIdx: idx };
+    }
+
+    return {
+        target: candidate,
+        nextIdx: idx,
+    };
 }

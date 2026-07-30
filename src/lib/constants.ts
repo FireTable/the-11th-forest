@@ -24,6 +24,7 @@ export const CAT = {
 // ─── Rendering Depths / Z-Indices ─────────────────────────────────────
 export const DEPTH = {
     BACKGROUND_IMAGE: 0,
+    LIGHT: 1, // Renders over background image, under all materials, walls, and entities
     MATERIAL_BACKGROUND: 10,
     BULLET_TRAIL: 15,
     PROJECTILE_BASE: 20, // Min base depth for bullets so they always render OVER background materials
@@ -260,3 +261,30 @@ export const DROP_CONFIG = {
     },
 } as const;
 
+// ─── Graphics: Pixel Art Engine Lighting & Camera Filter Config ────────
+export const PIXEL_LIGHTING_CONFIG = {
+    /** Global toggle for pixel art engine lighting and camera filters. */
+    ENABLE: true,
+
+    /** Environment background tint when pixel lighting is active (soft ambient twilight). */
+    BACKGROUND_TINT: 0x6c7c8c,
+
+    /** PointLight warm amber color (torch light). */
+    LIGHT_COLOR: 0xe8d5b0,
+    /** PointLight radius around player character (px). */
+    LIGHT_RADIUS: 200,
+    /** PointLight intensity (0.0 ~ 1.0). Very subtle mist glow. */
+    LIGHT_INTENSITY: 0.1,
+    /** PointLight edge attenuation factor (smooth natural diffusion without rings). */
+    LIGHT_ATTENUATION: 0.05,
+
+    /** Camera Pixelate filter amount (0 = off). */
+    PIXELATE_AMOUNT: 0,
+
+    /** Enable color quantization filter (false = smooth natural light diffusion without step rings). */
+    USE_QUANTIZE: true,
+    /** Camera Quantize filter step array per channel [R, G, B, A]. */
+    QUANTIZE_STEPS: [32, 32, 32, 1],
+    /** Whether to enable Bayer matrix ordered dithering. */
+    QUANTIZE_DITHER: false,
+} as const;

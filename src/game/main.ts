@@ -140,6 +140,8 @@ async function getSpriteCellDims(
     };
 }
 
+import { PixelLightPostFX } from '@/game/pipelines/pixel-light';
+
 const StartGame = async (parent: string): Promise<Phaser.Game> => {
     const scene = await resolveScene();
     // World size matches the level's native image dimensions so air-wall
@@ -149,6 +151,9 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
         type: AUTO,
         parent,
         backgroundColor: '#000000',
+        pipeline: {
+            'PixelLightPostFX': PixelLightPostFX,
+        },
         scale: {
             mode: Scale.FIT,
             autoCenter: Scale.CENTER_BOTH,
@@ -174,7 +179,7 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
             sfxSpecs: scene.sfx,
             musicSpecs: scene.music,
         })],
-    });
+    } as any);
 };
 
 export default StartGame;
