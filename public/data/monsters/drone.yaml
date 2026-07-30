@@ -1,5 +1,5 @@
 name: Thorn Drone
-hp: 80
+hp: 160
 moveSpeed: 4
 body:
     halfW: 20

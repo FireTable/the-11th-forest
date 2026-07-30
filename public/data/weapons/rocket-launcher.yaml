@@ -1,5 +1,5 @@
 name: Rocket Launcher
-damage: 60
+damage: 55
 cooldownMs: 1200
 range: 800
 clipSize: 1

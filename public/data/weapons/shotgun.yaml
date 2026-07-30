@@ -1,5 +1,5 @@
 name: Shotgun
-damage: 6
+damage: 5
 cooldownMs: 800
 range: 400
 clipSize: 2

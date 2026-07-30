@@ -1,5 +1,5 @@
 name: Laser Cannon
-damage: 8
+damage: 2
 cooldownMs: 60
 range: 700
 clipSize: 50

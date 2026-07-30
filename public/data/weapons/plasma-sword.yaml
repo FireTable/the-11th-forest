@@ -1,5 +1,5 @@
 name: Plasma Sword
-damage: 20
+damage: 22
 cooldownMs: 400
 range: 180
 hitWidth: 80

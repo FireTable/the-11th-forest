@@ -1,5 +1,5 @@
 name: Moss Gunner
-hp: 60
+hp: 120
 moveSpeed: 3
 body:
     halfW: 32

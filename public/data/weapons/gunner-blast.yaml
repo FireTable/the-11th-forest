@@ -1,5 +1,5 @@
 name: Energy Blast
-damage: 6
+damage: 3
 cooldownMs: 1500
 range: 280
 projectile:

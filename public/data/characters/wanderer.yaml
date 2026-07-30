@@ -115,7 +115,6 @@ dodge:
     durationMs: 220
     cooldownMs: 600
 hotbar:
-    - pistol
     - assault-rifle
     - laser-cannon
     - plasma-sword

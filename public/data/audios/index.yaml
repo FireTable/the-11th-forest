@@ -7,8 +7,6 @@
 
 sfx:
   # Per-weapon shoot sounds — each weapon has its own unique fire SFX.
-  - pistol-shoot
-  - smg-shoot
   - assault-rifle-shoot
   - shotgun-shoot
   - laser-cannon-shoot

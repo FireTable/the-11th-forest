@@ -1,5 +1,5 @@
 name: Arcana Staff
-damage: 28
+damage: 14
 cooldownMs: 350
 range: 1000
 clipSize: 8
