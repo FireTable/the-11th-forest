@@ -17,8 +17,13 @@ export const WeaponHUDOverlay: React.FC = () => {
 
     return (
         <div className="absolute bottom-6 right-6 z-20 pointer-events-none select-none flex font-['Silkscreen',monospace]">
-            {/* Main Panel - Flex Row */}
-            <div className="pixel-box bg-stone-950/95 p-3.5 flex gap-4 items-center border-2 border-stone-700 shadow-[inset_0_0_8px_rgba(0,0,0,0.8)]">
+            {/* Retro Pixel Box - Dark Outer Border + Amber Accent Corners */}
+            <div className="bg-stone-950/40 p-3.5 flex gap-4 items-center border-2 border-stone-900/80 shadow-[0_4px_16px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(245,158,11,0.25)] backdrop-blur-sm relative">
+                {/* 4 Corner Pixels */}
+                <div className="absolute -top-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400" />
+                <div className="absolute -top-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400" />
+                <div className="absolute -bottom-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400" />
+                <div className="absolute -bottom-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400" />
                 {/* Left Side: Active Weapon Details & Reload Bar */}
                 <div className="flex flex-col justify-between h-full min-w-[160px] gap-2">
                     <div className="flex flex-col">

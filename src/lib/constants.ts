@@ -271,8 +271,10 @@ export const PIXEL_LIGHTING_CONFIG = {
 
     /** PointLight warm amber color (torch light). */
     LIGHT_COLOR: 0xe8d5b0,
-    /** PointLight radius around player character (px). */
-    LIGHT_RADIUS: 200,
+    /** PointLight horizontal radius (px). */
+    LIGHT_RADIUS_X: 200,
+    /** PointLight vertical radius matching 2.5D body perspective (200 * 24 / 28 ≈ 171px). */
+    LIGHT_RADIUS_Y: 171,
     /** PointLight intensity (0.0 ~ 1.0). Very subtle mist glow. */
     LIGHT_INTENSITY: 0.1,
     /** PointLight edge attenuation factor (smooth natural diffusion without rings). */

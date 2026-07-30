@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CharacterHUDOverlay } from './CharacterHUDOverlay';
 import { WeaponHUDOverlay } from './WeaponHUDOverlay';
+import { SceneHubOverlay } from './SceneHubOverlay';
 import { PixelCrosshair } from './PixelCrosshair';
 
 export const GameHUDLayer: React.FC = () => {
@@ -55,6 +56,7 @@ export const GameHUDLayer: React.FC = () => {
 
     return (
         <div style={style} className="pointer-events-none overflow-hidden z-10">
+            <SceneHubOverlay />
             <CharacterHUDOverlay />
             <WeaponHUDOverlay />
             <PixelCrosshair />

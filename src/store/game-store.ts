@@ -24,10 +24,14 @@ export interface GameUIState {
     reloadProgress: number; // 0 to 1
     slots: WeaponSlotData[];
 
+    // Level Status
+    levelTitle: string;
+
     // Visibility
     hubsVisible: boolean;
 
     // Setters
+    setLevelTitle: (title: string) => void;
     setCharacterStats: (stats: { name?: string; hp: number; maxHp: number; sp: number; maxSp: number }) => void;
     setWeaponStats: (stats: {
         activeIndex: number;
@@ -56,7 +60,11 @@ export const useGameStore = create<GameUIState>((set) => ({
     reloadProgress: 0,
     slots: [],
 
+    levelTitle: '',
+
     hubsVisible: true,
+
+    setLevelTitle: (title) => set({ levelTitle: title }),
 
     setCharacterStats: (stats) =>
         set((state) => ({

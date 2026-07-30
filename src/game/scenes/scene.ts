@@ -43,6 +43,7 @@ import { PathfindingService } from '@/game/monsters/logic';
 import { DEPTH, MUSIC_EVENT, PIXEL_LIGHTING_CONFIG } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
+import { useGameStore } from '@/store/game-store';
 import type { MusicSpec, SfxSpec, SoundSpec } from '@/lib/audios';
 import type { CharacterSpec } from '@/lib/characters';
 import type { DropSpec } from '@/lib/drops';
@@ -298,10 +299,16 @@ export class LoadScene extends Phaser.Scene {
                 this.character.body.position.x,
                 this.character.body.position.y,
                 PIXEL_LIGHTING_CONFIG.LIGHT_COLOR,
-                PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS,
+                PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_X,
                 PIXEL_LIGHTING_CONFIG.LIGHT_INTENSITY,
                 PIXEL_LIGHTING_CONFIG.LIGHT_ATTENUATION,
             );
+            if (playerLight?.setScale) {
+                playerLight.setScale(
+                    1.0,
+                    PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_Y / PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_X,
+                );
+            }
             playerLight.setDepth?.(DEPTH.LIGHT);
 
             // Update light position every frame following the player character
@@ -359,6 +366,7 @@ export class LoadScene extends Phaser.Scene {
         // get the payload.
         const payload = { id: this.id, level: this.level };
         setCurrentLevel(payload);
+        useGameStore.getState().setLevelTitle(this.level.title || this.id);
         EventBus.emit('level-loaded', payload);
         EventBus.emit('current-scene-ready', this);
     }
