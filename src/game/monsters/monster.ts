@@ -116,6 +116,10 @@ export class Monster {
     readonly shadow: Phaser.GameObjects.Ellipse;
     readonly hitboxWidth: number;
     readonly hitboxHeight: number;
+    /** Floating HP bar / name label above the monster. Built once and kept alive
+     * through the `dying` state (visibility toggled instead of destroyed) so the
+     * death animation can show 0 HP without re-spawning the HUD mid-tween. */
+    readonly statusHud: StatusHud;
     hp: number;
     state: MonsterState = 'idle';
     lastAttackAt = 0;
