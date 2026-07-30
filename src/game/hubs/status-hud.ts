@@ -20,6 +20,32 @@ import {
 
 import { BaseHud } from './base-hub';
 
+/**
+ * Half-width / half-height of the random offset applied to each new
+ * floating combat number so simultaneous hits spread instead of stacking.
+ * Tuned small enough to stay near the status bar, large enough that
+ * 5+ hits/sec don't visually overlap into one unreadable blob.
+ */
+const FLOATING_JITTER_X = 8;
+const FLOATING_JITTER_Y = 4;
+
+/**
+ * Pick the per-spawn position offset for a floating combat number. Pure
+ * helper so tests can inject a deterministic RNG; defaults to Math.random.
+ *
+ * Two jitter draws: first for horizontal (x), second for vertical (y).
+ */
+export function computeFloatingNumberSpawn(
+    baseX: number,
+    baseY: number,
+    jitterFn: () => number = Math.random,
+): { x: number; y: number } {
+    return {
+        x: baseX + (jitterFn() - 0.5) * 2 * FLOATING_JITTER_X,
+        y: baseY + (jitterFn() - 0.5) * 2 * FLOATING_JITTER_Y,
+    };
+}
+
 export interface StatusHudState {
     name?: string;
     reloading?: boolean;
@@ -39,6 +65,7 @@ export interface StatusHudState {
 
 interface FloatingText {
     textObj: Phaser.GameObjects.Text;
+    startX: number;
     startY: number;
     createdAt: number;
     durationMs: number;
@@ -119,10 +146,12 @@ export class StatusHud extends BaseHud {
         const textStr = isHeal ? `+${absVal}` : `-${absVal}`;
         const colorStr = isHeal ? '#34d399' : '#f87171'; // Green for heal, Red for damage
 
-        // Floating offset to the right side of status bar
-        const rightX = HUD_STATUS_BAR_W / 2 + 8;
+        // Floating offset to the right side of status bar, jittered per hit
+        // so high-frequency damage doesn't pile into a single unreadable blob.
+        const baseX = HUD_STATUS_BAR_W / 2 + 8;
+        const { x: startX, y: startY } = computeFloatingNumberSpawn(baseX, 0);
         const textObj = this.scene.add
-            .text(rightX, 0, textStr, {
+            .text(startX, startY, textStr, {
                 fontFamily: 'monospace',
                 fontSize: isHeal ? '12px' : '14px',
                 color: colorStr,
@@ -144,7 +173,8 @@ export class StatusHud extends BaseHud {
 
         this.floatingTexts.push({
             textObj,
-            startY: 0,
+            startX,
+            startY,
             createdAt: this.scene.time.now,
             durationMs: 800,
         });
@@ -276,6 +306,7 @@ export class StatusHud extends BaseHud {
                 this.floatingTexts.splice(i, 1);
             } else {
                 const progress = elapsed / item.durationMs;
+                item.textObj.setX(item.startX);
                 item.textObj.setY(item.startY - progress * 24);
                 item.textObj.setAlpha(1 - progress);
             }

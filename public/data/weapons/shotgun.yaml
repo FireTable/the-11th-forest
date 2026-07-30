@@ -25,7 +25,7 @@ projectile:
         radius: 4
         width: 16
         height: 4
-        color: 0xA64B39
+        color: 0x313142
 sfx:
     shoot: shotgun-shoot
     dryFire: dry-fire
