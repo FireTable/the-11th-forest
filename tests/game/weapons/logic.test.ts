@@ -9,8 +9,15 @@ import {
 import { isPlayerBullet, isWall } from '@/game/weapons/logic';
 
 describe('weapons/logic — masks', () => {
-    it('PROJECTILE_PLAYER_MASK hits every category (Matter checks other body)', () => {
-        expect(PROJECTILE_PLAYER_MASK).toBe(0xffff);
+    it('PROJECTILE_PLAYER_MASK hits tall walls + monsters, ignores short walls (cover)', () => {
+        // Mirrors the monster-mask pattern: a bullet shouldn't see what
+        // it can't collide with, otherwise it would try to register a
+        // short-wall hit and get destroyed mid-flight.
+        expect(PROJECTILE_PLAYER_MASK).toBe(
+            CAT.WALL_TALL | CAT.MONSTER_MELEE | CAT.MONSTER_PROJECTILE,
+        );
+        // Sanity: short wall bit is explicitly excluded.
+        expect(PROJECTILE_PLAYER_MASK & CAT.WALL_SHORT).toBe(0);
     });
 
     it('PROJECTILE_MONSTER_MASK collides with character + tall walls only', () => {

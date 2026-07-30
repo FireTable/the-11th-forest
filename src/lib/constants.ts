@@ -47,8 +47,10 @@ export const BULLET_HIT_MASK: number =
 /** Categories a drop sensor responds to (character only). */
 export const DROP_PICKUP_MASK: number = CAT.CHARACTER;
 
-/** Player bullets collide with everything; walls decide. */
-export const PROJECTILE_PLAYER_MASK: number = 0xffff;
+/** Player bullets hit tall walls + monsters, pass over short walls (cover).
+ *  Symmetric to PROJECTILE_MONSTER_MASK. */
+export const PROJECTILE_PLAYER_MASK: number =
+    CAT.WALL_TALL | CAT.MONSTER_MELEE | CAT.MONSTER_PROJECTILE;
 
 /** Monster projectiles hit player + tall walls. Symmetric to player. */
 export const PROJECTILE_MONSTER_MASK: number = CAT.CHARACTER | CAT.WALL_TALL;
