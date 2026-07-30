@@ -12,6 +12,12 @@ import { AirWallsSection } from './sections/air-walls';
 import { BackgroundSection } from './sections/background';
 import { CharacterSection } from './sections/character';
 import { MaterialsSection } from './sections/materials';
+import {
+    DropsSection,
+    MonstersSectionEditor,
+    WeaponsSectionEditor,
+    AudiosSection,
+} from './sections/modules';
 import { MonstersSection } from './sections/monsters';
 import { ScenesListSection } from './sections/scenes-list';
 import { WallCanvas } from './wall-canvas';
@@ -21,12 +27,16 @@ interface ScenePayload {
     level: Level;
 }
 
-type TopTab = 'scenes' | 'characters';
+type TopTab = 'scenes' | 'characters' | 'drops' | 'monsters' | 'weapons' | 'audios';
 type SceneSubTab = 'scenes' | 'background' | 'monsters' | 'air-walls' | 'materials';
 
 const TOP_TABS: { id: TopTab; label: string }[] = [
     { id: 'scenes', label: 'Scenes' },
-    { id: 'characters', label: 'Characters' },
+    { id: 'characters', label: 'Chars' },
+    { id: 'drops', label: 'Drops' },
+    { id: 'monsters', label: 'Mobs' },
+    { id: 'weapons', label: 'Weaps' },
+    { id: 'audios', label: 'Audio' },
 ];
 
 const SCENE_SUB_TABS: { id: SceneSubTab; label: string }[] = [
@@ -235,6 +245,10 @@ export function EditorPanel() {
                         <MaterialsSection level={level} setLevel={handleLevelChange} />
                     )}
                     {topTab === 'characters' && <CharacterSection />}
+                    {topTab === 'drops' && <DropsSection />}
+                    {topTab === 'monsters' && <MonstersSectionEditor />}
+                    {topTab === 'weapons' && <WeaponsSectionEditor />}
+                    {topTab === 'audios' && <AudiosSection />}
                 </div>
                 <div className="border-t border-neutral-800 p-3 flex flex-col gap-1.5">
                     {error && <div className="text-red-400 text-[11px]">{error}</div>}

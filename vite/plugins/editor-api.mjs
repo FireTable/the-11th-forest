@@ -648,6 +648,105 @@ async function handleUploadCharacterSprite(req, res) {
     });
 }
 
+// ─── Generic module CRUD (drops / monsters / weapons / audios) ──────────
+
+/**
+ * Resolve a module slug to its directory + index field name.
+ *
+ * The slug mirrors `public/data/<module>/index.yaml`:
+ *   drops      → drops,      dropSpec
+ *   monsters   → monsters,   monsterSpec
+ *   weapons    → weapons,    weaponSpec
+ *   audios-sfx → audios/sfx, sfxSpec
+ *   audios-music → audios/music, musicSpec
+ */
+const MODULE_ROOTS = {
+    drops: { dir: 'data/drops', indexField: 'drops' },
+    monsters: { dir: 'data/monsters', indexField: 'monsters' },
+    weapons: { dir: 'data/weapons', indexField: 'weapons' },
+    'audios-sfx': { dir: 'data/audios/sfx', indexField: 'sfx' },
+    'audios-music': { dir: 'data/audios/music', indexField: 'music' },
+};
+
+const ID_PATTERN_GENERIC = /^[a-z][a-z0-9-]*$/;
+
+async function handleListModule(req, res) {
+    const { module: mod } = await readJsonBody(req);
+    const root = MODULE_ROOTS[mod];
+    if (!root) return sendJson(res, 400, { error: `unknown module: ${mod}` });
+    try {
+        const idxPath = path.join(PUBLIC_DIR, root.dir.split('/').slice(0, 2).join('/'), 'index.yaml');
+        const text = await readFile(idxPath, 'utf8');
+        const idx = parseYaml(text) || {};
+        const ids = Array.isArray(idx[root.indexField]) ? idx[root.indexField] : [];
+        return sendJson(res, 200, { ids });
+    } catch {
+        return sendJson(res, 200, { ids: [] });
+    }
+}
+
+async function handleGetModuleSpec(req, res) {
+    const { module: mod, id } = await readJsonBody(req);
+    const root = MODULE_ROOTS[mod];
+    if (!root) return sendJson(res, 400, { error: `unknown module: ${mod}` });
+    if (typeof id !== 'string' || !ID_PATTERN_GENERIC.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    try {
+        const text = await readFile(
+            path.join(PUBLIC_DIR, root.dir, `${id}.yaml`),
+            'utf8',
+        );
+        return sendJson(res, 200, { id, spec: parseYaml(text) });
+    } catch {
+        return sendJson(res, 404, { error: `${mod}/${id} not found` });
+    }
+}
+
+async function handleSaveModuleSpec(req, res) {
+    const { module: mod, id, spec } = await readJsonBody(req);
+    const root = MODULE_ROOTS[mod];
+    if (!root) return sendJson(res, 400, { error: `unknown module: ${mod}` });
+    if (typeof id !== 'string' || !ID_PATTERN_GENERIC.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    if (!spec || typeof spec !== 'object') {
+        return sendJson(res, 400, { error: 'spec required' });
+    }
+    const out = path.join(PUBLIC_DIR, root.dir, `${id}.yaml`);
+    await writeFile(out, stringifyYaml(spec, { lineWidth: -1, noRefs: true }), 'utf8');
+    return sendJson(res, 200, { ok: true });
+}
+
+async function handleCreateModuleSpec(req, res) {
+    const { module: mod, id, spec } = await readJsonBody(req);
+    const root = MODULE_ROOTS[mod];
+    if (!root) return sendJson(res, 400, { error: `unknown module: ${mod}` });
+    if (typeof id !== 'string' || !ID_PATTERN_GENERIC.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    // Append to index.yaml
+    const idxPath = path.join(PUBLIC_DIR, root.dir.split('/').slice(0, 2).join('/'), 'index.yaml');
+    const idxText = await readFile(idxPath, 'utf8');
+    const idx = parseYaml(idxText) || {};
+    if (!Array.isArray(idx[root.indexField])) idx[root.indexField] = [];
+    if (!idx[root.indexField].includes(id)) {
+        idx[root.indexField].push(id);
+        await writeFile(
+            idxPath,
+            stringifyYaml(idx, { lineWidth: -1, noRefs: true }),
+            'utf8',
+        );
+    }
+    const out = path.join(PUBLIC_DIR, root.dir, `${id}.yaml`);
+    await writeFile(
+        out,
+        stringifyYaml(spec, { lineWidth: -1, noRefs: true }),
+        'utf8',
+    );
+    return sendJson(res, 200, { ok: true });
+}
+
 export function editorApiPlugin() {
     return {
         name: 'editor-api',
@@ -761,6 +860,38 @@ export function editorApiPlugin() {
                 if (req.method !== 'POST') return next();
                 try {
                     await handleUploadCharacterSprite(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/list-module', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleListModule(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/get-module-spec', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleGetModuleSpec(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/save-module-spec', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleSaveModuleSpec(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/create-module-spec', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleCreateModuleSpec(req, res);
                 } catch (e) {
                     sendJson(res, 500, { error: String(e?.message ?? e) });
                 }
