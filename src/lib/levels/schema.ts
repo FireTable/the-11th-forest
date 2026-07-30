@@ -68,11 +68,40 @@ export const CharacterSpawnSchema = z
     .strict()
     .transform((v) => ({ ...v, x: Math.round(v.x), y: Math.round(v.y) }));
 
+/**
+ * When a monster spawn is gated by a trigger instead of firing immediately
+ * at level start. Pure data — runtime evaluation lives in
+ * `src/game/monsters/monster.ts:advanceSpawnQueue`.
+ *
+ *   - `time`  fires at `levelStartElapsedMs + delayMs`.
+ *   - `clear` fires once when no monster of the same `waveId` (or any
+ *             monster, when `waveId` is omitted) is alive on the field,
+ *             plus optional `delayMs` after that moment.
+ *
+ * `waveId` is optional on `MonsterSpawnSchema` itself so the same kind of
+ * trigger can group multiple spawns into a "wave" that must all be cleared
+ * before the next wave fires.
+ */
+export const MonsterTriggerSchema = z
+    .object({
+        kind: z.enum(['time', 'clear']),
+        delayMs: z.number().gte(0).default(0),
+        /** For `kind: 'clear'` — only this wave must be cleared. For
+         *  `kind: 'time'` — tags which wave this spawn belongs to so
+         *  subsequent `clear` triggers can wait on it. */
+        waveId: z.string().min(1).optional(),
+    })
+    .strict();
+
 export const MonsterSpawnSchema = z
     .object({
         type: z.string().min(1),
         x: z.number(),
         y: z.number(),
+        trigger: MonsterTriggerSchema.optional(),
+        /** Tag this spawn as part of a named wave so other triggers can
+         *  wait on it via `trigger.waveId`. */
+        waveId: z.string().min(1).optional(),
     })
     .strict()
     .transform((v) => ({ ...v, x: Math.round(v.x), y: Math.round(v.y) }));

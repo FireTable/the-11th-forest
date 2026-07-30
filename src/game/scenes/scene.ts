@@ -97,6 +97,11 @@ export class LoadScene extends Phaser.Scene {
     private dropSystem!: DropController;
     private materialManager!: MaterialManager;
     private audio!: AudioController;
+    /** `this.time.now` value at the moment create() finished wiring the
+     *  level. Subtracted from current `this.time.now` to get elapsed. */
+    private levelStartAt = 0;
+    /** Last time we pushed levelElapsedMs to the store. Throttle to ~5Hz. */
+    private lastLevelClockPushAt = 0;
 
     constructor(
         private readonly id: string,
@@ -208,6 +213,8 @@ export class LoadScene extends Phaser.Scene {
                 )!,
                 x: m.x,
                 y: m.y,
+                trigger: m.trigger,
+                waveId: m.waveId,
             })),
             this.character.body,
             {
@@ -358,6 +365,10 @@ export class LoadScene extends Phaser.Scene {
             this.monsterSystem.update(this.time.now);
             this.dropSystem.update();
             this.materialManager.update();
+            // Push elapsed time to the UI store. Throttled to ~5Hz so we
+            // don't re-render React 60 times/sec for a 1-second-resolution
+            // display.
+            this.tickLevelClock();
         });
 
         // Tell the editor panel which scene this is. Both the EventBus
@@ -367,11 +378,28 @@ export class LoadScene extends Phaser.Scene {
         const payload = { id: this.id, level: this.level };
         setCurrentLevel(payload);
         useGameStore.getState().setLevelTitle(this.level.title || this.id);
+        this.levelStartAt = this.time.now;
+        this.lastLevelClockPushAt = this.time.now;
+        useGameStore.getState().setLevelElapsedMs(0);
         EventBus.emit('level-loaded', payload);
         EventBus.emit('current-scene-ready', this);
     }
 
     shutdown(): void {
         this.audio?.destroy();
+    }
+
+    /**
+     * Push the current elapsed-since-level-start to the UI store. Throttled
+     * to ~5Hz (200ms) so React doesn't re-render 60×/sec for a 1-second
+     * resolution display. The first push always fires immediately so the
+     * HUD shows 00:00 right after create() instead of holding the previous
+     * level's stale time.
+     */
+    private tickLevelClock(): void {
+        const now = this.time.now;
+        if (now - this.lastLevelClockPushAt < 200) return;
+        this.lastLevelClockPushAt = now;
+        useGameStore.getState().setLevelElapsedMs(now - this.levelStartAt);
     }
 }

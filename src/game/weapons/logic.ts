@@ -325,7 +325,7 @@ export class WeaponController {
             }
 
             b.rect.setPosition(bp.x, bp.y);
-            b.rect.setDepth(DEPTH.PROJECTILE_BASE + Math.round(bp.y) + 20);
+            b.rect.setDepth(DEPTH.PROJECTILE_BASE + Math.round(bp.y));
             b.rect.setRotation(Math.atan2(vel.y, vel.x) + (b.rotationOffset ?? 0));
             pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
         }

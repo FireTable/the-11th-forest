@@ -23,6 +23,7 @@ import type {
     LevelIndexSchema,
     LevelSchema,
     MonsterSpawnSchema,
+    MonsterTriggerSchema,
     PlacedMaterialSchema,
 } from './schema';
 
@@ -53,6 +54,9 @@ export type SpawnPoint = {
 export type CharacterSpawn = z.infer<typeof CharacterSpawnSchema>;
 
 export type MonsterSpawn = z.infer<typeof MonsterSpawnSchema>;
+
+/** Trigger gating a monster spawn — see `MonsterTriggerSchema`. */
+export type MonsterTrigger = z.infer<typeof MonsterTriggerSchema>;
 
 export type DropSpawn = z.infer<typeof DropSpawnSchema>;
 

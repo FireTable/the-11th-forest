@@ -31,6 +31,12 @@ import { EventBus } from '@/lib/events/bus';
 import type { WeaponSpec } from '@/lib/weapons';
 import { spawnProjectile, spawnMeleeHitbox } from '@/game/weapons/weapon';
 import { WeaponVisualController } from '@/game/weapons/visual';
+import {
+    advanceSpawnQueue,
+    type AliveSnapshot,
+    type PendingSpawn,
+} from '@/game/monsters/spawn-queue';
+import type { MonsterTrigger } from '@/lib/levels';
 import type { DropRef, MonsterSpec } from '@/lib/monsters';
 import { StatusHud } from '@/game/hubs/status-hud';
 
@@ -143,15 +149,27 @@ export class Monster {
     stuckTicks = 0;
     lastStuckCheckAt = 0;
     noLoSUntil = 0;
+    /** Wave identifier from the level spawn entry — used by `clear`
+     *  triggers that wait on a specific wave. Undefined for spawns that
+     *  aren't part of a named wave. */
+    waveId?: string;
     /** Visual tint per weapon kind — derived from weapon (ranged/melee). */
     static readonly TINT_MELEE = 0xef4444;
     static readonly TINT_RANGED = 0xa855f7;
 
-    constructor(scene: Phaser.Scene, spec: MonsterSpec, weapon: WeaponSpec, x: number, y: number) {
+    constructor(
+        scene: Phaser.Scene,
+        spec: MonsterSpec,
+        weapon: WeaponSpec,
+        x: number,
+        y: number,
+        waveId?: string,
+    ) {
         this.spec = spec;
         this.weapon = weapon;
         this.hp = spec.hp;
         this.stuckCheckPos = { x, y };
+        this.waveId = waveId;
 
         let w = spec.body.halfW * 2;
         let h = spec.body.halfH * 2;
@@ -308,9 +326,23 @@ export class MonsterController {
      *  interleaved races when two monsters fire on the same frame. */
     private lastDamageAt = 0;
 
+    /** Trigger-gated monster spawns awaiting their fire condition. Pairs the
+     *  pure `PendingSpawn` (consumed by `advanceSpawnQueue`) with the heavy
+     *  spec/weapon handles needed to instantiate the monster at fire time. */
+    private pendingSpawns: { pending: PendingSpawn; spec: MonsterSpec; weapon: WeaponSpec }[] = [];
+
     constructor(
         scene: Phaser.Scene,
-        spawns: { spec: MonsterSpec; weapon: WeaponSpec; x: number; y: number }[] | undefined,
+        spawns:
+            | {
+                  spec: MonsterSpec;
+                  weapon: WeaponSpec;
+                  x: number;
+                  y: number;
+                  trigger?: MonsterTrigger;
+                  waveId?: string;
+              }[]
+            | undefined,
         playerBody: MatterJS.BodyType,
         cb: MonsterControllerCallbacks,
         pathfinder?: PathfindingService,
@@ -323,10 +355,32 @@ export class MonsterController {
 
         // Self-spawn monsters from the spawn list (replaces the old
         // spawnMonsters helper — controller owns its own construction).
+        // Spawns without a `trigger` (or with `kind: 'time', delayMs: 0`)
+        // fire immediately; everything else lands in the pending queue and
+        // gets checked each frame via `advanceSpawnQueue`.
         if (spawns) {
-            for (const s of spawns) {
-                this.monsters.push(new Monster(scene, s.spec, s.weapon, s.x, s.y));
-            }
+            spawns.forEach((s, index) => {
+                const trigger = s.trigger;
+                // Immediate: no trigger at all, OR `kind: 'time', delayMs: 0`.
+                // Branch in two separate checks so TS narrows `trigger` to a
+                // non-undefined type after the if/return.
+                if (!trigger || (trigger.kind === 'time' && trigger.delayMs === 0)) {
+                    this.monsters.push(new Monster(scene, s.spec, s.weapon, s.x, s.y, s.waveId));
+                    return;
+                }
+                this.pendingSpawns.push({
+                    pending: {
+                        index,
+                        type: s.spec.id!,
+                        x: s.x,
+                        y: s.y,
+                        trigger,
+                        waveId: s.waveId,
+                    },
+                    spec: s.spec,
+                    weapon: s.weapon,
+                });
+            });
         }
 
         this.bindCollisions();
@@ -341,6 +395,7 @@ export class MonsterController {
 
     /** Per-frame: AI tick + projectile sync + cleanup. */
     update(time: number): void {
+        this.advancePendingSpawns(time);
         const pp = this.playerBody.position;
         const playerMovedDist = distBetween(this.lastPlayerPos, pp);
         const shouldRecalcPaths =
@@ -792,6 +847,45 @@ export class MonsterController {
             duration: totalMs,
             ease: 'Linear',
             onComplete: () => m.destroy(this.scene),
+        });
+    }
+
+    /**
+     * Per-frame: advance the trigger-gated spawn queue. Builds an
+     * alive snapshot grouped by waveId, hands it to the pure reducer,
+     * instantiates any spawns that fire, and updates the surviving
+     * queue with refreshed `clearReadyAt` stamps.
+     */
+    private advancePendingSpawns(time: number): void {
+        if (this.pendingSpawns.length === 0) return;
+
+        // Build alive snapshot: count non-dead/non-dying monsters per waveId.
+        // Empty-string bucket holds spawns without a waveId.
+        const byWave: Record<string, number> = {};
+        for (const m of this.monsters) {
+            if (m.dead || m.state === 'dying') continue;
+            const w = m.waveId ?? '';
+            byWave[w] = (byWave[w] ?? 0) + 1;
+        }
+        const alive: AliveSnapshot = { byWave };
+
+        const pendingList = this.pendingSpawns.map((q) => q.pending);
+        const { fired, remaining } = advanceSpawnQueue(pendingList, time, alive);
+
+        // Instantiate fired spawns + keep survivors with updated clearReadyAt.
+        const remainingByIndex = new Map<number, PendingSpawn>();
+        for (const p of remaining) remainingByIndex.set(p.index, p);
+        this.pendingSpawns = this.pendingSpawns.filter((q) => {
+            const isFired = fired.some((p) => p.index === q.pending.index);
+            if (isFired) {
+                this.monsters.push(
+                    new Monster(this.scene, q.spec, q.weapon, q.pending.x, q.pending.y, q.pending.waveId),
+                );
+                return false;
+            }
+            const refreshed = remainingByIndex.get(q.pending.index);
+            if (refreshed) q.pending.clearReadyAt = refreshed.clearReadyAt;
+            return true;
         });
     }
 

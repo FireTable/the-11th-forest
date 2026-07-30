@@ -19,6 +19,7 @@ export type {
     Level,
     LevelIndex,
     MonsterSpawn,
+    MonsterTrigger,
 } from './types';
 
 export { parseImageSize, formatImageSize } from './types';

@@ -26,12 +26,16 @@ export interface GameUIState {
 
     // Level Status
     levelTitle: string;
+    /** Elapsed milliseconds since the current level started. Driven by
+     *  the scene's update() loop; HUDs read it to display MM:SS. */
+    levelElapsedMs: number;
 
     // Visibility
     hubsVisible: boolean;
 
     // Setters
     setLevelTitle: (title: string) => void;
+    setLevelElapsedMs: (ms: number) => void;
     setCharacterStats: (stats: { name?: string; hp: number; maxHp: number; sp: number; maxSp: number }) => void;
     setWeaponStats: (stats: {
         activeIndex: number;
@@ -61,10 +65,12 @@ export const useGameStore = create<GameUIState>((set) => ({
     slots: [],
 
     levelTitle: '',
+    levelElapsedMs: 0,
 
     hubsVisible: true,
 
     setLevelTitle: (title) => set({ levelTitle: title }),
+    setLevelElapsedMs: (ms) => set({ levelElapsedMs: ms }),
 
     setCharacterStats: (stats) =>
         set((state) => ({
