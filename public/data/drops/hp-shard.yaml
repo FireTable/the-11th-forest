@@ -1,5 +1,6 @@
 name: HP Shard
 kind: static
+sfx: pickup-hp
 visual:
     size: 18
     tint: 0x22c55e

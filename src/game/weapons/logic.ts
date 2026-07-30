@@ -111,10 +111,15 @@ export class WeaponController {
                 const isMonster = (category & CAT.MONSTER_MELEE) !== 0 || other.label === 'monster';
 
                 if (isTallWall) {
+                    // Find the slot whose bullet hit, so the per-weapon
+                    // sfx.bulletWall override applies.
+                    const ownerIndex = this.bullets.findIndex((b) => b.body === bulletBody);
+                    const ownerSpec = ownerIndex >= 0 ? this.slots[this.currentIndex].spec : undefined;
                     for (let i = this.bullets.length - 1; i >= 0; i--) {
                         if (this.bullets[i].body === bulletBody) {
                             this.destroyBullet(i);
-                            EventBus.emit(SFX_EVENT('bullet-wall'));
+                            const sfx = ownerSpec?.sfx?.bulletWall ?? 'bullet-wall';
+                            EventBus.emit(SFX_EVENT(sfx));
                             break;
                         }
                     }
@@ -149,7 +154,7 @@ export class WeaponController {
         if (slot.ammo >= clipSize) return;
         slot.reloading = true;
         slot.reloadStartedAt = this.scene.time.now;
-        EventBus.emit(SFX_EVENT('reload-start'));
+        EventBus.emit(SFX_EVENT(slot.spec.sfx?.reloadStart ?? 'reload-start'));
     }
 
     /** Drop ammo into the current slot — caps at clipSize. */
@@ -236,7 +241,7 @@ export class WeaponController {
                     slot.ammo = slot.spec.clipSize ?? 1;
                     slot.reloading = false;
                     slot.justCompletedAt = time;
-                    EventBus.emit(SFX_EVENT('reload-finish'));
+                    EventBus.emit(SFX_EVENT(slot.spec.sfx?.reloadFinish ?? 'reload-finish'));
                 }
             }
             if (slot.justCompletedAt > 0) {
@@ -252,7 +257,7 @@ export class WeaponController {
         if (active.ammo === 0 && !active.reloading && active.justCompletedAt === 0) {
             active.reloading = true;
             active.reloadStartedAt = time;
-            EventBus.emit(SFX_EVENT('reload-start'));
+            EventBus.emit(SFX_EVENT(active.spec.sfx?.reloadStart ?? 'reload-start'));
         }
 
         // 3. Fire — gated by reload state and ammo.
@@ -265,7 +270,7 @@ export class WeaponController {
             // Dry-fire click on empty clip — once per fire-press. Tracks
             // the rising edge of `fire` via lastFireAt so we don't spam.
             if (time - active.lastFireAt >= 80) {
-                EventBus.emit(SFX_EVENT('dry-fire'));
+                EventBus.emit(SFX_EVENT(active.spec.sfx?.dryFire ?? 'dry-fire'));
                 active.lastFireAt = time;
             }
         }
@@ -307,7 +312,7 @@ export class WeaponController {
         const projectile = slot.spec.projectile;
         if (!projectile) return; // melee-only weapons don't fire
         const { speed, visual: size } = projectile;
-        EventBus.emit(SFX_EVENT('player-shoot'));
+        EventBus.emit(SFX_EVENT(slot.spec.sfx?.shoot ?? 'player-shoot'));
         // Spread only when n > 1 (shotgun-style). Single-shot weapons fire straight.
         const spreadDeg = n > 1 ? 16 : 0;
         for (let i = 0; i < n; i++) {

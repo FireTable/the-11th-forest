@@ -325,7 +325,7 @@ export class MonsterController {
             // One-shot aggro growl on the first idle → chase transition.
             if (!m.hasAggroed && prevState === 'idle' && m.state === 'chase') {
                 m.hasAggroed = true;
-                EventBus.emit(SFX_EVENT('monster-aggro'));
+                EventBus.emit(SFX_EVENT(m.spec.sfx?.aggro ?? 'monster-aggro'));
             }
 
             // ── Velocity ──────────────────────────────────────────────
@@ -434,7 +434,7 @@ export class MonsterController {
         if (target && target.state !== 'dying') {
             target.hp -= bulletDamage;
             target.lastHitAt = this.scene.time.now;
-            EventBus.emit(SFX_EVENT('monster-hit'));
+            EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'));
 
             if (target.hp <= 0) {
                 this.kill(target);
@@ -493,7 +493,7 @@ export class MonsterController {
 
     private kill(m: Monster): void {
         m.state = 'dying';
-        EventBus.emit(SFX_EVENT('monster-death'));
+        EventBus.emit(SFX_EVENT(m.spec.sfx?.death ?? 'monster-death'));
 
         // Disable collision filter so dead monster doesn't block player or bullets
         m.body.collisionFilter.mask = 0;

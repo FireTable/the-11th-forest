@@ -76,6 +76,79 @@ weaponId: drone-claws
     });
 });
 
+describe('parseMonsterYaml — sfx', () => {
+    it('accepts optional sfx block', () => {
+        const m = parseMonsterYaml(
+            `
+name: Drone
+hp: 30
+moveSpeed: 4
+weaponId: drone-claws
+drops: []
+sfx:
+  hit: monster-hit
+  death: monster-death
+  aggro: monster-aggro
+`,
+            'drone',
+        );
+        expect(m.sfx).toEqual({
+            hit: 'monster-hit',
+            death: 'monster-death',
+            aggro: 'monster-aggro',
+        });
+    });
+
+    it('sfx block is optional (undefined when omitted)', () => {
+        const m = parseMonsterYaml(
+            `
+name: Drone
+hp: 30
+moveSpeed: 4
+weaponId: drone-claws
+drops: []
+`,
+            'drone',
+        );
+        expect(m.sfx).toBeUndefined();
+    });
+
+    it('partial sfx block (only hit) is accepted', () => {
+        const m = parseMonsterYaml(
+            `
+name: Drone
+hp: 30
+moveSpeed: 4
+weaponId: drone-claws
+drops: []
+sfx:
+  hit: monster-hit
+`,
+            'drone',
+        );
+        expect(m.sfx?.hit).toBe('monster-hit');
+        expect(m.sfx?.death).toBeUndefined();
+        expect(m.sfx?.aggro).toBeUndefined();
+    });
+
+    it('rejects empty sfx value', () => {
+        expect(() =>
+            parseMonsterYaml(
+                `
+name: Drone
+hp: 30
+moveSpeed: 4
+weaponId: drone-claws
+drops: []
+sfx:
+  hit: ''
+`,
+                'drone',
+            ),
+        ).toThrow(/sfx/);
+    });
+});
+
 describe('parseMonsterIndex', () => {
     it('parses a manifest', () => {
         const idx = parseMonsterIndex('monsters:\n  - drone\n  - gunner\n');

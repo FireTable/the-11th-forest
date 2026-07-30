@@ -81,6 +81,83 @@ projectile:
     });
 });
 
+describe('parseWeaponYaml — sfx', () => {
+    it('accepts optional sfx block', () => {
+        const w = parseWeaponYaml(
+            `
+name: Pistol
+damage: 12
+cooldownMs: 200
+range: 600
+projectile:
+  speed: 20
+  visual:
+    radius: 4
+    width: 16
+    height: 4
+    color: 0x22c55e
+sfx:
+  shoot: pistol-shoot
+  reloadStart: pistol-reload
+  reloadFinish: pistol-reload-finish
+  dryFire: pistol-dry
+  bulletWall: bullet-wall
+`,
+            'pistol',
+        );
+        expect(w.sfx).toEqual({
+            shoot: 'pistol-shoot',
+            reloadStart: 'pistol-reload',
+            reloadFinish: 'pistol-reload-finish',
+            dryFire: 'pistol-dry',
+            bulletWall: 'bullet-wall',
+        });
+    });
+
+    it('sfx is optional', () => {
+        const w = parseWeaponYaml(
+            `
+name: Pistol
+damage: 12
+cooldownMs: 200
+range: 600
+projectile:
+  speed: 20
+  visual:
+    radius: 4
+    width: 16
+    height: 4
+    color: 0x22c55e
+`,
+            'pistol',
+        );
+        expect(w.sfx).toBeUndefined();
+    });
+
+    it('partial sfx block accepted (only shoot)', () => {
+        const w = parseWeaponYaml(
+            `
+name: Pistol
+damage: 12
+cooldownMs: 200
+range: 600
+projectile:
+  speed: 20
+  visual:
+    radius: 4
+    width: 16
+    height: 4
+    color: 0x22c55e
+sfx:
+  shoot: pistol-shoot
+`,
+            'pistol',
+        );
+        expect(w.sfx?.shoot).toBe('pistol-shoot');
+        expect(w.sfx?.reloadStart).toBeUndefined();
+    });
+});
+
 describe('parseWeaponYaml — melee', () => {
     const validYaml = `
 name: Claws

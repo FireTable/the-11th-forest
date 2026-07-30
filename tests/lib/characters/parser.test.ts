@@ -207,3 +207,83 @@ describe('parseCharacterIndex', () => {
         expect(() => parseCharacterIndex('characters: 7')).toThrow(/array/);
     });
 });
+
+describe('parseCharacterYaml — sfx', () => {
+    const baseYaml = `
+id: wanderer
+name: Wanderer
+hp: 100
+sp: 60
+moveSpeed: 10
+spRegenMs: 5000
+body: { halfW: 16, halfH: 24 }
+dodge: { spCost: 15, speed: 14, durationMs: 220, cooldownMs: 600 }
+hotbar: [pistol]
+`;
+
+    it('accepts full sfx block with tuning', () => {
+        const c = parseCharacterYaml(
+            `${baseYaml}
+sfx:
+  dodge: dodge
+  hurt: player-hurt
+  footstep: footstep
+  footstepThrottleMs: 200
+  lowHpHeartbeat: low-hp-heartbeat
+  lowHpThreshold: 0.3
+  lowHpPulseMs: 900
+`,
+            'wanderer',
+        );
+        expect(c.sfx).toEqual({
+            dodge: 'dodge',
+            hurt: 'player-hurt',
+            footstep: 'footstep',
+            footstepThrottleMs: 200,
+            lowHpHeartbeat: 'low-hp-heartbeat',
+            lowHpThreshold: 0.3,
+            lowHpPulseMs: 900,
+        });
+    });
+
+    it('sfx block is optional', () => {
+        const c = parseCharacterYaml(baseYaml, 'wanderer');
+        expect(c.sfx).toBeUndefined();
+    });
+
+    it('partial sfx block (only dodge) is accepted', () => {
+        const c = parseCharacterYaml(
+            `${baseYaml}
+sfx:
+  dodge: dodge
+`,
+            'wanderer',
+        );
+        expect(c.sfx?.dodge).toBe('dodge');
+        expect(c.sfx?.footstep).toBeUndefined();
+    });
+
+    it('rejects lowHpThreshold out of (0, 1]', () => {
+        expect(() =>
+            parseCharacterYaml(
+                `${baseYaml}
+sfx:
+  lowHpThreshold: 1.5
+`,
+                'wanderer',
+            ),
+        ).toThrow(/lowHpThreshold/);
+    });
+
+    it('rejects negative footstepThrottleMs', () => {
+        expect(() =>
+            parseCharacterYaml(
+                `${baseYaml}
+sfx:
+  footstepThrottleMs: -10
+`,
+                'wanderer',
+            ),
+        ).toThrow(/footstepThrottleMs/);
+    });
+});

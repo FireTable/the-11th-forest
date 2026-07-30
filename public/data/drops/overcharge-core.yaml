@@ -1,5 +1,6 @@
 name: Overcharge Core
 kind: static
+sfx: pickup-overcharge
 visual:
     size: 22
     tint: 0xef4444

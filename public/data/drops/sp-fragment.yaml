@@ -1,5 +1,6 @@
 name: SP Fragment
 kind: static
+sfx: pickup-sp
 visual:
     size: 18
     tint: 0x3b82f6

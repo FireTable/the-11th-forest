@@ -1,5 +1,6 @@
 name: Ammo Cache
 kind: static
+sfx: pickup-ammo
 visual:
     size: 18
     tint: 0xfacc15

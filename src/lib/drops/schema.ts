@@ -72,6 +72,9 @@ export const DropSpecSchema = z
         kind: z.enum(['static', 'monster']),
         visual: DropVisualSchema,
         effect: DropEffectSchema,
+        /** SFX id to play on pickup. Falls back to a generic pickup tone
+         *  in the controller when omitted. */
+        sfx: z.string().min(1).optional(),
         sprite: SpriteSchema.optional(),
         anims: z.record(z.string(), AnimSpecSchema).optional(),
         prompt: z.string().optional(),

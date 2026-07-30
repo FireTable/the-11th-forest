@@ -4,3 +4,5 @@ cooldownMs: 1000
 range: 36
 hitWidth: 30
 hitHeight: 30
+sfx:
+  bulletWall: bullet-wall

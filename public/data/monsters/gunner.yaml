@@ -5,6 +5,10 @@ body:
     halfW: 32
     halfH: 20
 weaponId: gunner-blast
+sfx:
+    hit: monster-hit
+    death: monster-death
+    aggro: monster-aggro
 drops:
     - dropId: ammo-cache
       chance: 0.5

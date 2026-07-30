@@ -12,3 +12,9 @@ projectile:
     width: 16
     height: 4
     color: 0x22c55e
+sfx:
+  shoot: player-shoot
+  dryFire: dry-fire
+  bulletWall: bullet-wall
+  reloadStart: reload-start
+  reloadFinish: reload-finish

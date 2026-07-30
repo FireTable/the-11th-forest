@@ -72,6 +72,14 @@ export const AnimSpecSchema = z
 
 const AnimsSchema = z.record(z.string(), AnimSpecSchema);
 
+export const MonsterSfxSchema = z
+    .object({
+        hit: z.string().min(1).optional(),
+        death: z.string().min(1).optional(),
+        aggro: z.string().min(1).optional(),
+    })
+    .strict();
+
 export const MonsterSpecSchema = z
     .object({
         id: z.string().min(1).optional(),
@@ -83,6 +91,9 @@ export const MonsterSpecSchema = z
         body: BodySchema,
         weaponId: z.string().min(1),
         drops: z.array(DropRefSchema).default([]),
+        /** SFX ids to play on hit / death / aggro. Each field optional;
+         *  controller falls back to global 'monster-*' ids when missing. */
+        sfx: MonsterSfxSchema.optional(),
         sprite: SpriteSchema.optional(),
         anims: AnimsSchema.optional(),
     })

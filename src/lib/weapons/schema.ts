@@ -33,6 +33,19 @@ const ProjectileSchema = z
     })
     .strict();
 
+/** SFX ids played for this weapon's events. All fields optional —
+ *  controller falls back to global 'player-shoot' / 'reload-*' / etc.
+ *  when missing. */
+export const WeaponSfxSchema = z
+    .object({
+        shoot: z.string().min(1).optional(),
+        dryFire: z.string().min(1).optional(),
+        bulletWall: z.string().min(1).optional(),
+        reloadStart: z.string().min(1).optional(),
+        reloadFinish: z.string().min(1).optional(),
+    })
+    .strict();
+
 export const WeaponSpecSchema = z
     .object({
         id: z.string().min(1).optional(),
@@ -48,6 +61,7 @@ export const WeaponSpecSchema = z
         // Melee-only
         hitWidth: z.number().gt(0).optional(),
         hitHeight: z.number().gt(0).optional(),
+        sfx: WeaponSfxSchema.optional(),
     })
     .strict()
     .superRefine((val, ctx) => {

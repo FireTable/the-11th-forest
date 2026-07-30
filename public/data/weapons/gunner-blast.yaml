@@ -9,3 +9,6 @@ projectile:
     width: 14
     height: 4
     color: 0xef4444
+sfx:
+  shoot: monster-shoot
+  bulletWall: bullet-wall

@@ -5,6 +5,10 @@ body:
     halfW: 20
     halfH: 20
 weaponId: drone-claws
+sfx:
+    hit: monster-hit
+    death: monster-death
+    aggro: monster-aggro
 drops:
     - dropId: hp-shard
       chance: 0.4

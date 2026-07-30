@@ -214,6 +214,62 @@ effect:
     });
 });
 
+describe('parseDropYaml — sfx', () => {
+    it('accepts optional sfx id', () => {
+        const d = parseDropYaml(
+            `
+name: HP Shard
+kind: static
+sfx: pickup-hp
+visual:
+  size: 18
+  tint: 0x22c55e
+effect:
+  type: instant
+  hp: 25
+`,
+            'hp-shard',
+        );
+        expect(d.sfx).toBe('pickup-hp');
+    });
+
+    it('sfx is optional (undefined when omitted)', () => {
+        const d = parseDropYaml(
+            `
+name: X
+kind: static
+visual:
+  size: 18
+  tint: 0xffffff
+effect:
+  type: instant
+  hp: 1
+`,
+            'x',
+        );
+        expect(d.sfx).toBeUndefined();
+    });
+
+    it('rejects empty sfx string', () => {
+        expect(() =>
+            parseDropYaml(
+                `
+name: X
+kind: static
+sfx: ''
+visual:
+  size: 18
+  tint: 0xffffff
+effect:
+  type: instant
+  hp: 1
+`,
+                'x',
+            ),
+        ).toThrow(/sfx/);
+    });
+});
+
 describe('parseDropIndex', () => {
     it('parses a manifest', () => {
         const idx = parseDropIndex('drops:\n  - hp-shard\n  - sp-frag\n');

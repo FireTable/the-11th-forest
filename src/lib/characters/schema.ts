@@ -75,6 +75,22 @@ const AnimSpecSchema = z
 
 const AnimsSchema = z.record(z.string(), AnimSpecSchema);
 
+/** Per-character audio identity. SFX ids are required when the
+ *  corresponding event applies; tuning knobs (throttle / threshold /
+ *  pulse) are optional and fall back to controller defaults when
+ *  omitted. */
+export const CharacterSfxSchema = z
+    .object({
+        dodge: z.string().min(1).optional(),
+        hurt: z.string().min(1).optional(),
+        footstep: z.string().min(1).optional(),
+        footstepThrottleMs: z.number().gt(0).optional(),
+        lowHpHeartbeat: z.string().min(1).optional(),
+        lowHpThreshold: z.number().gt(0).lte(1).optional(),
+        lowHpPulseMs: z.number().gt(0).optional(),
+    })
+    .strict();
+
 export const CharacterSpecSchema = z
     .object({
         // YAML `id` is required and must match the filename-derived id;
@@ -94,6 +110,9 @@ export const CharacterSpecSchema = z
         body: BodySchema,
         dodge: DodgeSchema,
         hotbar: z.array(z.string().min(1)).min(1),
+        /** Per-character audio identity — SFX ids + tuning knobs for
+         *  dodge / hurt / footstep / low-HP heartbeat. All optional. */
+        sfx: CharacterSfxSchema.optional(),
         sprite: SpriteSchema.optional(),
         anims: AnimsSchema.optional(),
     })

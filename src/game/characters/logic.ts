@@ -229,7 +229,10 @@ export class CharacterController {
     heal(hpDelta: number, spDelta: number): void {
         if (hpDelta !== 0) {
             this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
-            if (hpDelta < 0) EventBus.emit(SFX_EVENT('player-hurt'));
+            if (hpDelta < 0) {
+                const sfx = this.spec.sfx?.hurt;
+                if (sfx) EventBus.emit(SFX_EVENT(sfx));
+            }
         }
         if (spDelta !== 0) this.sp = Math.max(0, Math.min(this.spec.sp, this.sp + spDelta));
     }
@@ -281,7 +284,8 @@ export class CharacterController {
             this.dodgeVy = dodge.vy;
             this.dodgeActiveUntil = now + this.spec.dodge.durationMs;
             this.lastDodgeEndAt = now + this.spec.dodge.durationMs;
-            EventBus.emit(SFX_EVENT('dodge'));
+            const sfx = this.spec.sfx?.dodge;
+            if (sfx) EventBus.emit(SFX_EVENT(sfx));
         }
 
         // ── Velocity resolution ─────────────────────────────────────
@@ -342,17 +346,25 @@ export class CharacterController {
             );
         }
 
-        // ── Footstep SFX (throttled) ─────────────────────────────────
+        // ── Footstep SFX (throttled; cadence from spec) ─────────────
         const moving = intent.vx !== 0 || intent.vy !== 0;
-        if (moving && now >= this.dodgeActiveUntil && now - this.lastFootstepAt > 200) {
-            EventBus.emit(SFX_EVENT('footstep'));
+        const footstepThrottleMs = this.spec.sfx?.footstepThrottleMs ?? 200;
+        if (
+            moving &&
+            now >= this.dodgeActiveUntil &&
+            now - this.lastFootstepAt > footstepThrottleMs
+        ) {
+            const sfx = this.spec.sfx?.footstep;
+            if (sfx) EventBus.emit(SFX_EVENT(sfx));
             this.lastFootstepAt = now;
         }
 
-        // ── Low-HP heartbeat (only while HP < 30%) ───────────────────
-        const lowHpThreshold = this.spec.hp * 0.3;
-        if (this.hp < lowHpThreshold && now - this.lastHeartbeatAt > 900) {
-            EventBus.emit(SFX_EVENT('low-hp-heartbeat'));
+        // ── Low-HP heartbeat (threshold + pulse from spec) ──────────
+        const lowHpThreshold = this.spec.sfx?.lowHpThreshold ?? 0.3;
+        const lowHpPulseMs = this.spec.sfx?.lowHpPulseMs ?? 900;
+        if (this.hp < this.spec.hp * lowHpThreshold && now - this.lastHeartbeatAt > lowHpPulseMs) {
+            const sfx = this.spec.sfx?.lowHpHeartbeat;
+            if (sfx) EventBus.emit(SFX_EVENT(sfx));
             this.lastHeartbeatAt = now;
         }
 
