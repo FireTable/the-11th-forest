@@ -144,9 +144,13 @@ export function spawnMeleeHitbox(
     matter: any,
     opts: MeleeSpawnOptions,
 ): BulletRecord {
-    const dist = opts.range * 0.6;
-    const hx = opts.origin.x + Math.cos(opts.angle) * dist;
-    const hy = opts.origin.y + Math.sin(opts.angle) * dist;
+    const scale = opts.scale ?? 0.18;
+    const isLeft = Math.cos(opts.angle) < 0;
+
+    // Position directly on character left or right side based on facing direction
+    const sideOffset = opts.range * 0.45;
+    const hx = opts.origin.x + (isLeft ? -sideOffset : sideOffset);
+    const hy = opts.origin.y;
 
     const body = matter.Bodies.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, {
         isSensor: true,
@@ -156,46 +160,30 @@ export function spawnMeleeHitbox(
             mask: PROJECTILE_PLAYER_MASK,
         },
     });
-    matter.Body.setAngle(body, opts.angle);
     scene.matter.world.add(body);
 
     let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
-    const scale = opts.scale ?? 0.18;
-    const isLeft = Math.cos(opts.angle) < 0;
 
-    // sweepArc: how many radians the arc sweeps during animation
-    const sweepArc = Math.PI / 5; // 36 degrees
-
-    // rotationOffset: extra rotation on the sprite around its own center (YAML-configurable)
-    // Positive = clockwise, negated when facing left to preserve mirror symmetry
     const rotOffsetRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
-    const visualRotOffset = isLeft ? -rotOffsetRad : rotOffsetRad;
-
-    // Base angle pointing OUTWARD from player (same direction as attack)
-    // Start swept back, sweep forward through the attack direction
-    const baseAngle = opts.angle + visualRotOffset;
-    const startRotation = baseAngle - sweepArc;
-    const endRotation = baseAngle + sweepArc;
+    const visualRotation = isLeft ? -rotOffsetRad : rotOffsetRad;
 
     if (opts.texture && scene.textures.exists(opts.texture)) {
-        // Spawn slash arc centered at hitbox position (hx, hy) - in front of player
-        // Center pivot (0.5, 0.5) makes rotationOffset rotate the image around its center
+        // Spawn full circle / melee graphic centered directly at character left/right
         const sprite = scene.add.image(hx, hy, opts.texture);
         sprite.setOrigin(0.5, 0.5);
         sprite.setDepth(DEPTH.MELEE_SLASH);
-        // Mirror via flipX when facing left — keeps scaleX always positive so rotation tween is clean
         sprite.setFlipX(isLeft);
         sprite.setScale(scale, scale);
-        sprite.setRotation(startRotation);
+        sprite.setRotation(visualRotation);
         sprite.setAlpha(1.0);
+
         scene.tweens.add({
             targets: sprite,
-            rotation: endRotation,
             alpha: 0,
-            scaleX: scale * 1.5,
-            scaleY: scale * 1.5,
+            scaleX: scale * 1.35,
+            scaleY: scale * 1.35,
             duration: 200,
-            ease: 'Quad.out',
+            ease: 'Cubic.out',
             onComplete: () => {
                 sprite.destroy();
                 scene.matter.world.remove(body);
@@ -204,7 +192,6 @@ export function spawnMeleeHitbox(
         visualObj = sprite;
     } else {
         const rect = scene.add.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, 0xc084fc, 0.7);
-        rect.setRotation(opts.angle);
         scene.tweens.add({
             targets: rect,
             alpha: 0,
