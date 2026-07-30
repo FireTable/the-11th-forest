@@ -401,10 +401,22 @@ export class WeaponController {
             const t = n === 1 ? 0 : (i - (n - 1) / 2) * (spreadDeg / Math.max(1, n - 1));
             const a = angle + (t * Math.PI) / 180;
             const v = bulletVelocity(a, speed);
+
+            let originX = muzzlePos.x;
+            let originY = muzzlePos.y;
+            if (slot.spec.bullet?.spawnOffset) {
+                const [offX, offY] = slot.spec.bullet.spawnOffset;
+                const cos = Math.cos(a);
+                const sin = Math.sin(a);
+                const effectiveOffY = Math.cos(angle) < 0 ? -offY : offY;
+                originX += cos * offX - sin * effectiveOffY;
+                originY += sin * offX + cos * effectiveOffY;
+            }
+
             const bullet = spawnProjectile(
                 this.scene,
                 this.matter,
-                { x: muzzlePos.x, y: muzzlePos.y },
+                { x: originX, y: originY },
                 { x: v.x, y: v.y },
                 {
                     label: 'player-bullet',
@@ -415,6 +427,7 @@ export class WeaponController {
                     size,
                     texture: slot.spec.bullet?.texture,
                     scale: slot.spec.bullet?.scale,
+                    anchor: slot.spec.bullet?.anchor,
                     color: slot.spec.projectile?.visual?.color,
                     maxDistance: slot.spec.range,
                     rotationOffset: slot.spec.bullet?.rotationOffset,

@@ -1,5 +1,5 @@
 name: Assault Rifle
-damage: 15
+damage: 8
 cooldownMs: 100
 range: 550
 clipSize: 30

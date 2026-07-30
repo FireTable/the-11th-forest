@@ -68,7 +68,10 @@ export const WeaponPairedBulletSchema = z
         scale: z.number().gt(0).default(1),
         color: z.string().optional(),
         beamWidth: z.number().gt(0).optional(),
-        rotationOffset: z.number().default(0),
+        beamDuration: z.number().gt(0).optional(),
+        anchor: z.tuple([z.number(), z.number()]).optional(),
+        rotationOffset: z.number().optional(),
+        spawnOffset: z.tuple([z.number(), z.number()]).optional(),
     })
     .strict();
 

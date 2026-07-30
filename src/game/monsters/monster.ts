@@ -290,6 +290,13 @@ export class MonsterController {
         this.bindCollisions();
     }
 
+    /** Get active alive monsters positions for aim assist magnet. */
+    public getActiveMonsters(): { x: number; y: number }[] {
+        return this.monsters
+            .filter((m) => !m.dead && m.state !== 'dying')
+            .map((m) => ({ x: m.body.position.x, y: m.body.position.y }));
+    }
+
     /** Per-frame: AI tick + projectile sync + cleanup. */
     update(time: number): void {
         const pp = this.playerBody.position;
@@ -327,6 +334,14 @@ export class MonsterController {
             if (m.state === 'dying') {
                 // Freeze physics body during death animation
                 this.matter.Body.setVelocity(m.body, { x: 0, y: 0 });
+                if (m.statusHud) {
+                    const halfH = m.sprite ? m.sprite.displayHeight / 2 : m.spec.body.halfH;
+                    m.statusHud.update(
+                        { hp: 0, maxHp: m.spec.hp, showHpBar: false },
+                        time,
+                        halfH,
+                    );
+                }
                 continue;
             }
 
@@ -525,9 +540,6 @@ export class MonsterController {
 
         // Disable collision filter so dead monster doesn't block player or bullets
         m.body.collisionFilter.mask = 0;
-
-        // Hide editor-only chrome immediately — no point fading a hidden rect.
-        m.statusHud?.destroy();
 
         // Compute the death-track duration so the fade can run in PARALLEL
         // with the animation, not after. By the time the death anim ends

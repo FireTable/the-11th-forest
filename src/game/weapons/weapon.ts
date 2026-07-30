@@ -65,6 +65,7 @@ export interface ProjectileSpawnOptions {
     color?: number;
     maxDistance?: number;
     rotationOffset?: number;
+    anchor?: [number, number];
 }
 
 /**
@@ -99,6 +100,7 @@ export function spawnProjectile(
     if (opts.texture && scene.textures.exists(opts.texture)) {
         const sprite = scene.add.image(origin.x, origin.y, opts.texture);
         if (opts.scale) sprite.setScale(opts.scale);
+        if (opts.anchor) sprite.setOrigin(opts.anchor[0], opts.anchor[1]);
         visualObj = sprite;
     } else {
         const rect = scene.add.rectangle(origin.x, origin.y, width, height, bulletColor);
