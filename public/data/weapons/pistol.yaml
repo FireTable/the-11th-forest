@@ -6,28 +6,27 @@ clipSize: 12
 reloadTimeMs: 1200
 bulletsPerShot: 1
 visual:
-  texture: assets/image/weapons/pistol.png
-  scale: 0.16
-  orbitRadius: 16
-  anchor: [0.2, 0.5]
-  recoilDistance: 6
-  recoilDuration: 80
+    texture: assets/image/weapons/pistol.png
+    scale: 0.16
+    orbitRadius: 16
+    anchor: [0.2, 0.5]
+    recoilDistance: 6
+    recoilDuration: 80
 bullet:
-  texture: assets/image/weapons/pistol-bullet.png
-  type: projectile
-  speed: 600
-  scale: 0.16
+    texture: assets/image/weapons/pistol-bullet.png
+    type: projectile
+    speed: 600
+    scale: 0.16
 projectile:
-  speed: 20
-  visual:
-    radius: 4
-    width: 16
-    height: 4
-    color: 0x22c55e
+    speed: 20
+    visual:
+        radius: 4
+        width: 16
+        height: 4
+        color: 0x22c55e
 sfx:
-  shoot: player-shoot
-  dryFire: dry-fire
-  bulletWall: bullet-wall
-  reloadStart: reload-start
-  reloadFinish: reload-finish
-
+    shoot: player-shoot
+    dryFire: dry-fire
+    bulletWall: bullet-wall
+    reloadStart: reload-start
+    reloadFinish: reload-finish

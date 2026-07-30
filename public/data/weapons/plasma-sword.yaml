@@ -7,7 +7,7 @@ hitHeight: 80
 visual:
     texture: assets/image/weapons/plasma-sword.png
     scale: 0.16
-    orbitRadius: 20
+    orbitRadius: -10
     anchor: [0.1, 0.5]
     swingAngle: 180
     rotationOffset: 0
@@ -15,6 +15,6 @@ bullet:
     texture: assets/image/weapons/plasma-slash-arc.png
     type: melee
     scale: 0.18
-    rotationOffset: 0
+    rotationOffset: 270
 sfx:
     shoot: player-shoot
