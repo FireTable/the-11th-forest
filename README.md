@@ -102,7 +102,11 @@ class MyScene extends Phaser.Scene {
 Long-form design, mechanics, art, and tooling docs live in [`docs/`](./docs/), one topic per `UPPERCASE-ENGLISH.md` file. See [`docs/README.md`](./docs/README.md) for the full index.
 
 Start with:
-- [`docs/SCENES.md`](./docs/SCENES.md) — how a scene is loaded (file layout, `handle-fetch`, adding a new scene).
+- [`docs/SCENES.md`](./docs/SCENES.md) — how a scene is loaded (file layout, `handle-fetch`, adding a new scene, monster spawn triggers, HUD bridge).
+- [`docs/MODULES.md`](./docs/MODULES.md) — the yaml → schema → parser → loader → logic pattern every data-driven module follows.
+
+Per-module references:
+- [`docs/WEAPONS.md`](./docs/WEAPONS.md) · [`docs/MONSTERS.md`](./docs/MONSTERS.md) · [`docs/CHARACTERS.md`](./docs/CHARACTERS.md) · [`docs/DROPS.md`](./docs/DROPS.md) · [`docs/AUDIOS.md`](./docs/AUDIOS.md) · [`docs/EVENTS.md`](./docs/EVENTS.md)
 
 ## License
 
