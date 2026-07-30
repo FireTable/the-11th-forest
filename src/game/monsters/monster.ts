@@ -529,29 +529,43 @@ export class MonsterController {
         // Hide editor-only chrome immediately — no point fading a hidden rect.
         m.statusHud?.destroy();
 
+        // Compute the death-track duration so the fade can run in PARALLEL
+        // with the animation, not after. By the time the death anim ends
+        // the body is already partly transparent; the tail of the tween
+        // finishes the dissolve to 0.
         const deathTrackKey = animKey(m.spec, 'death');
-        if (m.sprite && this.scene.anims.exists(deathTrackKey)) {
+        const hasDeathAnim = !!(m.sprite && this.scene.anims.exists(deathTrackKey));
+        if (hasDeathAnim && m.sprite) {
             m.sprite.play(deathTrackKey);
-            m.sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
-                this.startDeathFade(m);
-            });
-        } else {
-            // Fallback if no sprite / death anim — start the fade right away.
-            this.startDeathFade(m);
         }
+        const animMs = hasDeathAnim
+            ? (this.scene.anims.get(deathTrackKey)?.duration ?? 0)
+            : 0;
+        this.startDeathFade(m, animMs);
     }
 
     /**
-     * Tween the dying monster's alpha to 0 over MONSTER_DEATH_FADE_MS,
-     * then destroy. The onMonsterDied callback fires at the START of the
-     * fade so dropped items appear while the body is still dissolving —
-     * the player sees loot materialize at the death location instead of
-     * popping in once the corpse vanishes.
+     * Tween alpha to 0 over `animMs + MONSTER_DEATH_FADE_MS`, then
+     * destroy. The fade runs in parallel with the death animation, so
+     * the body starts dissolving the moment the monster dies.
+     *
+     * onMonsterDied fires at the end of the death animation (so the
+     * dropped items appear at the moment the body is half-faded — the
+     * "puff of smoke + loot materialises" beat). If there's no death
+     * animation, the callback fires immediately and the total fade
+     * duration collapses to MONSTER_DEATH_FADE_MS.
      */
-    private startDeathFade(m: Monster): void {
-        // Notify gameplay (drop roller etc.) immediately so loot / SFX /
-        // score events land while the body is still on screen.
-        this.cb.onMonsterDied(m);
+    private startDeathFade(m: Monster, animMs: number): void {
+        const totalMs = animMs + MONSTER_DEATH_FADE_MS;
+        const dropSpawnAt = animMs; // emit onMonsterDied at end of death anim
+
+        if (animMs > 0) {
+            this.scene.time.delayedCall(dropSpawnAt, () => this.cb.onMonsterDied(m));
+        } else {
+            // No death animation — drop loot immediately, fade as the
+            // only visible cue.
+            this.cb.onMonsterDied(m);
+        }
 
         // Capture the targets now — destroy() will null out the
         // references and a tween against the same handle would no-op.
@@ -571,7 +585,7 @@ export class MonsterController {
         this.scene.tweens.add({
             targets,
             alpha: 0,
-            duration: MONSTER_DEATH_FADE_MS,
+            duration: totalMs,
             ease: 'Linear',
             onComplete: () => m.destroy(this.scene),
         });
