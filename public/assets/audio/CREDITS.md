@@ -10,31 +10,39 @@
 
 The selected files were converted to mono WAV at 44.1 kHz via ffmpeg. The original ogg archive is preserved at the OpenGameArt URL; this directory contains only the in-use subset.
 
-### SFX → pack file mapping
+## SFX — OpenGameArt "8-Bit Sound Effects Library"
 
-| This game's SFX id | Source file in the pack |
-| ------------------ | ----------------------- |
-| pickup-hp | sfx_02a |
-| pickup-sp | sfx_02b |
-| pickup-ammo | sfx_02c |
-| pickup-overcharge | sfx_06 (truncated to 0.5s) |
-| pickup-weapon | sfx_11a (truncated to 0.8s) |
-| pickup-generic | sfx_02d |
-| player-shoot | sfx_01a |
-| dry-fire | sfx_17a |
-| bullet-wall | sfx_03a |
-| reload-start | sfx_09a |
-| reload-finish | sfx_09b |
-| weapon-switch | sfx_22a |
-| monster-hit | sfx_03a |
-| monster-death | sfx_04a |
-| monster-shoot | sfx_01a |
-| monster-aggro | sfx_11a (truncated to 1.0s) |
-| player-hit | sfx_03b |
-| player-hurt | sfx_04b |
-| dodge | sfx_22a |
-| footstep | sfx_09a |
-| low-hp-heartbeat | sfx_13a |
+- **Source:** <https://opengameart.org/content/8-bit-sound-effects-library>
+- **Author:** Little Robot Sound Factory (<https://www.littlerobotsoundfactory.com>)
+- **License:** CC-BY 3.0 (attribution required — keep this section in CREDITS)
+- **Original format:** WAV 16-bit mono 44.1 kHz (no conversion needed)
+- **Files:** 40 SFX across categories — Shoot, Hit, Pickup, Collect_Point, Menu_Navigate
+
+### SFX → source pack mapping
+
+| This game's SFX id | Source pack |
+| ------------------ | ----------- |
+| **player-shoot** | 8-Bit: `Shoot_00.wav` |
+| **monster-shoot** | 8-Bit: `Shoot_02.wav` |
+| **monster-hit** | 8-Bit: `Hit_02.wav` |
+| **player-hit** | 8-Bit: `Hit_00.wav` |
+| **bullet-wall** | 8-Bit: `Hit_01.wav` |
+| **pickup-generic** | 8-Bit: `Pickup_00.wav` |
+| **pickup-hp** | 8-Bit: `Collect_Point_00.wav` |
+| **pickup-sp** | 8-Bit: `Collect_Point_01.wav` |
+| **pickup-ammo** | 8-Bit: `Collect_Point_02.wav` |
+| **pickup-overcharge** | 8-Bit: `Pickup_03.wav` |
+| **pickup-weapon** | 8-Bit: `Pickup_02.wav` |
+| **weapon-switch** | 8-Bit: `Menu_Navigate_02.wav` |
+| dry-fire | OGA 60: `sfx_17a` |
+| reload-start | OGA 60: `sfx_09a` |
+| reload-finish | OGA 60: `sfx_09b` |
+| monster-death | OGA 60: `sfx_04a` |
+| monster-aggro | OGA 60: `sfx_11a` (truncated to 1.0s) |
+| player-hurt | OGA 60: `sfx_04b` |
+| dodge | OGA 60: `sfx_22a` |
+| footstep | OGA 60: `sfx_09a` |
+| low-hp-heartbeat | OGA 60: `sfx_13a` |
 
 ## Music — MiniMax music-2.6
 
