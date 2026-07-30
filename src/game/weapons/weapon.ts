@@ -16,14 +16,39 @@
 
 import type * as Phaser from 'phaser';
 
-import { DEPTH, RENDER_BULLET_TRAIL_LENGTH } from '@/lib/constants';
+import { CAT, DEPTH, PROJECTILE_PLAYER_MASK, RENDER_BULLET_TRAIL_LENGTH } from '@/lib/constants';
+import type { WeaponSpec } from '@/lib/weapons';
+
+/**
+ * Queue weapon and paired bullet texture assets into the Phaser Loader.
+ */
+export function loadWeaponAssets(
+    scene: Phaser.Scene,
+    weaponSpecs: Iterable<WeaponSpec>,
+): void {
+    for (const spec of weaponSpecs) {
+        if (spec.visual?.texture && !scene.textures.exists(spec.visual.texture)) {
+            const url = spec.visual.texture.startsWith('/') ? spec.visual.texture : `/${spec.visual.texture}`;
+            scene.load.image(spec.visual.texture, url);
+        }
+        if (spec.bullet?.texture && !scene.textures.exists(spec.bullet.texture)) {
+            const url = spec.bullet.texture.startsWith('/') ? spec.bullet.texture : `/${spec.bullet.texture}`;
+            scene.load.image(spec.bullet.texture, url);
+        }
+    }
+}
 
 // ─── Bullets ─────────────────────────────────────────────────────────────
 
 export interface BulletRecord {
     body: MatterJS.BodyType;
-    rect: Phaser.GameObjects.Rectangle;
+    rect: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
     damage: number;
+    color: number;
+    originX: number;
+    originY: number;
+    maxDistance: number;
+    isMelee?: boolean;
     trail: { x: number; y: number }[];
 }
 
@@ -34,12 +59,14 @@ export interface ProjectileSpawnOptions {
     speed: number;
     damage: number;
     size: { radius: number; width: number; height: number; color: number };
+    texture?: string;
+    scale?: number;
+    color?: number;
+    maxDistance?: number;
 }
 
 /**
- * Spawn a single projectile body + placeholder rectangle at origin, fired
- * along `direction`. Used by both player's WeaponController and monsters'
- * performAttack (so all ranged attacks share the same physics).
+ * Spawn a single projectile body + visual (Sprite if texture exists, rectangle fallback).
  */
 export function spawnProjectile(
     scene: Phaser.Scene,
@@ -50,7 +77,8 @@ export function spawnProjectile(
 ): BulletRecord {
     const len = Math.hypot(direction.x, direction.y);
     if (len === 0) throw new Error('spawnProjectile: zero-length direction');
-    const { radius, width, height, color } = opts.size;
+    const { radius, width, height, color: defaultColor } = opts.size;
+    const bulletColor = opts.color ?? defaultColor;
 
     const body = scene.matter.add.circle(origin.x, origin.y, radius, {
         label: opts.label,
@@ -64,11 +92,120 @@ export function spawnProjectile(
         y: (direction.y / len) * opts.speed,
     });
 
-    const rect = scene.add.rectangle(origin.x, origin.y, width, height, color);
-    rect.setStrokeStyle(1, 0x14532d, 1);
-    rect.setRotation(Math.atan2(direction.y, direction.x));
+    let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
 
-    return { body, rect, damage: opts.damage, trail: [] };
+    if (opts.texture && scene.textures.exists(opts.texture)) {
+        const sprite = scene.add.image(origin.x, origin.y, opts.texture);
+        if (opts.scale) sprite.setScale(opts.scale);
+        visualObj = sprite;
+    } else {
+        const rect = scene.add.rectangle(origin.x, origin.y, width, height, bulletColor);
+        rect.setStrokeStyle(1, 0x14532d, 1);
+        visualObj = rect;
+    }
+
+    visualObj.setRotation(Math.atan2(direction.y, direction.x));
+
+    return {
+        body,
+        rect: visualObj,
+        damage: opts.damage,
+        color: bulletColor,
+        originX: origin.x,
+        originY: origin.y,
+        maxDistance: opts.maxDistance ?? 800,
+        trail: [],
+    };
+}
+
+export interface MeleeSpawnOptions {
+    origin: { x: number; y: number };
+    angle: number;
+    range: number;
+    hitWidth: number;
+    hitHeight: number;
+    damage: number;
+    texture?: string;
+    scale?: number;
+}
+
+/**
+ * Spawn a melee attack hitbox sensor + visual slash arc trajectory.
+ */
+export function spawnMeleeHitbox(
+    scene: Phaser.Scene,
+    matter: any,
+    opts: MeleeSpawnOptions,
+): BulletRecord {
+    const dist = opts.range * 0.6;
+    const hx = opts.origin.x + Math.cos(opts.angle) * dist;
+    const hy = opts.origin.y + Math.sin(opts.angle) * dist;
+
+    const body = matter.Bodies.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, {
+        isSensor: true,
+        label: 'player-bullet',
+        collisionFilter: {
+            category: CAT.BULLET,
+            mask: PROJECTILE_PLAYER_MASK,
+        },
+    });
+    matter.Body.setAngle(body, opts.angle);
+    scene.matter.world.add(body);
+
+    let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+    const scale = opts.scale ?? 0.18;
+    // Rotate texture by -90 degrees (-Math.PI/2) so the arc faces outward along the attack vector
+    const baseRotation = opts.angle - Math.PI / 2;
+    const startRotation = baseRotation - Math.PI / 6;
+    const endRotation = baseRotation + Math.PI / 6;
+
+    if (opts.texture && scene.textures.exists(opts.texture)) {
+        const sprite = scene.add.image(hx, hy, opts.texture);
+        sprite.setScale(scale);
+        sprite.setRotation(startRotation);
+        sprite.setAlpha(1.0);
+        scene.tweens.add({
+            targets: sprite,
+            rotation: endRotation,
+            alpha: 0,
+            scaleX: scale * 1.5,
+            scaleY: scale * 1.5,
+            duration: 180,
+            ease: 'Quad.out',
+            onComplete: () => {
+                sprite.destroy();
+                scene.matter.world.remove(body);
+            },
+        });
+        visualObj = sprite;
+    } else {
+        const rect = scene.add.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, 0xc084fc, 0.7);
+        rect.setRotation(opts.angle);
+        scene.tweens.add({
+            targets: rect,
+            alpha: 0,
+            duration: 180,
+            onComplete: () => {
+                rect.destroy();
+                scene.matter.world.remove(body);
+            },
+        });
+        visualObj = rect;
+    }
+
+    visualObj.setDepth(DEPTH.PROJECTILE_BASE + Math.round(hy) + 50);
+
+    return {
+        body,
+        rect: visualObj,
+        damage: opts.damage,
+        color: 0xc084fc,
+        originX: opts.origin.x,
+        originY: opts.origin.y,
+        maxDistance: opts.range,
+        isMelee: true,
+        trail: [],
+    };
 }
 
 /** Destroy a bullet's body + visual. */
@@ -95,8 +232,6 @@ export interface BulletTrail {
     positions: { x: number; y: number }[];
 }
 
-
-
 /** Create the shared trail graphics (one for all bullets). */
 export function createBulletTrail(scene: Phaser.Scene): Phaser.GameObjects.Graphics {
     const g = scene.add.graphics();
@@ -122,7 +257,7 @@ export function renderBulletTrails(
         if (!trail || trail.length < 2) continue;
         for (let k = 1; k < trail.length; k++) {
             const alpha = k / (trail.length - 1);
-            graphics.lineStyle(3, 0x22c55e, alpha * 0.7);
+            graphics.lineStyle(3, b.color, alpha * 0.7);
             graphics.beginPath();
             graphics.moveTo(trail[k - 1].x, trail[k - 1].y);
             graphics.lineTo(trail[k].x, trail[k].y);

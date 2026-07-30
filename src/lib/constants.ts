@@ -68,6 +68,10 @@ export const KEY_SHIFT = 16;
 export const KEY_ONE = 49;
 export const KEY_TWO = 50;
 export const KEY_THREE = 51;
+export const KEY_FOUR = 52;
+export const KEY_FIVE = 53;
+export const KEY_SIX = 54;
+export const KEY_SEVEN = 55;
 export const KEY_R = 82;
 
 // ─── HUD: shared layout values (apply to all HUDs) ────────────────────

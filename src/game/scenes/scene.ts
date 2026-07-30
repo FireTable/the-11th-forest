@@ -88,6 +88,8 @@ export interface SceneAssets {
  * editor's drawing tools live in the editor panel (Konva overlay), not
  * here. Keeps the scene focused on what gameplay needs.
  */
+import { loadWeaponAssets } from '@/game/weapons/weapon';
+
 export class LoadScene extends Scene {
     private character!: CharacterRuntime;
     private monsterSystem!: MonsterController;
@@ -122,6 +124,8 @@ export class LoadScene extends Scene {
         );
         // Load drop spritesheet assets
         loadDropAssets(this, this.assets.dropSpecs.values());
+        // Load weapon & bullet visual assets
+        loadWeaponAssets(this, this.assets.weaponsById.values());
         // Audio assets — every SFX + music track gets queued here.
         loadAudioAssets(
             this,

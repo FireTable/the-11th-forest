@@ -46,6 +46,30 @@ export const WeaponSfxSchema = z
     })
     .strict();
 
+export const WeaponVisualSchema = z
+    .object({
+        texture: z.string().optional(),
+        scale: z.number().gt(0).default(0.16),
+        orbitRadius: z.number().default(16),
+        anchor: z.tuple([z.number(), z.number()]).default([0.2, 0.5]),
+        muzzleOffset: z.number().default(400),
+        recoilDistance: z.number().default(6),
+        recoilDuration: z.number().default(80),
+        swingAngle: z.number().default(120),
+    })
+    .strict();
+
+export const WeaponPairedBulletSchema = z
+    .object({
+        texture: z.string().optional(),
+        type: z.enum(['projectile', 'beam', 'melee']).default('projectile'),
+        speed: z.number().gt(0).optional(),
+        scale: z.number().gt(0).default(1),
+        color: z.string().optional(),
+        beamWidth: z.number().gt(0).optional(),
+    })
+    .strict();
+
 export const WeaponSpecSchema = z
     .object({
         id: z.string().min(1).optional(),
@@ -53,6 +77,10 @@ export const WeaponSpecSchema = z
         damage: z.number().gt(0),
         cooldownMs: z.number().gte(0),
         range: z.number().gt(0),
+        // Visual & Procedural Controls
+        visual: WeaponVisualSchema.optional(),
+        // Paired 1-to-1 Bullet / Attack Spec
+        bullet: WeaponPairedBulletSchema.optional(),
         // Ranged-only
         projectile: ProjectileSchema.optional(),
         clipSize: z.number().gt(0).optional(),

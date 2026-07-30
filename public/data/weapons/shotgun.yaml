@@ -5,6 +5,18 @@ range: 400
 clipSize: 2
 reloadTimeMs: 2400
 bulletsPerShot: 5
+visual:
+  texture: assets/image/weapons/shotgun.png
+  scale: 0.16
+  orbitRadius: 18
+  anchor: [0.2, 0.5]
+  recoilDistance: 10
+  recoilDuration: 120
+bullet:
+  texture: assets/image/weapons/shotgun-pellet.png
+  type: projectile
+  speed: 650
+  scale: 0.12
 projectile:
   speed: 22
   visual:

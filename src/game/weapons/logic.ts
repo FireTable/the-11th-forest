@@ -25,9 +25,11 @@ import {
     destroyBulletVisual,
     pushBulletTrail,
     renderBulletTrails,
+    spawnMeleeHitbox,
     spawnProjectile,
     type BulletRecord,
 } from './weapon';
+import { WeaponVisualController } from './visual';
 
 import {
     CAT,
@@ -66,6 +68,7 @@ export class WeaponController {
     private currentIndex = 0;
     private readonly bullets: BulletRecord[] = [];
     private readonly trailGraphics: Phaser.GameObjects.Graphics;
+    private readonly visualController: WeaponVisualController;
 
     constructor(
         scene: Phaser.Scene,
@@ -90,6 +93,8 @@ export class WeaponController {
         });
 
         this.trailGraphics = createBulletTrail(scene);
+        this.visualController = new WeaponVisualController(scene);
+        this.visualController.setWeapon(this.slots[this.currentIndex].spec);
 
         // Bullets die on contact with tall walls (WALL_TALL) or monsters.
         // Short walls (WALL_SHORT) and player character hitboxes are explicitly ignored.
@@ -106,7 +111,7 @@ export class WeaponController {
                 const other = pair.bodyA === bulletBody ? pair.bodyB : pair.bodyA;
                 if (!other) continue;
 
-                const category = other.collisionFilter?.category ?? 0;
+                const category = (other as any).collisionFilter?.category ?? 0;
                 const isTallWall = (category & CAT.WALL_TALL) !== 0;
                 const isMonster = (category & CAT.MONSTER_MELEE) !== 0 || other.label === 'monster';
 
@@ -143,13 +148,15 @@ export class WeaponController {
         slot.reloading = false;
         slot.justCompletedAt = 0;
         this.currentIndex = index;
+        this.visualController.setWeapon(this.slots[index].spec);
         EventBus.emit(SFX_EVENT('weapon-switch'));
     }
 
     /** R key — manual reload. Only when ammo < clipSize and not already reloading. */
     manualReload(): void {
         const slot = this.slots[this.currentIndex];
-        if (slot.reloading) return;
+        const isMelee = slot.spec.bullet?.type === 'melee' || slot.spec.hitWidth !== undefined;
+        if (isMelee || slot.reloading) return;
         const clipSize = slot.spec.clipSize ?? 1;
         if (slot.ammo >= clipSize) return;
         slot.reloading = true;
@@ -194,11 +201,15 @@ export class WeaponController {
     }
 
     getAmmo(): number {
-        return this.slots[this.currentIndex].ammo;
+        const slot = this.slots[this.currentIndex];
+        const isMelee = slot.spec.bullet?.type === 'melee' || slot.spec.hitWidth !== undefined;
+        return isMelee ? 1 : slot.ammo;
     }
 
     getMaxAmmo(): number {
-        return this.slots[this.currentIndex].spec.clipSize ?? 1;
+        const slot = this.slots[this.currentIndex];
+        const isMelee = slot.spec.bullet?.type === 'melee' || slot.spec.hitWidth !== undefined;
+        return isMelee ? 1 : (slot.spec.clipSize ?? 1);
     }
 
     getActiveIndex(): number {
@@ -211,11 +222,14 @@ export class WeaponController {
 
     getSlot(index: number): { spec: WeaponSpec; ammo: number } {
         const s = this.slots[index];
-        return { spec: s.spec, ammo: s.ammo };
+        const isMelee = s.spec.bullet?.type === 'melee' || s.spec.hitWidth !== undefined;
+        return { spec: s.spec, ammo: isMelee ? 1 : s.ammo };
     }
 
     isReloading(): boolean {
-        return this.slots[this.currentIndex].reloading;
+        const slot = this.slots[this.currentIndex];
+        const isMelee = slot.spec.bullet?.type === 'melee' || slot.spec.hitWidth !== undefined;
+        return isMelee ? false : slot.reloading;
     }
 
     getReloadProgress(time: number): number {
@@ -230,7 +244,13 @@ export class WeaponController {
     /**
      * Per-frame: tick reload, spawn bullets on fire, sync visuals.
      */
-    update(time: number, tx: number, ty: number, fire: boolean, _halfH: number): void {
+    private lastHalfH = 16;
+
+    /**
+     * Per-frame: tick reload, spawn bullets on fire, sync visuals.
+     */
+    update(time: number, tx: number, ty: number, fire: boolean, halfH: number): void {
+        this.lastHalfH = halfH;
         // 1. Reload tick — every slot ticks independently.
         for (let i = 0; i < this.slots.length; i++) {
             const slot = this.slots[i];
@@ -252,9 +272,13 @@ export class WeaponController {
             }
         }
 
-        // 2. Auto-reload on empty.
+        // 2. Auto-reload on empty (ranged only).
         const active = this.slots[this.currentIndex];
-        if (active.ammo === 0 && !active.reloading && active.justCompletedAt === 0) {
+        const isActiveMelee = active.spec.bullet?.type === 'melee' || active.spec.hitWidth !== undefined;
+        if (isActiveMelee) {
+            active.ammo = 1;
+            active.reloading = false;
+        } else if (active.ammo === 0 && !active.reloading && active.justCompletedAt === 0) {
             active.reloading = true;
             active.reloadStartedAt = time;
             EventBus.emit(SFX_EVENT(active.spec.sfx?.reloadStart ?? 'reload-start'));
@@ -275,22 +299,44 @@ export class WeaponController {
             }
         }
 
-        // 4. Sync bullet visuals + record trail.
+        // 4. Sync weapon attachment visual at character upper body / hand position
+        const origin = this.body.position;
+        const handX = origin.x;
+        const handY = origin.y - halfH; // Align weapon to character hitbox center (chest/hands)
+        const dx = tx - handX;
+        const dy = ty - handY;
+        const aimAngle = Math.atan2(dy, dx);
+        const feetY = DEPTH.PROJECTILE_BASE + Math.round(origin.y + halfH);
+        this.visualController.update(handX, handY, feetY, aimAngle);
+
+        // 5. Sync bullet visuals + record trail + destroy stopped/expired bullets.
         renderBulletTrails(this.trailGraphics, this.bullets);
-        for (const b of this.bullets) {
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+            const b = this.bullets[i];
             const bp = b.body.position;
+            const vel = b.body.velocity;
+            const currentSpeed = Math.hypot(vel.x, vel.y);
+            const distSq = (bp.x - b.originX) ** 2 + (bp.y - b.originY) ** 2;
+
+            // Cleanup ranged bullets that stopped moving (speed < 1.0) or traveled past max range
+            if (!b.isMelee && (currentSpeed < 1.0 || distSq >= b.maxDistance ** 2)) {
+                this.destroyBullet(i);
+                continue;
+            }
+
             b.rect.setPosition(bp.x, bp.y);
-            b.rect.setDepth(DEPTH.PROJECTILE_BASE + Math.round(bp.y));
-            b.rect.setRotation(Math.atan2(b.body.velocity.y, b.body.velocity.x));
+            b.rect.setDepth(DEPTH.PROJECTILE_BASE + Math.round(bp.y) + 20);
+            b.rect.setRotation(Math.atan2(vel.y, vel.x));
             pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
         }
 
-        // 5. Head indicator is drawn by StatusHud — character.ts wires it
+        // 6. Head indicator is drawn by StatusHud — character.ts wires it
         // and reads the slot state via WeaponController's getters.
     }
 
     destroy(): void {
         this.trailGraphics.destroy();
+        this.visualController.destroy();
         for (const b of this.bullets) {
             destroyBulletVisual(this.scene, b);
         }
@@ -302,11 +348,42 @@ export class WeaponController {
     private fire(tx: number, ty: number): void {
         const slot = this.slots[this.currentIndex];
         const origin = this.body.position;
-        const dx = tx - origin.x;
-        const dy = ty - origin.y;
+        const handX = origin.x;
+        const handY = origin.y - this.lastHalfH;
+        const dx = tx - handX;
+        const dy = ty - handY;
         const len = Math.hypot(dx, dy);
         if (len === 0) return;
         const angle = Math.atan2(dy, dx);
+
+        // Trigger procedural animation for active weapon (Recoil for guns, Swing for melee)
+        const attackType = slot.spec.bullet?.type;
+        const isMelee = attackType === 'melee' || slot.spec.hitWidth !== undefined;
+
+        if (isMelee) {
+            this.visualController.triggerSwing();
+            EventBus.emit(SFX_EVENT(slot.spec.sfx?.shoot ?? 'player-shoot'));
+
+            const meleeBullet = spawnMeleeHitbox(this.scene, this.matter, {
+                origin: { x: handX, y: handY },
+                angle,
+                range: slot.spec.range ?? 120,
+                hitWidth: slot.spec.hitWidth ?? 60,
+                hitHeight: slot.spec.hitHeight ?? 80,
+                damage: slot.spec.damage,
+                texture: slot.spec.bullet?.texture,
+                scale: slot.spec.bullet?.scale ?? 0.18,
+            });
+
+            this.bullets.push(meleeBullet);
+            slot.ammo = 1;
+            return;
+        }
+
+        this.visualController.triggerRecoil();
+
+        // Calculate exact muzzle tip position for bullet release
+        const muzzlePos = this.visualController.getMuzzlePosition(handX, handY);
 
         const n = slot.spec.bulletsPerShot ?? 1;
         const projectile = slot.spec.projectile;
@@ -322,7 +399,7 @@ export class WeaponController {
             const bullet = spawnProjectile(
                 this.scene,
                 this.matter,
-                { x: origin.x, y: origin.y },
+                { x: muzzlePos.x, y: muzzlePos.y },
                 { x: v.x, y: v.y },
                 {
                     label: 'player-bullet',
@@ -331,6 +408,10 @@ export class WeaponController {
                     speed,
                     damage: slot.spec.damage,
                     size,
+                    texture: slot.spec.bullet?.texture,
+                    scale: slot.spec.bullet?.scale,
+                    color: slot.spec.projectile?.visual?.color,
+                    maxDistance: slot.spec.range,
                 },
             );
             this.bullets.push(bullet);

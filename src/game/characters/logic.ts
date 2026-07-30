@@ -22,10 +22,14 @@ import type * as Phaser from 'phaser';
 import {
     KEY_A,
     KEY_D,
+    KEY_FIVE,
+    KEY_FOUR,
     KEY_ONE,
     KEY_R,
     KEY_S,
+    KEY_SEVEN,
     KEY_SHIFT,
+    KEY_SIX,
     KEY_THREE,
     KEY_TWO,
     KEY_W,
@@ -385,10 +389,14 @@ export class CharacterController {
         }
 
         // ── Weapon update ───────────────────────────────────────────
+        // Default aiming target when cursor hasn't moved yet aligns with character's sprite facing (flipX)
+        const defaultAimX = pos.x + (sprite.flipX ? -100 : 100);
+        const defaultAimY = pos.y - this.spec.body.halfH;
+
         this.parts.weapons.update(
             now,
-            this.targetX ?? pos.x,
-            this.targetY ?? pos.y,
+            this.targetX ?? defaultAimX,
+            this.targetY ?? defaultAimY,
             this.firing && now >= this.dodgeActiveUntil,
             this.spec.body.halfH,
         );
@@ -506,6 +514,10 @@ export class CharacterController {
         kb.addKey(KEY_ONE).on('down', () => weapons.switchTo(0));
         kb.addKey(KEY_TWO).on('down', () => weapons.switchTo(1));
         kb.addKey(KEY_THREE).on('down', () => weapons.switchTo(2));
+        kb.addKey(KEY_FOUR).on('down', () => weapons.switchTo(3));
+        kb.addKey(KEY_FIVE).on('down', () => weapons.switchTo(4));
+        kb.addKey(KEY_SIX).on('down', () => weapons.switchTo(5));
+        kb.addKey(KEY_SEVEN).on('down', () => weapons.switchTo(6));
         kb.addKey(KEY_R).on('down', () => weapons.manualReload());
     }
 

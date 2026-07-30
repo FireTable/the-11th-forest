@@ -246,7 +246,7 @@ export interface MonsterControllerCallbacks {
 /** Snapshot of a monster projectile — owns body + visual + damage. */
 export interface MonsterProjectile {
     body: MatterJS.BodyType;
-    rect: Phaser.GameObjects.Rectangle;
+    rect: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
     damage: number;
     monster: Monster;
 }

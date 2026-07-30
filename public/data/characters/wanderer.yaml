@@ -116,8 +116,12 @@ dodge:
     cooldownMs: 600
 hotbar:
     - pistol
+    - assault-rifle
+    - laser-cannon
+    - plasma-sword
     - shotgun
-    - smg
+    - arcana-staff
+    - rocket-launcher
 sprite:
     texture: assets/image/characters/wanderer.png
     grid: { rows: 4, cols: 4 }

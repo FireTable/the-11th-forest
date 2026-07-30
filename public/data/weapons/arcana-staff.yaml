@@ -1,0 +1,32 @@
+name: Arcana Staff
+damage: 28
+cooldownMs: 350
+range: 500
+clipSize: 8
+reloadTimeMs: 1800
+bulletsPerShot: 1
+visual:
+  texture: assets/image/weapons/arcana-staff.png
+  scale: 0.16
+  orbitRadius: 22
+  anchor: [0.15, 0.5]
+  recoilDistance: 8
+  recoilDuration: 100
+bullet:
+  texture: assets/image/weapons/arcana-orb.png
+  type: projectile
+  speed: 450
+  scale: 0.16
+projectile:
+  speed: 16
+  visual:
+    radius: 8
+    width: 16
+    height: 16
+    color: 0xa855f7
+sfx:
+  shoot: player-shoot
+  dryFire: dry-fire
+  bulletWall: bullet-wall
+  reloadStart: reload-start
+  reloadFinish: reload-finish

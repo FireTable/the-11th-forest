@@ -1,0 +1,32 @@
+name: Laser Cannon
+damage: 8
+cooldownMs: 60
+range: 700
+clipSize: 50
+reloadTimeMs: 2000
+bulletsPerShot: 1
+visual:
+  texture: assets/image/weapons/laser-cannon.png
+  scale: 0.16
+  orbitRadius: 20
+  anchor: [0.2, 0.5]
+  recoilDistance: 4
+  recoilDuration: 50
+bullet:
+  texture: assets/image/weapons/laser-beam-segment.png
+  type: beam
+  speed: 900
+  scale: 0.16
+projectile:
+  speed: 30
+  visual:
+    radius: 5
+    width: 20
+    height: 6
+    color: 0xef4444
+sfx:
+  shoot: player-shoot
+  dryFire: dry-fire
+  bulletWall: bullet-wall
+  reloadStart: reload-start
+  reloadFinish: reload-finish
