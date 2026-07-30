@@ -183,6 +183,12 @@ export const HUD_STATUS_LABEL_OFFSET_Y = -2;
  *  brush-by contact from stacking to death in a single frame. */
 export const COMBAT_PLAYER_DAMAGE_COOLDOWN_MS = 100;
 
+/** How long a monster's death animation lingers in a fade-out tween
+ *  before the body is destroyed and dropped items are released.
+ *  Long enough for the player to register the kill, short enough to
+ *  not stall combat flow. */
+export const MONSTER_DEATH_FADE_MS = 800;
+
 // ─── Render: shared visual constants ──────────────────────────────────
 
 /** Max trail positions kept per bullet for the bullet trail. */

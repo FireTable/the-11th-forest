@@ -20,7 +20,13 @@
 
 import * as Phaser from 'phaser';
 
-import { CAT, PROJECTILE_MONSTER_MASK, COMBAT_PLAYER_DAMAGE_COOLDOWN_MS, SFX_EVENT } from '@/lib/constants';
+import {
+    CAT,
+    PROJECTILE_MONSTER_MASK,
+    COMBAT_PLAYER_DAMAGE_COOLDOWN_MS,
+    MONSTER_DEATH_FADE_MS,
+    SFX_EVENT,
+} from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import type { WeaponSpec } from '@/lib/weapons';
 import { spawnProjectile } from '@/game/weapons/weapon';
@@ -520,18 +526,55 @@ export class MonsterController {
         // Disable collision filter so dead monster doesn't block player or bullets
         m.body.collisionFilter.mask = 0;
 
+        // Hide editor-only chrome immediately — no point fading a hidden rect.
+        m.statusHud?.destroy();
+
         const deathTrackKey = animKey(m.spec, 'death');
         if (m.sprite && this.scene.anims.exists(deathTrackKey)) {
             m.sprite.play(deathTrackKey);
             m.sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
-                m.destroy(this.scene);
-                this.cb.onMonsterDied(m);
+                this.startDeathFade(m);
             });
         } else {
-            // Fallback if no sprite / death anim
-            m.destroy(this.scene);
-            this.cb.onMonsterDied(m);
+            // Fallback if no sprite / death anim — start the fade right away.
+            this.startDeathFade(m);
         }
+    }
+
+    /**
+     * Tween the dying monster's alpha to 0 over MONSTER_DEATH_FADE_MS,
+     * then destroy. The onMonsterDied callback fires at the START of the
+     * fade so dropped items appear while the body is still dissolving —
+     * the player sees loot materialize at the death location instead of
+     * popping in once the corpse vanishes.
+     */
+    private startDeathFade(m: Monster): void {
+        // Notify gameplay (drop roller etc.) immediately so loot / SFX /
+        // score events land while the body is still on screen.
+        this.cb.onMonsterDied(m);
+
+        // Capture the targets now — destroy() will null out the
+        // references and a tween against the same handle would no-op.
+        // All four GameObject subclasses (Sprite / Ellipse / Rectangle)
+        // share the single `alpha: number` property, which is what the
+        // tween actually mutates.
+        const targets: Phaser.GameObjects.GameObject[] = [];
+        if (m.sprite) targets.push(m.sprite);
+        if (m.shadow) targets.push(m.shadow);
+        if (m.debugBodyRect) targets.push(m.debugBodyRect);
+        if (m.debugHitboxRect) targets.push(m.debugHitboxRect);
+        if (targets.length === 0) {
+            m.destroy(this.scene);
+            return;
+        }
+
+        this.scene.tweens.add({
+            targets,
+            alpha: 0,
+            duration: MONSTER_DEATH_FADE_MS,
+            ease: 'Linear',
+            onComplete: () => m.destroy(this.scene),
+        });
     }
 
     private bindCollisions(): void {
