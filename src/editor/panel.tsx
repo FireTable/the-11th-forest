@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Brush, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { isDev } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import { addWall, removeWall, setWallKind } from '@/lib/editor/air-walls';
 import { getCurrentLevel } from '@/lib/levels/current-level';
@@ -52,6 +53,12 @@ const SCENE_SUB_TABS: { id: SceneSubTab; label: string }[] = [
 ];
 
 export function EditorPanel() {
+    // Gate the entire editor surface — including the toggle button and
+    // sidebar — to dev builds. The /api/editor/* endpoints live in a
+    // Vite plugin that only exists in `vite dev`, so exposing the UI
+    // in prod would surface a broken UI (read endpoints 404, saves 404).
+    if (!isDev()) return null;
+
     const [open, setOpen] = useState(false);
     const [sceneId, setSceneId] = useState<string | null>(null);
     const [level, setLevel] = useState<Level | null>(null);
