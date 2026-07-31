@@ -1,0 +1,5 @@
+kind: sfx
+id: assault-rifle-shoot
+name: assault-rifle-shoot
+source: assets/audio/sfx/assault-rifle-shoot.wav
+volume: 0.38

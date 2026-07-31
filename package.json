@@ -1,21 +1,21 @@
 {
-  "name": "template-react-ts",
+  "name": "the-11th-forest",
   "description": "The 11th Forest — a top-down, anime-styled pixel art shooter built on Phaser 4 + React + Vite + TypeScript.",
   "version": "1.1.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/phaserjs/template-react-ts.git"
+    "url": "git+https://github.com/FireTable/the-11th-forest.git"
   },
-  "author": "Phaser Studio <support@phaser.io> (https://phaser.io/)",
+  "author": "Yongzhuo Liang <firetable@foxmail.com>",
   "license": "MIT",
   "licenseUrl": "http://www.opensource.org/licenses/mit-license.php",
   "bugs": {
-    "url": "https://github.com/phaserjs/template-react-ts/issues"
+    "url": "https://github.com/FireTable/the-11th-forest/issues"
   },
-  "homepage": "https://github.com/phaserjs/template-react-ts#readme",
+  "homepage": "https://github.com/FireTable/the-11th-forest#readme",
   "keywords": [
     "phaser",
-    "phaser3",
+    "phaser4",
     "react",
     "vite",
     "typescript"
@@ -44,15 +44,31 @@
     ]
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@tailwindcss/vite": "^4.3.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "earcut": "^3.2.3",
+    "konva": "^10.3.0",
+    "lucide-react": "^1.27.0",
     "phaser": "4.0.0",
+    "poly-decomp": "^0.3.0",
+    "radix-ui": "^1.6.7",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-konva": "^19.2.5",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@types/pngjs": "6.0.5",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "colord": "^2.9.3",
     "dotenv": "^17.4.2",
     "eslint": "^9.22.0",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -60,9 +76,11 @@
     "globals": "^16.0.0",
     "happy-dom": "^20.11.1",
     "husky": "^9.1.7",
+    "image-q": "^4.0.0",
     "js-yaml": "^5.2.2",
     "lint-staged": "^15.2.10",
     "openai": "^6.49.0",
+    "pngjs": "7.0.0",
     "prettier": "^3.3.0",
     "terser": "^5.28.1",
     "tsx": "^4.23.1",

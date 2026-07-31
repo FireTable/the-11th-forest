@@ -1,0 +1,6 @@
+kind: sfx
+id: monster-hit
+name: Monster Hit
+source: assets/audio/sfx/monster-hit.wav
+volume: 0.5
+prompt: Dull muffled monster hit reaction, anime style, low deep thud with no high frequency, soft and brief impact, deep sub-bass thump

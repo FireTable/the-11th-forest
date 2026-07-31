@@ -1,0 +1,6 @@
+kind: sfx
+id: dry-fire
+name: Dry Fire
+source: assets/audio/sfx/dry-fire.wav
+volume: 0.4
+prompt: Light click of empty gun trigger, anime, dry tap on wood, hollow click

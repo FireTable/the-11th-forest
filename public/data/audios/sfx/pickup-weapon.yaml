@@ -1,0 +1,5 @@
+kind: sfx
+id: pickup-weapon
+name: Pickup Weapon
+source: assets/audio/sfx/pickup-weapon.wav
+volume: 0.7

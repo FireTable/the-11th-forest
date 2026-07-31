@@ -1,0 +1,1019 @@
+/**
+ * src/game/monsters/monster.ts
+ * --------------------------------------------------------------------------
+ * Monsters module — entity + controller + projectile + drop roller in one
+ * file. Pure helpers (distBetween / dirTo / decideAIState / chaseVelocity /
+ * pickClosestMonster) live in `./logic.ts`.
+ *
+ *   - Monster: one monster entity (body + visual + HP + AI state + weapon).
+ *   - MonsterController: scene-side orchestrator. Self-spawns monsters
+ *     from a spawn array, runs per-frame AI tick, fires the monster's
+ *     weapon (delegated to the shared `weapons/` module).
+ *   - fireProjectile: shared projectile factory (reused from weapons/).
+ *   - rollDrops: monster death drop table roller (independent Bernoulli).
+ *
+ * Monster attacks are routed through the weapons/ module so the same
+ * projectile physics, wall policy, and visual style apply. The only
+ * difference is the trigger: monsters auto-fire on cooldown; the player
+ * fires on click.
+ */
+
+import * as Phaser from 'phaser';
+
+import {
+    CAT,
+    PROJECTILE_MONSTER_MASK,
+    COMBAT_PLAYER_DAMAGE_COOLDOWN_MS,
+    MONSTER_DEATH_FADE_MS,
+    SFX_EVENT,
+} from '@/lib/constants';
+import { EventBus } from '@/lib/events/bus';
+import type { WeaponSpec } from '@/lib/weapons';
+import { spawnProjectile, spawnMeleeHitbox } from '@/game/weapons/weapon';
+import { WeaponVisualController } from '@/game/weapons/visual';
+import {
+    advanceSpawnQueue,
+    type AliveSnapshot,
+    type PendingSpawn,
+} from '@/game/monsters/spawn-queue';
+import type { MonsterTrigger } from '@/lib/levels';
+import type { DropRef, MonsterSpec } from '@/lib/monsters';
+import { StatusHud } from '@/game/hubs/status-hud';
+
+import {
+    chaseVelocity,
+    decideAIState,
+    dirTo,
+    distBetween,
+    pickClosestMonster,
+    PathfindingService,
+    calcSeparationForce,
+    getSurroundOffset,
+    getPathLookAheadPoint,
+} from './logic';
+
+// ─── Entity ──────────────────────────────────────────────────────────────
+
+export type MonsterState = 'idle' | 'chase' | 'attack' | 'dying';
+
+export function textureKey(spec: MonsterSpec): string {
+    return `monster:${spec.id ?? spec.name}`;
+}
+
+export function animKey(spec: MonsterSpec, animName: string): string {
+    return `${textureKey(spec)}:${animName}`;
+}
+
+export function loadMonsterAssets(
+    scene: Pick<Phaser.Scene, 'load'>,
+    specs: Iterable<MonsterSpec>,
+    getSpriteCell: (spec: MonsterSpec) => Promise<{ width: number; height: number }>,
+): Promise<void> {
+    const promises: Promise<void>[] = [];
+    for (const spec of specs) {
+        if (!spec.sprite) continue;
+        const key = textureKey(spec);
+        const url = spec.sprite.texture.startsWith('/')
+            ? spec.sprite.texture
+            : `/${spec.sprite.texture}`;
+        promises.push(
+            getSpriteCell(spec).then((cell) => {
+                scene.load.spritesheet(key, url, {
+                    frameWidth: cell.width,
+                    frameHeight: cell.height,
+                });
+            }),
+        );
+    }
+    return Promise.all(promises).then(() => undefined);
+}
+
+export function createMonsterAnims(
+    scene: Pick<Phaser.Scene, 'anims'>,
+    specs: Iterable<MonsterSpec>,
+): void {
+    for (const spec of specs) {
+        if (!spec.anims) continue;
+        for (const [name, anim] of Object.entries(spec.anims)) {
+            const key = animKey(spec, name);
+            if (scene.anims.exists(key)) scene.anims.remove(key);
+            const texture = textureKey(spec);
+            const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+            for (let i = anim.frames[0]; i <= anim.frames[1]; i++) {
+                frames.push({ key: texture, frame: i });
+            }
+            scene.anims.create({
+                key,
+                frames,
+                frameRate: anim.frameRate,
+                repeat: anim.repeat,
+            });
+        }
+    }
+}
+
+export class Monster {
+    readonly spec: MonsterSpec;
+    readonly weapon: WeaponSpec;
+    readonly body: MatterJS.BodyType;
+    readonly rect: Phaser.GameObjects.Rectangle;
+    readonly debugBodyRect: Phaser.GameObjects.Rectangle;
+    readonly debugHitboxRect: Phaser.GameObjects.Rectangle;
+    readonly sprite?: Phaser.GameObjects.Sprite;
+    readonly shadow: Phaser.GameObjects.Ellipse;
+    readonly hitboxWidth: number;
+    readonly hitboxHeight: number;
+    /** Floating HP bar / name label above the monster. Built once and kept alive
+     * through the `dying` state (visibility toggled instead of destroyed) so the
+     * death animation can show 0 HP without re-spawning the HUD mid-tween. */
+    readonly statusHud: StatusHud;
+    /** Floating weapon attachment (sprite + aim rotation + recoil/swing tweens).
+     * Mirrors `WeaponController.visualController` on the player so monsters
+     * visually hold their weapon the same way. Always created; `setWeapon`
+     * leaves the sprite null when the weapon has no `visual.texture`, but
+     * the controller is still callable for animation triggers (swing). */
+    readonly weaponVisual: WeaponVisualController;
+    hp: number;
+    state: MonsterState = 'idle';
+    lastAttackAt = 0;
+    lastHitAt = 0;
+    /** Set by MonsterController when killed — used to suppress further collisions. */
+    dead = false;
+    /** One-shot guard so the aggro growl only fires once per monster. */
+    hasAggroed = false;
+    /** Waypoints for pathfinding navigation. */
+    path: { x: number; y: number }[] | null = null;
+    currentWaypointIdx = 0;
+    /** Stuck detection and emergency pathing recovery fields. */
+    stuckCheckPos = { x: 0, y: 0 };
+    stuckTicks = 0;
+    lastStuckCheckAt = 0;
+    noLoSUntil = 0;
+    /** Wave identifier from the level spawn entry — used by `clear`
+     *  triggers that wait on a specific wave. Undefined for spawns that
+     *  aren't part of a named wave. */
+    waveId?: string;
+    /** Visual tint per weapon kind — derived from weapon (ranged/melee). */
+    static readonly TINT_MELEE = 0xef4444;
+    static readonly TINT_RANGED = 0xa855f7;
+
+    constructor(
+        scene: Phaser.Scene,
+        spec: MonsterSpec,
+        weapon: WeaponSpec,
+        x: number,
+        y: number,
+        waveId?: string,
+    ) {
+        this.spec = spec;
+        this.weapon = weapon;
+        this.hp = spec.hp;
+        this.stuckCheckPos = { x, y };
+        this.waveId = waveId;
+
+        let w = spec.body.halfW * 2;
+        let h = spec.body.halfH * 2;
+        let centerY = y - spec.body.halfH;
+
+        if (spec.sprite && scene.textures.exists(textureKey(spec))) {
+            const frame = scene.textures.getFrame(textureKey(spec), 0);
+            const scale = spec.sprite.scale ?? 1.0;
+            if (frame) {
+                w = frame.width * scale * 0.8;
+                h = frame.height * scale;
+                centerY = y - h / 2;
+            }
+        }
+
+        this.hitboxWidth = w;
+        this.hitboxHeight = h;
+
+        this.body = scene.matter.add.rectangle(x, centerY, w, h, {
+            label: 'monster',
+            friction: 0,
+            frictionStatic: 0,
+            frictionAir: 0.02,
+            restitution: 0,
+            chamfer: { radius: Math.min(8, Math.min(w, h) / 4) },
+            collisionFilter: {
+                category: CAT.MONSTER_MELEE,
+                mask: CAT.CHARACTER | CAT.BULLET | (CAT.WALL_TALL | CAT.WALL_SHORT),
+            },
+        });
+
+        const matter = (Phaser as any).Physics.Matter.Matter;
+        matter.Body.setInertia(this.body, Infinity);
+
+        const tint = weapon.projectile !== undefined
+            ? Monster.TINT_RANGED
+            : Monster.TINT_MELEE;
+        
+        // Foot shadow based on hit box size
+        this.shadow = scene.add.ellipse(x, y, spec.body.halfW * 2, spec.body.halfH * 0.8, 0x000000, 0.3);
+
+        // Status HUD above monster hitbox
+        this.statusHud = new StatusHud(scene, this.body);
+
+        // Weapon visual attachment — mirrors how the player carries weapons.
+        // Always created so melee (swing) and ranged (recoil) share the same
+        // animation path. `setWeapon` skips the sprite if `visual.texture`
+        // is missing, leaving only the controller (invisible but callable).
+        this.weaponVisual = new WeaponVisualController(scene);
+        this.weaponVisual.setWeapon(weapon);
+
+        // Feet Body Debug Rect (Green outline)
+        this.debugBodyRect = scene.add.rectangle(x, y, spec.body.halfW * 2, spec.body.halfH * 2);
+        this.debugBodyRect.setStrokeStyle(2, 0x22c55e, 1);
+        this.debugBodyRect.setDepth(9999);
+        this.debugBodyRect.setVisible(false);
+
+        // Full Hitbox Debug Rect (Purple / Red outline matching full Body)
+        this.debugHitboxRect = scene.add.rectangle(x, centerY, w, h, tint, 0.25);
+        this.debugHitboxRect.setStrokeStyle(2, tint, 1);
+        this.debugHitboxRect.setDepth(10000);
+        this.debugHitboxRect.setVisible(false);
+
+        this.rect = this.debugHitboxRect;
+
+        if (spec.sprite && scene.textures.exists(textureKey(spec))) {
+            const spriteObj = scene.add.sprite(x, y, textureKey(spec));
+            if (spec.sprite.scale) {
+                spriteObj.setScale(spec.sprite.scale);
+            }
+
+            const idleKey = animKey(spec, 'idle');
+            if (scene.anims.exists(idleKey)) {
+                spriteObj.play(idleKey);
+            }
+            this.sprite = spriteObj;
+        }
+    }
+
+    position(): { x: number; y: number } {
+        return this.body.position;
+    }
+
+    /** Calculate clearance radius using full physical Hitbox dimensions x 2. */
+    getHitboxRadius(): number {
+        return Math.hypot(this.hitboxWidth, this.hitboxHeight) * 2;
+    }
+
+    destroy(scene: Phaser.Scene): void {
+        scene.matter.world.remove(this.body);
+        this.debugBodyRect?.destroy();
+        this.debugHitboxRect?.destroy();
+        this.sprite?.destroy();
+        this.shadow?.destroy();
+        this.statusHud?.destroy();
+        this.weaponVisual?.destroy?.();
+        this.dead = true;
+    }
+}
+
+// ─── Drop roller ─────────────────────────────────────────────────────────
+
+export interface RolledDrop {
+    dropId: string;
+    spec: unknown; // DropSpec — resolved at the call site
+}
+
+/** Roll each entry independently; return all that succeed. */
+export function rollDrops(
+    table: DropRef[],
+    byId: (id: string) => unknown,
+): RolledDrop[] {
+    const out: RolledDrop[] = [];
+    for (const entry of table) {
+        if (Math.random() < entry.chance) {
+            out.push({ dropId: entry.dropId, spec: byId(entry.dropId) });
+        }
+    }
+    return out;
+}
+
+// ─── Controller ──────────────────────────────────────────────────────────
+
+export interface MonsterControllerCallbacks {
+    /** Called when a monster dies (HP ≤ 0). Useful for drop rolling. */
+    onMonsterDied: (monster: Monster) => void;
+    /**
+     * Called when the player takes damage from a monster's projectile.
+     * The HP application lives in the character module; here we just notify.
+     */
+    onPlayerHit: (damage: number) => void;
+}
+
+/** Snapshot of a monster projectile — owns body + visual + damage. */
+export interface MonsterProjectile {
+    body: MatterJS.BodyType;
+    rect: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+    damage: number;
+    monster: Monster;
+}
+
+export class MonsterController {
+    private readonly scene: Phaser.Scene;
+    private readonly monsters: Monster[] = [];
+    private readonly projectiles: MonsterProjectile[] = [];
+    private readonly cb: MonsterControllerCallbacks;
+    /** Cached for fast lookup in attack tests. */
+    private readonly playerBody: MatterJS.BodyType;
+    private readonly matter: any;
+    private readonly pathfinder?: PathfindingService;
+    private lastPathCalcAt = 0;
+    private lastPlayerPos = { x: 0, y: 0 };
+    /** Last attack timestamp per monster — independently tracked to avoid
+     *  interleaved races when two monsters fire on the same frame. */
+    private lastDamageAt = 0;
+
+    /** Trigger-gated monster spawns awaiting their fire condition. Pairs the
+     *  pure `PendingSpawn` (consumed by `advanceSpawnQueue`) with the heavy
+     *  spec/weapon handles needed to instantiate the monster at fire time. */
+    private pendingSpawns: { pending: PendingSpawn; spec: MonsterSpec; weapon: WeaponSpec }[] = [];
+
+    constructor(
+        scene: Phaser.Scene,
+        spawns:
+            | {
+                  spec: MonsterSpec;
+                  weapon: WeaponSpec;
+                  x: number;
+                  y: number;
+                  trigger?: MonsterTrigger;
+                  waveId?: string;
+              }[]
+            | undefined,
+        playerBody: MatterJS.BodyType,
+        cb: MonsterControllerCallbacks,
+        pathfinder?: PathfindingService,
+    ) {
+        this.scene = scene;
+        this.playerBody = playerBody;
+        this.cb = cb;
+        this.matter = (Phaser as any).Physics.Matter.Matter;
+        this.pathfinder = pathfinder;
+
+        // Self-spawn monsters from the spawn list (replaces the old
+        // spawnMonsters helper — controller owns its own construction).
+        // Spawns without a `trigger` (or with `kind: 'time', delayMs: 0`)
+        // fire immediately; everything else lands in the pending queue and
+        // gets checked each frame via `advanceSpawnQueue`.
+        if (spawns) {
+            spawns.forEach((s, index) => {
+                const trigger = s.trigger;
+                // Immediate: no trigger at all, OR `kind: 'time', delayMs: 0`.
+                // Branch in two separate checks so TS narrows `trigger` to a
+                // non-undefined type after the if/return.
+                if (!trigger || (trigger.kind === 'time' && trigger.delayMs === 0)) {
+                    this.monsters.push(new Monster(scene, s.spec, s.weapon, s.x, s.y, s.waveId));
+                    return;
+                }
+                this.pendingSpawns.push({
+                    pending: {
+                        index,
+                        type: s.spec.id!,
+                        x: s.x,
+                        y: s.y,
+                        trigger,
+                        waveId: s.waveId,
+                    },
+                    spec: s.spec,
+                    weapon: s.weapon,
+                });
+            });
+        }
+
+        this.bindCollisions();
+    }
+
+    /** Get active alive monsters positions (hitbox center) for aim assist magnet. */
+    public getActiveMonsters(): { id: number; x: number; y: number }[] {
+        return this.monsters
+            .filter((m) => !m.dead && m.state !== 'dying')
+            .map((m, idx) => ({ id: idx, x: m.body.position.x, y: m.body.position.y }));
+    }
+
+    /** Per-frame: AI tick + projectile sync + cleanup. */
+    update(time: number): void {
+        this.advancePendingSpawns(time);
+        const pp = this.playerBody.position;
+        const playerMovedDist = distBetween(this.lastPlayerPos, pp);
+        const shouldRecalcPaths =
+            this.pathfinder &&
+            (playerMovedDist > 16 || time - this.lastPathCalcAt > 150);
+
+        if (shouldRecalcPaths) {
+            this.lastPathCalcAt = time;
+            this.lastPlayerPos = { x: pp.x, y: pp.y };
+        }
+
+        const totalMonsters = this.monsters.length;
+
+        for (let i = this.monsters.length - 1; i >= 0; i--) {
+            const m = this.monsters[i];
+            if (m.dead) {
+                this.monsters.splice(i, 1);
+                continue;
+            }
+            const mp = m.body.position;
+            const dist = distBetween(mp, pp);
+            const dirToPlayer = dirTo(mp, pp);
+
+            // Compute surround target offset around player to prevent crowding single-file
+            const surroundOffset = getSurroundOffset(i, totalMonsters, Math.min(28, m.weapon.range * 0.45));
+            const targetPos = { x: pp.x + surroundOffset.x, y: pp.y + surroundOffset.y };
+
+            // Dynamic clearance radius based on exact physical Hitbox dimensions
+            const monsterBodyRadius = m.getHitboxRadius();
+
+            // Per-monster Active Stuck Detector (checks every 120ms)
+            let isStuckEmergency = false;
+            if (time - m.lastStuckCheckAt >= 120) {
+                m.lastStuckCheckAt = time;
+                const movedDist = distBetween(mp, m.stuckCheckPos);
+                if (m.state === 'chase' && movedDist < 3.0) {
+                    m.stuckTicks++;
+                    if (m.stuckTicks >= 1) {
+                        isStuckEmergency = true;
+                        m.noLoSUntil = time + 2000; // Disable direct LoS shortcut for 2s
+                        if (this.pathfinder) {
+                            const newPath = this.pathfinder.findPath(mp, targetPos);
+                            if (newPath && newPath.length > 1) {
+                                m.path = newPath;
+                                m.currentWaypointIdx = 1;
+                            }
+                        }
+                    }
+                } else {
+                    m.stuckTicks = 0;
+                }
+                m.stuckCheckPos = { x: mp.x, y: mp.y };
+            }
+
+            // Recalculate A* path if needed globally
+            if (shouldRecalcPaths && dist > m.weapon.range && this.pathfinder) {
+                const canUseLoS = time >= m.noLoSUntil;
+                if (canUseLoS && this.pathfinder.hasLineOfSight(mp, targetPos, monsterBodyRadius)) {
+                    m.path = [mp, targetPos];
+                    m.currentWaypointIdx = 1;
+                } else {
+                    const path = this.pathfinder.findPath(mp, targetPos);
+                    if (path && path.length > 1) {
+                        m.path = path;
+                        m.currentWaypointIdx = 1; // 0 is start cell
+                    } else {
+                        m.path = null;
+                    }
+                }
+            }
+
+            if (m.state === 'dying') {
+                // Freeze physics body during death animation
+                this.matter.Body.setVelocity(m.body, { x: 0, y: 0 });
+                if (m.statusHud) {
+                    const halfH = m.sprite ? m.sprite.displayHeight / 2 : m.spec.body.halfH;
+                    m.statusHud.update(
+                        { hp: 0, maxHp: m.spec.hp, showHpBar: false },
+                        time,
+                        halfH,
+                    );
+                }
+                continue;
+            }
+
+            // ── AI transitions ─────────────────────────────────────────
+            const prevState = m.state;
+            m.state = decideAIState(dist, m.weapon.range);
+            // One-shot aggro growl on the first idle → chase transition.
+            if (!m.hasAggroed && prevState === 'idle' && m.state === 'chase') {
+                m.hasAggroed = true;
+                EventBus.emit(SFX_EVENT(m.spec.sfx?.aggro ?? 'monster-aggro'));
+            }
+
+            // ── Velocity ──────────────────────────────────────────────
+            let desiredVx = 0;
+            let desiredVy = 0;
+            if (m.state === 'chase') {
+                let targetDir = dirTo(mp, targetPos);
+
+                // Direct Line of Sight shortcut check (guarded by stuck timer & monster body size x 2)
+                const canUseLoS = time >= m.noLoSUntil;
+                const hasLoS = canUseLoS && (this.pathfinder?.hasLineOfSight(mp, targetPos, monsterBodyRadius) ?? false);
+
+                if (!hasLoS && m.path && m.currentWaypointIdx < m.path.length) {
+                    const checkLoS = (p1: { x: number; y: number }, p2: { x: number; y: number }) =>
+                        this.pathfinder?.hasLineOfSight(p1, p2, monsterBodyRadius * 0.7) ?? false;
+                    const lookAhead = getPathLookAheadPoint(mp, m.path, m.currentWaypointIdx, 12, checkLoS);
+                    m.currentWaypointIdx = lookAhead.nextIdx;
+                    targetDir = dirTo(mp, lookAhead.target);
+                }
+
+                // Base chase vector
+                const cv = chaseVelocity(targetDir, m.spec.moveSpeed);
+                desiredVx = cv.vx;
+                desiredVy = cv.vy;
+
+                // Soft Separation vector from other monsters (anti-clumping & anti-stacking)
+                const sep = calcSeparationForce(m, this.monsters, 42, m.spec.moveSpeed * 0.7);
+                desiredVx += sep.x;
+                desiredVy += sep.y;
+
+                // Anti-blocking Detour: check if an ally directly ahead is stationary / attacking
+                for (const ally of this.monsters) {
+                    if (ally === m || ally.dead) continue;
+                    const allyPos = ally.body.position;
+                    const distToAlly = distBetween(mp, allyPos);
+                    if (distToAlly < 28) {
+                        const dirToAlly = dirTo(mp, allyPos);
+                        const dot = targetDir.x * dirToAlly.x + targetDir.y * dirToAlly.y;
+                        // Ally is directly in front (dot > 0.6) and is attacking or stopped
+                        if (dot > 0.6 && (ally.state === 'attack' || ally.state === 'idle')) {
+                            // Tangential detour vector perpendicular to targetDir
+                            const sign = (i % 2 === 0) ? 1 : -1;
+                            const detourX = -targetDir.y * sign * m.spec.moveSpeed * 0.6;
+                            const detourY = targetDir.x * sign * m.spec.moveSpeed * 0.6;
+                            desiredVx += detourX;
+                            desiredVy += detourY;
+                            break;
+                        }
+                    }
+                }
+
+                // Emergency Escape Impulse if monster is stuck against wall corner
+                if (isStuckEmergency || m.stuckTicks >= 2) {
+                    const escapeAngle = (i * 1.57 + time * 0.005) % (Math.PI * 2);
+                    desiredVx += Math.cos(escapeAngle) * m.spec.moveSpeed * 1.2;
+                    desiredVy += Math.sin(escapeAngle) * m.spec.moveSpeed * 1.2;
+                }
+
+                // Cap total desired velocity to preserve move speed limit
+                const speed = Math.hypot(desiredVx, desiredVy);
+                const maxAllowedSpeed = m.spec.moveSpeed * 1.15;
+                if (speed > maxAllowedSpeed) {
+                    desiredVx = (desiredVx / speed) * maxAllowedSpeed;
+                    desiredVy = (desiredVy / speed) * maxAllowedSpeed;
+                }
+            }
+
+            // Smooth Inertial Velocity Steering (LERP) for organic curved turns
+            const currVx = m.body.velocity.x;
+            const currVy = m.body.velocity.y;
+            const lerpFactor = 0.22; // Smooth curve interpolation factor
+            const finalVx = currVx + (desiredVx - currVx) * lerpFactor;
+            const finalVy = currVy + (desiredVy - currVy) * lerpFactor;
+
+            this.matter.Body.setVelocity(m.body, { x: finalVx, y: finalVy });
+
+            // ── Attack tick ──────────────────────────────────────────
+            if (
+                m.state === 'attack' &&
+                time - m.lastAttackAt >= m.weapon.cooldownMs
+            ) {
+                this.performAttack(m, dirToPlayer);
+                m.lastAttackAt = time;
+            }
+
+            // ── Visual sync & animation ───────────────────────────────
+            const footY = Math.round(mp.y + (m.sprite ? m.sprite.displayHeight / 2 - m.spec.body.halfH : 0));
+            const footX = mp.x;
+            
+            // Align feet shadow and green debug rect with actual feet position
+            m.shadow.setPosition(footX, footY);
+            m.shadow.setDepth(footY - 1);
+            m.debugBodyRect.setPosition(footX, footY - m.spec.body.halfH);
+
+            if (m.sprite) {
+                // Calculate visual offset. `left` shifts right (+) / left (-), `bottom` shifts up (-) / down (+)
+                const rawX = m.spec.sprite?.offset?.left ?? m.spec.sprite?.offset?.x ?? 0;
+                const rawY = m.spec.sprite?.offset?.bottom !== undefined 
+                    ? -m.spec.sprite.offset.bottom 
+                    : (m.spec.sprite?.offset?.y ?? 0);
+                const offX = rawX * (m.sprite.flipX ? -1 : 1);
+                const offY = rawY;
+
+                // Align sprite with feet and apply offset
+                m.sprite.setPosition(mp.x + offX, mp.y + offY);
+                m.sprite.setDepth(footY);
+
+                // Align Editor debug rect with physics body center
+                m.debugHitboxRect.setPosition(mp.x, mp.y);
+
+                // Update status HUD above monster hitbox/sprite top
+                const halfH = (m.body as any).bounds
+                    ? ((m.body as any).bounds.max.y - (m.body as any).bounds.min.y) / 2
+                    : m.sprite.displayHeight / 2;
+                m.statusHud.update(
+                    { name: m.spec.name, hp: m.hp, maxHp: m.spec.hp, showHpBar: true },
+                    time,
+                    halfH,
+                );
+
+                // Play corresponding animation track (idle / move / hit)
+                const isHit = time - m.lastHitAt < 250;
+                const animTrack = isHit ? 'hit' : m.state === 'chase' ? 'move' : 'idle';
+                const currentTrackKey = animKey(m.spec, animTrack);
+                if (
+                    this.scene.anims.exists(currentTrackKey) &&
+                    m.sprite.anims.currentAnim?.key !== currentTrackKey
+                ) {
+                    m.sprite.play(currentTrackKey);
+                }
+
+                // Flip sprite horizontally based on move direction / facing player
+                if (dist > 1) {
+                    m.sprite.setFlipX(dirToPlayer.x < 0);
+                }
+            } else {
+                m.debugHitboxRect.setPosition(mp.x, mp.y);
+                const halfH = m.spec.body.halfH;
+                m.statusHud.update(
+                    { hp: m.hp, maxHp: m.spec.hp, showHpBar: true },
+                    time,
+                    halfH,
+                );
+                if (dist > 1) {
+                    m.debugHitboxRect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
+                }
+            }
+
+            // ── Weapon visual sync (Brotato-style floating attachment) ──
+            // Aim the held weapon at the player the same way WeaponController
+            // does for the player character. Mirrors player visual behaviour.
+            if (m.weaponVisual) {
+                const halfH = m.spec.body.halfH;
+                const handX = mp.x;
+                const handY = mp.y - halfH;
+                const aimAngle = Math.atan2(dirToPlayer.y, dirToPlayer.x);
+                m.weaponVisual.update(handX, handY, footY, aimAngle);
+            }
+        }
+
+        // ── Projectile visual sync ────────────────────────────────────
+        for (const proj of this.projectiles) {
+            const bp = proj.body.position;
+            const vel = proj.body.velocity;
+            proj.rect.setPosition(bp.x, bp.y);
+            proj.rect.setDepth(Math.round(bp.y));
+            proj.rect.setRotation(Math.atan2(vel.y, vel.x));
+        }
+    }
+
+    /** Apply damage from a player bullet to a specific monster (or AoE later). */
+    applyBulletDamage(bulletDamage: number, hitBody: MatterJS.BodyType): void {
+        // Find monster whose main body or compound parts match hitBody
+        const target = this.monsters.find((m) => {
+            if (m.dead || m.state === 'dying') return false;
+            if (m.body === hitBody) return true;
+            // Check compound parts if any (includes spriteHitbox sensor)
+            const parts = (m.body as any).parts;
+            if (Array.isArray(parts) && parts.includes(hitBody)) return true;
+            // Fallback: check parent
+            if ((hitBody as any).parent === m.body) return true;
+            return false;
+        }) ?? pickClosestMonster(hitBody.position, this.monsters, 200);
+
+        if (target && target.state !== 'dying') {
+            target.hp -= bulletDamage;
+            target.lastHitAt = this.scene.time.now;
+            target.statusHud.showFloatingNumber(bulletDamage, 'damage');
+            EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'), {
+                key: `monster:${target.spec.id}`,
+                throttleMs: target.spec.sfx?.throttleMs,
+            });
+
+            if (target.hp <= 0) {
+                this.kill(target);
+            }
+        }
+    }
+
+    setDebugVisible(visible: boolean): void {
+        for (const m of this.monsters) {
+            m.debugBodyRect.setVisible(visible);
+            m.debugHitboxRect.setVisible(visible);
+        }
+    }
+
+    destroy(): void {
+        for (const m of this.monsters) m.destroy(this.scene);
+        for (const p of this.projectiles) {
+            this.scene.matter.world.remove(p.body);
+            p.rect.destroy();
+        }
+        this.monsters.length = 0;
+        this.projectiles.length = 0;
+    }
+
+    // ─── internals ──────────────────────────────────────────────────────
+
+    private performAttack(m: Monster, dirToPlayer: { x: number; y: number }): void {
+        const weapon = m.weapon;
+        const projectile = weapon.projectile;
+        const isMelee = projectile === undefined;
+
+        // Melee: trigger the swing tween (same animation the player gets)
+        // AND spawn a sensor hitbox so the swing has a proper hit-zone that
+        // matches player melee behaviour (slash arc + sensor body in front
+        // of the monster). Contact damage on the body itself is also kept
+        // as a fallback for the rare case where the player walks into the
+        // monster between swings.
+        if (isMelee) {
+            m.weaponVisual.triggerSwing();
+            const swingSfx = weapon.sfx?.shoot;
+            if (swingSfx) EventBus.emit(SFX_EVENT(swingSfx));
+            const range = weapon.range;
+            const originX = m.body.position.x;
+            const originY = m.body.position.y;
+            const dx = dirToPlayer.x;
+            const dy = dirToPlayer.y;
+            const len = Math.hypot(dx, dy);
+            const angle = len > 0 ? Math.atan2(dy, dx) : 0;
+            spawnMeleeHitbox(this.scene, this.matter, {
+                origin: { x: originX, y: originY },
+                angle,
+                range,
+                hitWidth: weapon.hitWidth ?? range,
+                hitHeight: weapon.hitHeight ?? range,
+                damage: weapon.damage,
+                texture: weapon.bullet?.texture,
+                scale: weapon.bullet?.scale ?? 0.2,
+                rotationOffset: weapon.bullet?.rotationOffset,
+                feetY: originY + (m.spec.body.halfH ?? 0),
+                category: CAT.MONSTER_PROJECTILE,
+                mask: PROJECTILE_MONSTER_MASK,
+                label: 'monster-melee',
+            });
+            return;
+        }
+
+        // Ranged: trigger recoil, spawn projectile from the weapon's muzzle.
+        // Don't lead — player dodge makes reaction aim more rewarding than prediction.
+        const len = Math.hypot(dirToPlayer.x, dirToPlayer.y);
+        if (len === 0) return;
+        const { speed, visual: size } = projectile;
+        const muzzlePos = m.weaponVisual.getMuzzlePosition(
+            m.body.position.x,
+            m.body.position.y,
+        );
+        m.weaponVisual.triggerRecoil();
+        EventBus.emit(SFX_EVENT(weapon.sfx?.shoot ?? 'monster-shoot'));
+        const bullet = spawnProjectile(
+            this.scene,
+            this.matter,
+            { x: muzzlePos.x, y: muzzlePos.y },
+            { x: dirToPlayer.x, y: dirToPlayer.y },
+            {
+                label: 'monster-projectile',
+                category: CAT.MONSTER_PROJECTILE,
+                mask: PROJECTILE_MONSTER_MASK,
+                speed,
+                damage: weapon.damage,
+                size,
+                // Render bullet as a sprite when the weapon spec has one —
+                // matches how player bullets look (e.g. assault-bullet.png).
+                texture: weapon.bullet?.texture,
+                scale: weapon.bullet?.scale,
+                anchor: weapon.bullet?.anchor,
+                rotationOffset: weapon.bullet?.rotationOffset,
+            },
+        );
+        this.projectiles.push({ ...bullet, monster: m });
+    }
+
+    private kill(m: Monster): void {
+        m.state = 'dying';
+        EventBus.emit(SFX_EVENT(m.spec.sfx?.death ?? 'monster-death'));
+
+        // Hide the held weapon during the death animation so it doesn't
+        // float in mid-air beside the corpse.
+        m.weaponVisual?.setVisible(false);
+
+        // Disable collision filter so dead monster doesn't block player or bullets
+        m.body.collisionFilter.mask = 0;
+
+        // Compute the death-track duration so the fade can run in PARALLEL
+        // with the animation, not after. By the time the death anim ends
+        // the body is already partly transparent; the tail of the tween
+        // finishes the dissolve to 0.
+        const deathTrackKey = animKey(m.spec, 'death');
+        const hasDeathAnim = !!(m.sprite && this.scene.anims.exists(deathTrackKey));
+        if (hasDeathAnim && m.sprite) {
+            m.sprite.play(deathTrackKey);
+        }
+        const animMs = hasDeathAnim
+            ? (this.scene.anims.get(deathTrackKey)?.duration ?? 0)
+            : 0;
+        this.startDeathFade(m, animMs);
+    }
+
+    /**
+     * Tween alpha to 0 over `animMs + MONSTER_DEATH_FADE_MS`, then
+     * destroy. The fade runs in parallel with the death animation, so
+     * the body starts dissolving the moment the monster dies.
+     *
+     * onMonsterDied fires at the end of the death animation (so the
+     * dropped items appear at the moment the body is half-faded — the
+     * "puff of smoke + loot materialises" beat). If there's no death
+     * animation, the callback fires immediately and the total fade
+     * duration collapses to MONSTER_DEATH_FADE_MS.
+     */
+    private startDeathFade(m: Monster, animMs: number): void {
+        const totalMs = animMs + MONSTER_DEATH_FADE_MS;
+        const dropSpawnAt = animMs; // emit onMonsterDied at end of death anim
+
+        if (animMs > 0) {
+            this.scene.time.delayedCall(dropSpawnAt, () => this.cb.onMonsterDied(m));
+        } else {
+            // No death animation — drop loot immediately, fade as the
+            // only visible cue.
+            this.cb.onMonsterDied(m);
+        }
+
+        // Capture the targets now — destroy() will null out the
+        // references and a tween against the same handle would no-op.
+        // All four GameObject subclasses (Sprite / Ellipse / Rectangle)
+        // share the single `alpha: number` property, which is what the
+        // tween actually mutates.
+        const targets: Phaser.GameObjects.GameObject[] = [];
+        if (m.sprite) targets.push(m.sprite);
+        if (m.shadow) targets.push(m.shadow);
+        if (m.debugBodyRect) targets.push(m.debugBodyRect);
+        if (m.debugHitboxRect) targets.push(m.debugHitboxRect);
+        if (targets.length === 0) {
+            m.destroy(this.scene);
+            return;
+        }
+
+        this.scene.tweens.add({
+            targets,
+            alpha: 0,
+            duration: totalMs,
+            ease: 'Linear',
+            onComplete: () => m.destroy(this.scene),
+        });
+    }
+
+    /**
+     * Per-frame: advance the trigger-gated spawn queue. Builds an
+     * alive snapshot grouped by waveId, hands it to the pure reducer,
+     * instantiates any spawns that fire, and updates the surviving
+     * queue with refreshed `clearReadyAt` stamps.
+     */
+    private advancePendingSpawns(time: number): void {
+        if (this.pendingSpawns.length === 0) return;
+
+        // Build alive snapshot: count non-dead/non-dying monsters per waveId.
+        // Empty-string bucket holds spawns without a waveId.
+        const byWave: Record<string, number> = {};
+        for (const m of this.monsters) {
+            if (m.dead || m.state === 'dying') continue;
+            const w = m.waveId ?? '';
+            byWave[w] = (byWave[w] ?? 0) + 1;
+        }
+        const alive: AliveSnapshot = { byWave };
+
+        const pendingList = this.pendingSpawns.map((q) => q.pending);
+        const { fired, remaining } = advanceSpawnQueue(pendingList, time, alive);
+
+        // Instantiate fired spawns + keep survivors with updated clearReadyAt.
+        const remainingByIndex = new Map<number, PendingSpawn>();
+        for (const p of remaining) remainingByIndex.set(p.index, p);
+        this.pendingSpawns = this.pendingSpawns.filter((q) => {
+            const isFired = fired.some((p) => p.index === q.pending.index);
+            if (isFired) {
+                this.monsters.push(
+                    new Monster(this.scene, q.spec, q.weapon, q.pending.x, q.pending.y, q.pending.waveId),
+                );
+                return false;
+            }
+            const refreshed = remainingByIndex.get(q.pending.index);
+            if (refreshed) q.pending.clearReadyAt = refreshed.clearReadyAt;
+            return true;
+        });
+    }
+
+    private bindCollisions(): void {
+        this.scene.matter.world.on('collisionstart', (event: any) => {
+            const pairs = event.pairs || [];
+            for (const pair of pairs) {
+                const a = pair.bodyA;
+                const b = pair.bodyB;
+                if (!a || !b) continue;
+
+                // ── monster-projectile ↔ player / wall ──────────────────
+                const projBody =
+                    a.label === 'monster-projectile'
+                        ? a
+                        : b.label === 'monster-projectile'
+                          ? b
+                          : null;
+                if (projBody) {
+                    const other = projBody === a ? b : a;
+                    if (other === this.playerBody) {
+                        this.damagePlayerFromProjectile(projBody as MatterJS.BodyType);
+                    } else if (typeof other.label === 'string' && other.label.startsWith('wall:')) {
+                        // Tall wall collision — short walls don't appear
+                        // here because the projectile mask omits WALL_SHORT.
+                        this.destroyProjectileByBody(projBody as MatterJS.BodyType);
+                    }
+                    continue;
+                }
+
+                // ── monster-melee (swing hitbox) ↔ player ───────────────
+                // Mirrors player plasma-sword: a sensor body fires briefly
+                // in front of the monster; on overlap it damages the player.
+                const meleeBody =
+                    a.label === 'monster-melee'
+                        ? a
+                        : b.label === 'monster-melee'
+                          ? b
+                          : null;
+                if (meleeBody) {
+                    const other = meleeBody === a ? b : a;
+                    if (other === this.playerBody) {
+                        this.damagePlayerFromMelee(meleeBody as MatterJS.BodyType);
+                    }
+                    continue;
+                }
+
+                // ── monster (melee body) ↔ player ─────────────────────
+                if (
+                    (a.label === 'monster' && b === this.playerBody) ||
+                    (b.label === 'monster' && a === this.playerBody)
+                ) {
+                    this.damagePlayerFromContact();
+                    continue;
+                }
+            }
+        });
+    }
+
+    private destroyProjectileByBody(body: MatterJS.BodyType): void {
+        const proj = this.projectiles.find((p) => p.body === body);
+        if (!proj) return;
+        this.destroyProjectile(proj);
+    }
+
+    private damagePlayerFromProjectile(projBody: MatterJS.BodyType): void {
+        const proj = this.projectiles.find((p) => p.body === projBody);
+        if (!proj) return;
+        const now = this.scene.time.now;
+        // ponytail: contact damage respects a short cooldown so brush-by
+        // contact doesn't stack to death in 1 frame. Projectiles themselves
+        // always destroy on contact.
+        if (now - this.lastDamageAt < COMBAT_PLAYER_DAMAGE_COOLDOWN_MS) {
+            this.destroyProjectile(proj);
+            return;
+        }
+        EventBus.emit(SFX_EVENT('player-hit'));
+        this.cb.onPlayerHit(proj.damage);
+        this.lastDamageAt = now;
+        this.destroyProjectile(proj);
+    }
+
+    /**
+     * Apply damage to the player from a monster melee swing hitbox. The body
+     * self-destroys via the spawnMeleeHitbox tween (no projectile cleanup
+     * needed). Like projectile hits, contact damage respects the global
+     * cooldown so simultaneous melee overlaps don't double-tap.
+     */
+    private damagePlayerFromMelee(meleeBody: MatterJS.BodyType): void {
+        const now = this.scene.time.now;
+        if (now - this.lastDamageAt < COMBAT_PLAYER_DAMAGE_COOLDOWN_MS) return;
+        // Find the swinging monster — the swing body was spawned from the
+        // attacker's position, so pick the nearest melee monster.
+        const meleeMonsters = this.monsters.filter(
+            (m) => !m.dead && m.weapon.projectile === undefined,
+        );
+        const best = pickClosestMonster(
+            meleeBody.position,
+            meleeMonsters,
+            Infinity,
+        );
+        if (!best) return;
+        EventBus.emit(SFX_EVENT('player-hit'));
+        this.cb.onPlayerHit(best.weapon.damage);
+        this.lastDamageAt = now;
+    }
+
+    private damagePlayerFromContact(): void {
+        const now = this.scene.time.now;
+        if (now - this.lastDamageAt < COMBAT_PLAYER_DAMAGE_COOLDOWN_MS) return;
+        // Find which melee monster is overlapping the player; pick nearest.
+        const meleeMonsters = this.monsters.filter(
+            (m) => !m.dead && m.weapon.projectile === undefined,
+        );
+        const best = pickClosestMonster(this.playerBody.position, meleeMonsters, Infinity);
+        if (!best) return;
+        EventBus.emit(SFX_EVENT('player-hit'));
+        this.cb.onPlayerHit(best.weapon.damage);
+        this.lastDamageAt = now;
+    }
+
+    private destroyProjectile(proj: MonsterProjectile): void {
+        const idx = this.projectiles.indexOf(proj);
+        if (idx >= 0) this.projectiles.splice(idx, 1);
+        this.scene.matter.world.remove(proj.body);
+        proj.rect.destroy();
+    }
+}

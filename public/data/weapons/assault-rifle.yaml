@@ -1,0 +1,34 @@
+name: Assault Rifle
+damage: 2
+cooldownMs: 100
+range: 550
+clipSize: 30
+reloadTimeMs: 1500
+bulletsPerShot: 1
+visual:
+    texture: assets/image/weapons/assault-rifle.png
+    scale: 0.16
+    orbitRadius: 18
+    anchor: [0.45, 0.5]
+    recoilDistance: 6
+    recoilDuration: 80
+bullet:
+    texture: assets/image/weapons/assault-bullet.png
+    type: projectile
+    speed: 700
+    scale: 0.08
+    anchor: [0.5, 0.5]
+    spawnOffset: [10, -10]
+projectile:
+    speed: 24
+    visual:
+        radius: 4
+        width: 2
+        height: 2
+        color: 0x23C9D0
+sfx:
+    shoot: assault-rifle-shoot
+    dryFire: dry-fire
+    bulletWall: bullet-wall
+    reloadStart: reload-start
+    reloadFinish: reload-finish

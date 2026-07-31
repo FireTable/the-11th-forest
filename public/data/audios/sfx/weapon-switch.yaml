@@ -1,0 +1,6 @@
+kind: sfx
+id: weapon-switch
+name: Weapon Switch
+source: assets/audio/sfx/weapon-switch.wav
+volume: 0.4
+prompt: Soft low weapon swap swoosh, anime inventory, muted magical whoosh, deep and gentle without high frequency sparkle or click

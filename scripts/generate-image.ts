@@ -59,7 +59,14 @@ type PromptTemplate = {
 };
 
 function loadPromptTemplate(id: string): PromptTemplate {
-    const path = `prompts/scenes/${id}.yaml`;
+    const levelPath = `public/data/levels/${id}.yaml`;
+    const characterPath = `public/data/characters/${id}.yaml`;
+    let path = levelPath;
+    try {
+        readFileSync(levelPath, 'utf8');
+    } catch {
+        path = characterPath;
+    }
     const text = readFileSync(path, 'utf8');
     return parseYaml(text) as PromptTemplate;
 }
@@ -131,7 +138,7 @@ async function generateImage(opts: MainOpts): Promise<void> {
     const outName = `${model}-${Date.now()}.png`;
     const outPath = `./tmp/image/${outName}`;
     mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(outPath, bytes);
+    writeFileSync(outPath, new Uint8Array(bytes));
     console.log(`\nSaved ${bytes.length} bytes -> ${outPath}`);
 }
 

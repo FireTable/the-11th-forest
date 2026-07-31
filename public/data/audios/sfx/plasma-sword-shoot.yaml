@@ -1,0 +1,5 @@
+kind: sfx
+id: plasma-sword-shoot
+name: plasma-sword-shoot
+source: assets/audio/sfx/plasma-sword-shoot.wav
+volume: 0.5

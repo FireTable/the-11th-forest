@@ -1,0 +1,21 @@
+name: Ammo Cache
+kind: static
+sfx: pickup-ammo
+visual:
+    size: 18
+    tint: 0xfacc15
+effect:
+    type: refill-ammo
+    ammoFraction: 0.3
+
+sprite:
+    texture: assets/image/drops/drops.png
+    grid: { rows: 4, cols: 4 }
+    scale: 1
+    offset: { left: 0, bottom: 0 }
+
+anims:
+    idle:
+        frames: [8, 11]
+        frameRate: 6
+        repeat: -1

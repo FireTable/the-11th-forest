@@ -1,0 +1,6 @@
+kind: sfx
+id: shotgun-shoot
+name: shotgun-shoot
+source: assets/audio/sfx/shotgun-shoot.wav
+volume: 0.575
+prompt: Powerful anime shotgun blast with deep booming report and rapid scatter of small pellet impacts spreading outward, punchy low frequency burst then multiple tiny hits, single shot

@@ -1,0 +1,34 @@
+name: Shotgun
+damage: 5
+cooldownMs: 800
+range: 400
+clipSize: 2
+reloadTimeMs: 2400
+bulletsPerShot: 5
+visual:
+    texture: assets/image/weapons/shotgun.png
+    scale: 0.16
+    orbitRadius: 18
+    anchor: [0.45, 0.5]
+    recoilDistance: 10
+    recoilDuration: 120
+bullet:
+    texture: assets/image/weapons/shotgun-pellet.png
+    type: projectile
+    speed: 650
+    scale: 0.11
+    anchor: [0.5, 0.5]
+    spawnOffset: [-40, -10]
+projectile:
+    speed: 22
+    visual:
+        radius: 4
+        width: 16
+        height: 4
+        color: 0x313142
+sfx:
+    shoot: shotgun-shoot
+    dryFire: dry-fire
+    bulletWall: bullet-wall
+    reloadStart: reload-start
+    reloadFinish: reload-finish

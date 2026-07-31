@@ -14,11 +14,15 @@
 export type {
     AirWall,
     AirWallKind,
+    DropSpawn,
     ImageSize,
     Level,
     LevelIndex,
+    MonsterSpawn,
+    MonsterTrigger,
 } from './types';
 
 export { parseImageSize, formatImageSize } from './types';
 export { parseLevelIndex, parseLevelYaml } from './parser';
 export { fetchLevel, fetchLevelIndex } from './loader';
+export { collectDropIds } from './prefetch';

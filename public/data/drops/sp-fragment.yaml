@@ -1,0 +1,21 @@
+name: SP Fragment
+kind: static
+sfx: pickup-sp
+visual:
+    size: 18
+    tint: 0x3b82f6
+effect:
+    type: instant
+    sp: 30
+
+sprite:
+    texture: assets/image/drops/drops.png
+    grid: { rows: 4, cols: 4 }
+    scale: 1
+    offset: { left: 0, bottom: 0 }
+
+anims:
+    idle:
+        frames: [4, 7]
+        frameRate: 6
+        repeat: -1

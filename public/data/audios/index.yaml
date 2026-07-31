@@ -1,0 +1,41 @@
+# Manifest of all audio assets. Each id points to a YAML spec under
+# data/audios/sfx/<id>.yaml or data/audios/music/<id>.yaml.
+#
+# The event name triggered by gameplay is `sfx:<id>` or `music:<id>` —
+# AudioController subscribes to those names so callers don't need to
+# import the audio module; they just EventBus.emit().
+
+sfx:
+  # Per-weapon shoot sounds — each weapon has its own unique fire SFX.
+  - assault-rifle-shoot
+  - shotgun-shoot
+  - laser-cannon-shoot
+  - rocket-launcher-shoot
+  - arcana-staff-shoot
+  - plasma-sword-shoot
+  - gunner-shoot
+  # Common / generic
+  - pickup-hp
+  - pickup-sp
+  - pickup-ammo
+  - pickup-overcharge
+  - pickup-weapon
+  - pickup-generic
+  - dry-fire
+  - bullet-wall
+  - reload-start
+  - reload-finish
+  - weapon-switch
+  - monster-hit
+  - monster-death
+  - monster-aggro
+  - player-hit
+  - player-hurt-female
+  - player-hurt-male
+  - dodge
+  - footstep
+  - low-hp-heartbeat
+
+music:
+  - forest-ambient
+  - boss-arena

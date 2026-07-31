@@ -1,0 +1,6 @@
+kind: sfx
+id: rocket-launcher-shoot
+name: rocket-launcher-shoot
+source: assets/audio/sfx/rocket-launcher-shoot.wav
+volume: 0.5
+prompt: Low rumbling rocket launcher boom, anime mecha style, bright tail whoosh and explosion, deep but not harsh

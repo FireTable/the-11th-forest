@@ -17,15 +17,15 @@ For every new function or module:
 - One module per file. Single responsibility.
 - Cap at **~1000 lines per file**. If a file approaches the cap, split it before continuing.
 - Tests mirror source tree one-to-one.
-- Group by concern: `src/game/scenes/`, `src/debug/sections/`, `src/debug/api/`, etc.
+- Group by concern: `src/game/scenes/`, `src/editor/sections/`, `src/editor/api/`, etc.
 - **`src/lib/`** — shared functions, organized by module:
     ```
     src/lib/
-      debug/   # debug panel helpers (air-wall model, sprite catalog, AI client)
+      editor/  # editor panel helpers (air-wall model, sprite catalog, AI client)
       game/    # shared game logic (e.g. math, pathing)
       ui/      # shared UI primitives
     ```
-    `src/lib/` is the bottom layer. Higher layers (`src/game/`, `src/debug/`, `src/components/`) depend on `lib/`; never the reverse. Each helper gets a sibling `*.test.ts` under `tests/lib/`.
+    `src/lib/` is the bottom layer. Higher layers (`src/game/`, `src/editor/`, `src/components/`) depend on `lib/`; never the reverse. Each helper gets a sibling `*.test.ts` under `tests/lib/`.
 
 ## Commit Hygiene
 

@@ -1,0 +1,6 @@
+kind: sfx
+id: player-hit
+name: Player Hit
+source: assets/audio/sfx/player-hit.wav
+volume: 0.5
+prompt: Soft player damage thud, anime style, brief but clear impact, no harsh screech

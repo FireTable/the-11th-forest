@@ -1,0 +1,5 @@
+kind: sfx
+id: pickup-sp
+name: Pickup SP
+source: assets/audio/sfx/pickup-sp.wav
+volume: 0.7

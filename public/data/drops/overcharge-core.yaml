@@ -1,0 +1,22 @@
+name: Overcharge Core
+kind: static
+sfx: pickup-overcharge
+visual:
+    size: 22
+    tint: 0xef4444
+effect:
+    type: instant
+    hp: 50
+    sp: 50
+
+sprite:
+    texture: assets/image/drops/drops.png
+    grid: { rows: 4, cols: 4 }
+    scale: 1
+    offset: { left: 0, bottom: 0 }
+
+anims:
+    idle:
+        frames: [12, 15]
+        frameRate: 6
+        repeat: -1

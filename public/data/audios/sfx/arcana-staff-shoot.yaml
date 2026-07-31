@@ -1,0 +1,5 @@
+kind: sfx
+id: arcana-staff-shoot
+name: arcana-staff-shoot
+source: assets/audio/sfx/arcana-staff-shoot.wav
+volume: 0.5

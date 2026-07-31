@@ -1,0 +1,13 @@
+name: Claws
+damage: 4
+cooldownMs: 1000
+range: 36
+hitWidth: 30
+hitHeight: 30
+bullet:
+    texture: assets/image/weapons/plasma-slash-arc.png
+    type: melee
+    scale: 0.25
+    anchor: [0.5, 0.5]
+sfx:
+  bulletWall: bullet-wall

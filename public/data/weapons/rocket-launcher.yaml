@@ -1,0 +1,33 @@
+name: Rocket Launcher
+damage: 55
+cooldownMs: 1200
+range: 800
+clipSize: 1
+reloadTimeMs: 2500
+bulletsPerShot: 1
+visual:
+    texture: assets/image/weapons/rocket-launcher.png
+    scale: 0.16
+    orbitRadius: 22
+    anchor: [0.45, 0.5]
+    recoilDistance: 14
+    recoilDuration: 150
+bullet:
+    texture: assets/image/weapons/rocket-missile.png
+    type: projectile
+    speed: 550
+    scale: 0.12
+    anchor: [0.5, 0.5]
+projectile:
+    speed: 18
+    visual:
+        radius: 6
+        width: 24
+        height: 8
+        color: 0x586B48
+sfx:
+    shoot: rocket-launcher-shoot
+    dryFire: dry-fire
+    bulletWall: bullet-wall
+    reloadStart: reload-start
+    reloadFinish: reload-finish

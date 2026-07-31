@@ -1,0 +1,6 @@
+kind: sfx
+id: monster-aggro
+name: Monster Aggro
+source: assets/audio/sfx/monster-aggro.wav
+volume: 0.5
+prompt: Single short anime referee whistle toot, tiny high pitched chirp less than half a second, very brief and crisp

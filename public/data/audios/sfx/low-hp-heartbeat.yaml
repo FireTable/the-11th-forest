@@ -1,0 +1,6 @@
+kind: sfx
+id: low-hp-heartbeat
+name: Low HP Heartbeat
+source: assets/audio/sfx/low-hp-heartbeat.wav
+volume: 0.5
+prompt: Slow low HP heartbeat pulse, anime tension, soft deep thump, single beat

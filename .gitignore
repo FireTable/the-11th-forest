@@ -30,3 +30,9 @@ dist-ssr
 
 # Local scratch / AI gen outputs (image, music, …)
 /tmp/
+.playground
+
+# Claude working notes (plans, scratch)
+.claude
+# Public backup (created before editor changes for safe rollback)
+public-bk/

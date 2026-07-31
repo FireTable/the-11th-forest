@@ -1,37 +1,54 @@
-import { AUTO, Game } from 'phaser';
+import { AUTO, Game, Scale } from 'phaser';
 
-import { LoadScene } from '@/game/scenes/load-scene';
-import { fetchLevel, fetchLevelIndex } from '@/lib/levels';
+import { LoadScene } from '@/game/scenes/scene';
+import { resolveDefaultSceneId, resolveScene } from '@/game/resolve-scene';
 
-// Scene id resolution: ?scene=<id> URL param wins; otherwise the first
-// entry in public/data/levels/index.yaml. Level is fetched here (NOT in
-// the scene) because Phaser's init() does not await async work — the
-// fetch would race with preload().
-async function resolveScene(): Promise<{ id: string; level: Awaited<ReturnType<typeof fetchLevel>> }> {
-    const params = new URLSearchParams(window.location.search);
-    const fromUrl = params.get('scene');
-    const id = fromUrl ?? (await fetchLevelIndex()).levels[0];
-    if (!id) throw new Error('Level index is empty — add an entry to public/data/levels/index.yaml');
-    const level = await fetchLevel(id);
-    return { id, level };
-}
+import { PixelLightPostFX } from '@/game/pipelines/pixel-light';
 
-// Canvas is 16:9 to match the AI-generated backgrounds.
-const config: Phaser.Types.Core.GameConfig = {
-    type: AUTO,
-    width: 1280,
-    height: 720,
-    parent: 'game-container',
-    backgroundColor: '#000000',
-};
+// Re-exported so the editor's restart path can resolve a scene id
+// without going through main.ts's Phaser-side effects.
+export { resolveScene } from '@/game/resolve-scene';
+export type { ResolvedScene } from '@/game/resolve-scene';
 
 const StartGame = async (parent: string): Promise<Phaser.Game> => {
-    const { id, level } = await resolveScene();
+    const sceneId = await resolveDefaultSceneId();
+    const scene = await resolveScene(sceneId);
+    // World size matches the level's native image dimensions so air-wall
+    // coords (defined in image pixel space) align 1:1. The canvas itself
+    // is scaled down via Scale.FIT to fit the viewport.
     return new Game({
-        ...config,
+        type: AUTO,
         parent,
-        scene: [new LoadScene(id, level)],
-    });
+        backgroundColor: '#000000',
+        pipeline: {
+            'PixelLightPostFX': PixelLightPostFX,
+        },
+        scale: {
+            mode: Scale.FIT,
+            autoCenter: Scale.CENTER_BOTH,
+            width: scene.level.imageSize.width,
+            height: scene.level.imageSize.height,
+        },
+        // Top-down shooter — no gravity, walls are static obstacles.
+        // Debug rendering off in prod; flip on for level design.
+        physics: {
+            default: 'matter',
+            matter: {
+                gravity: { x: 0, y: 0 },
+                debug: false,
+            },
+        },
+        scene: [new LoadScene(scene.id, scene.level, {
+            weapons: scene.weapons,
+            weaponsById: scene.weaponsById,
+            character: scene.character,
+            spriteCell: scene.spriteCell,
+            monsterSpecs: scene.monsters,
+            dropSpecs: scene.drops,
+            sfxSpecs: scene.sfx,
+            musicSpecs: scene.music,
+        })],
+    } as any);
 };
 
 export default StartGame;

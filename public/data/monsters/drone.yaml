@@ -1,0 +1,128 @@
+name: Thorn Drone
+hp: 160
+moveSpeed: 4
+body:
+    halfW: 20
+    halfH: 20
+weaponId: plasma-sword
+sfx:
+    hit: monster-hit
+    death: monster-death
+    aggro: monster-aggro
+drops:
+    - dropId: hp-shard
+      chance: 0.4
+    - dropId: sp-fragment
+      chance: 0.3
+    - dropId: overcharge-core
+      chance: 0.15
+
+sprite:
+    texture: assets/image/monsters/drone.png
+    grid: { rows: 4, cols: 4 }
+    scale: 1.0
+    offset: { left: 0, bottom: 4 }
+    script:
+        downsample: 4
+        colors: 32
+        pad: 2
+
+anims:
+    idle:
+        frames: [0, 3]
+        frameRate: 6
+        repeat: -1
+    move:
+        frames: [4, 7]
+        frameRate: 10
+        repeat: -1
+    hit:
+        frames: [8, 11]
+        frameRate: 12
+        repeat: 0
+    death:
+        frames: [12, 14]
+        frameRate: 10
+        repeat: 0
+
+prompt: |
+    The 11th Forest — Sacred Forest Sanctuary Thorn Drone sprite sheet
+
+    HARD NEGATIVE PROMPTS (must NOT appear in the image):
+      - No visible grid, no dividers, no borders, no ground, no scene,
+        no text, no logo, no watermark.
+      - No grid lines, no cell borders, no cell separators, no dividers
+        of any kind between the 4×4 frames.
+      - No guide marks, no reference crosses, no axis labels, no frame
+        numbers, no "Frame N" text, no index annotations.
+      - No checkerboard pattern, no tile outline overlays, no debug
+        visualizations.
+      - No watermarks, no logos, no signatures, no UI elements.
+      - The 4×4 layout is COMPLETELY IMPLIED by the character's position
+        — the magenta background is one continuous flat field everywhere
+        except where the character is drawn.
+
+    CRITICAL LAYOUT (must be EXACTLY this — 16 cells, no more, no less,
+    4 rows × 4 columns, every cell the same size):
+
+      ┌────┬────┬────┬────┐
+      │  0 │  1 │  2 │  3 │   row 1: idle
+      ├────┼────┼────┼────┤
+      │  4 │  5 │  6 │  7 │   row 2: move
+      ├────┼────┼────┼────┤
+      │  8 │  9 │ 10 │ 11 │   row 3: hit
+      ├────┼────┼────┼────┤
+      │ 12 │ 13 │ 14 │    │   row 4: death (last cell empty)
+      └────┴────┴────┴────┘
+
+    The bottom-right cell (cell #15) MUST be empty magenta — do NOT
+    place a frame there. Total: exactly 15 frames + 1 empty cell = 16
+    cells in a 4×4 grid. No other layout is acceptable.
+
+    Create a ** 4×4 grid ** of pixel-art chibi monster frames on a SOLID MAGENTA
+    (#FF00FF) BACKGROUND for chroma keying. The magenta must be saturated
+    and uniform — no gradients, no shadows, no anti-aliased corners on
+    the bg. Leave the bottom-right cell of the grid empty (15 frames + 1
+    blank cell). No grid lines, no guide marks, no cell borders, no
+    reference crosses between cells — the grid is implicit, the bg is
+    pure flat magenta everywhere except where the monster is drawn.
+
+    Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
+    512×512 px. The monster is ~350×400 px in each cell, centered
+    horizontally. No overlapping between cells. The monster faces RIGHT in
+    every frame (its front = screen right).
+
+    Monster Concept (Thorn Drone - Melee Forest Automaton):
+    A floating ancient forest drone composed of weathered dark brass metal
+    covered with glowing green moss, thorny vines, and a single cyan magical
+    eye core in the center. Equipped with two sharp wooden-blade scythe claws
+    underneath.
+
+    Same monster in every frame — core shape, moss, eye, and claws are
+    identical. Only the pose/state changes.
+
+    15 frames in row order (left-to-right, top-to-bottom), distributed as:
+
+    Frames 0–3 (idle, 4 frames, row 1):
+      Hovering in place smoothly. Gentle vertical bobbing, glowing cyan core
+      pulsing softly, vines swaying slightly.
+
+    Frames 4–7 (move, 4 frames, row 2):
+      Forward floating propulsion. Body tilted forward to the right, core
+      glowing intensely, blades pulled backward ready to strike.
+
+    Frames 8–11 (hit, 4 frames, row 3):
+      Taking damage / hit recoil. Body knocked backward to the left, red
+      flash on the core, sparks and floating moss leaves detaching.
+
+    Frames 12–14 (death, 3 frames, row 4):
+      Exploding / breaking down. Core cracks with bright cyan light, blades
+      drop, moss and mechanical pieces shatter outward, fading to smoke.
+
+    Style requirements:
+    - High-end handcrafted 16-bit RPG aesthetic.
+    - Inspired by Chrono Trigger, Eastward, Children of Morta, Hyper Light
+      Drifter, and premium modern indie pixel games.
+    - Hard clean pixel edges, no anti-aliasing on the silhouette.
+    - Limited muted color palette: ~32 colors total per character.
+    - No purple, magenta, or pink in the monster body itself.

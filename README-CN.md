@@ -102,7 +102,11 @@ class MyScene extends Phaser.Scene {
 详细的设计、机制、美术与工具文档存放在 [`docs/`](./docs/),每个主题一个 `UPPERCASE-ENGLISH.md` 文件。完整索引见 [`docs/README.md`](./docs/README.md)。
 
 建议从这里开始:
-- [`docs/SCENES.md`](./docs/SCENES.md) — 场景如何被加载(文件结构、`handle-fetch`、如何添加新场景)。
+- [`docs/SCENES.md`](./docs/SCENES.md) — 场景如何被加载(文件结构、`handle-fetch`、如何添加新场景、怪物刷新触发条件、HUD 桥接)。
+- [`docs/MODULES.md`](./docs/MODULES.md) — 每个数据驱动模块都遵循的 `yaml → schema → parser → loader → logic` 模式。
+
+各模块参考:
+- [`docs/WEAPONS.md`](./docs/WEAPONS.md) · [`docs/MONSTERS.md`](./docs/MONSTERS.md) · [`docs/CHARACTERS.md`](./docs/CHARACTERS.md) · [`docs/DROPS.md`](./docs/DROPS.md) · [`docs/AUDIOS.md`](./docs/AUDIOS.md) · [`docs/EVENTS.md`](./docs/EVENTS.md)
 
 ## 许可证
 
