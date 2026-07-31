@@ -15,6 +15,10 @@ import { GameHUDLayer } from '@/components/hud/GameHUDLayer';
  * (a tiny module-level singleton the scene writes to) so the lazy
  * chunk can mount after `level-loaded` has already fired without
  * missing the data.
+ *
+ * CheatPanel lives inside the editor sidebar (see `EditorPanel`) so it
+ * shares the same surface — no separate floating widget at the app
+ * root.
  */
 const EditorPanel = lazy(() =>
     import('@/editor/panel').then((m) => ({ default: m.EditorPanel })),

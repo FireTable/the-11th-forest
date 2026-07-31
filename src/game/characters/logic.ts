@@ -36,11 +36,15 @@ import {
     SFX_EVENT,
     AIM_ASSIST,
 } from '@/lib/constants';
+import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 
 import { animKey } from './keys';
+
+/** Dev cheat HP cap — effectively "cannot die". */
+const INFINITE_HP_VALUE = 999_999_999;
 
 // ─── Pure helpers ────────────────────────────────────────────────────────
 
@@ -233,6 +237,9 @@ export class CharacterController {
     private lastFootstepAt = 0;
     /** Throttle for the low-HP heartbeat so it pulses rather than buzzes. */
     private lastHeartbeatAt = 0;
+    /** Dev cheat: when true, `heal(hpDelta<0, …)` is a no-op so the
+     *  character can't die. Toggled via the cheat panel / EventBus. */
+    private infiniteHp = false;
 
     private readonly cleanupFns: Array<() => void> = [];
 
@@ -247,6 +254,16 @@ export class CharacterController {
         this.parts = parts;
         this.hp = spec.hp;
         this.sp = spec.sp;
+
+        // Honor a pre-existing dev "Infinite HP" toggle (e.g. user
+        // toggled it, then refreshed the page). The cheat panel only
+        // mounts on localhost — same gate as `isDev()` — so this is
+        // inert in production.
+        if (getCheats().infiniteHp) {
+            this.infiniteHp = true;
+            this.hp = INFINITE_HP_VALUE;
+        }
+
         // Spawn-time target stays null — the first real pointermove will
         // populate it. Until then, the sprite keeps the flipX that
         // loadCharacter() set from level.characterSpawn.facing.
@@ -263,13 +280,25 @@ export class CharacterController {
         const tick = () => this.update(scene.time.now);
         scene.events.on('update', tick);
         this.cleanupFns.push(() => scene.events.off('update', tick));
+
+        // Dev cheat — Infinite HP toggle. Updates the runtime flag and
+        // bumps HP to the cap when enabling.
+        const infiniteHpHandler = (payload?: { value?: boolean }) => {
+            this.infiniteHp = payload?.value === true;
+            if (this.infiniteHp) this.hp = INFINITE_HP_VALUE;
+        };
+        EventBus.on('dev:cheat:infiniteHp', infiniteHpHandler);
+        this.cleanupFns.push(() => EventBus.removeListener('dev:cheat:infiniteHp', infiniteHpHandler));
     }
 
     // ─── Public API ──────────────────────────────────────────────────────
 
-    /** Apply HP/SP healing (clamped to [0, max]). Negative values damage. */
+    /** Apply HP/SP healing (clamped to [0, max]). Negative values damage.
+     *  Dev cheat: when `infiniteHp` is on, negative HP deltas are
+     *  silently ignored so the player can't die. */
     heal(hpDelta: number, spDelta: number): void {
-        if (hpDelta !== 0) {
+        const hpBlocked = this.infiniteHp && hpDelta < 0;
+        if (hpDelta !== 0 && !hpBlocked) {
             const oldHp = this.hp;
             this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
             const actualDelta = this.hp - oldHp;

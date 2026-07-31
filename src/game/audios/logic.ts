@@ -24,6 +24,7 @@ import {
     MUSIC_STOP,
     SFX_EVENT,
 } from '@/lib/constants';
+import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import type { MusicSpec, SfxSpec, SoundSpec } from '@/lib/audios';
 
@@ -72,6 +73,12 @@ export class AudioController {
         for (const s of sfxSpecs) this.sfxSpecs.set(s.id, s);
         this.musicSpecs = new Map();
         for (const m of musicSpecs) this.musicSpecs.set(m.id, m);
+
+        // Honor the dev "Mute" cheat from localStorage so a refreshed
+        // page (or a re-mount after dev toggled it earlier) starts silent.
+        if (getCheats().muted) {
+            this.scene.sound.volume = 0;
+        }
 
         this.subscribe();
     }
@@ -213,5 +220,12 @@ export class AudioController {
         this.unsubscribers.push(() => EventBus.removeListener(MUSIC_STOP));
         this.unsubscribers.push(() => EventBus.removeListener(MUSIC_PAUSE));
         this.unsubscribers.push(() => EventBus.removeListener(MUSIC_RESUME));
+
+        // Dev cheat — Mute toggle flips Phaser's master sound volume.
+        const muteHandler = (payload?: { value?: boolean }) => {
+            this.scene.sound.volume = payload?.value ? 0 : 1;
+        };
+        EventBus.on('dev:cheat:muted', muteHandler);
+        this.unsubscribers.push(() => EventBus.removeListener('dev:cheat:muted', muteHandler));
     }
 }

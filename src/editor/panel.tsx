@@ -10,13 +10,15 @@ import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 import { AirWallsSection } from './sections/air-walls';
 import { BackgroundSection } from './sections/background';
-import { CharacterSection } from './sections/character';
+import { CharacterSection, type CharacterSaveState } from './sections/character';
+import { CheatPanel } from './cheat-panel';
 import { MaterialsSection } from './sections/materials';
 import {
     DropsSection,
     MonstersSectionEditor,
     WeaponsSectionEditor,
     AudiosSection,
+    type ModuleSaveState,
 } from './sections/modules';
 import { MonstersSection } from './sections/monsters';
 import { ScenesListSection } from './sections/scenes-list';
@@ -60,6 +62,28 @@ export function EditorPanel() {
     const [error, setError] = useState<string | null>(null);
     const [drawing, setDrawing] = useState(false);
     const [overlayTarget, setOverlayTarget] = useState<HTMLElement | null>(null);
+    // The character / module shell sections report their dirty/saving
+    // state here so the single outer Save button can dispatch. Null
+    // when the current top-tab section has nothing pending.
+    const [characterSaveState, setCharacterSaveState] =
+        useState<CharacterSaveState | null>(null);
+    const [moduleSaveState, setModuleSaveState] = useState<ModuleSaveState | null>(null);
+
+    // When the top-tab changes, drop any stale save state from the
+    // previous section so the outer Save button doesn't think there's
+    // pending work for an entity we just navigated away from.
+    useEffect(() => {
+        setCharacterSaveState(null);
+        setModuleSaveState(null);
+        setError(null);
+    }, [topTab]);
+
+    // Aggregate dirty / saving across all entities the panel can save.
+    // Only one source is ever active at a time, so OR is correct.
+    const isAnyDirty =
+        dirty || characterSaveState?.dirty || moduleSaveState?.dirty;
+    const isAnySaving =
+        saving || characterSaveState?.saving || moduleSaveState?.saving;
 
     useEffect(() => {
         setOverlayTarget(document.getElementById('game-container'));
@@ -108,22 +132,40 @@ export function EditorPanel() {
     }
 
     async function handleSave() {
-        if (!level || !sceneId) return;
-        setSaving(true);
-        setError(null);
-        try {
-            const res = await fetch('/api/editor/save-level', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: sceneId, level }),
-            });
-            const body = (await res.json().catch(() => ({}))) as { error?: string };
-            if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-            setDirty(false);
-            setSaving(false);
-        } catch (e) {
-            setError(String((e as Error).message ?? e));
-            setSaving(false);
+        // Dispatch to whichever entity is currently dirty. Only one can
+        // be dirty at a time — the user edits either the level (scenes
+        // tab) or one character/module (other tabs), never both.
+        if (topTab === 'scenes') {
+            if (!level || !sceneId) return;
+            setSaving(true);
+            setError(null);
+            try {
+                const res = await fetch('/api/editor/save-level', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: sceneId, level }),
+                });
+                const body = (await res.json().catch(() => ({}))) as { error?: string };
+                if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+                setDirty(false);
+                setSaving(false);
+            } catch (e) {
+                setError(String((e as Error).message ?? e));
+                setSaving(false);
+            }
+            return;
+        }
+        if (topTab === 'characters' && characterSaveState?.dirty) {
+            await characterSaveState.save();
+            return;
+        }
+        if (
+            (topTab === 'drops' || topTab === 'monsters' || topTab === 'weapons' ||
+                topTab === 'audios') &&
+            moduleSaveState?.dirty
+        ) {
+            await moduleSaveState.save();
+            return;
         }
     }
 
@@ -249,22 +291,37 @@ export function EditorPanel() {
                     {level && topTab === 'scenes' && sceneSubTab === 'materials' && (
                         <MaterialsSection level={level} setLevel={handleLevelChange} />
                     )}
-                    {topTab === 'characters' && <CharacterSection />}
-                    {topTab === 'drops' && <DropsSection />}
-                    {topTab === 'monsters' && <MonstersSectionEditor />}
-                    {topTab === 'weapons' && <WeaponsSectionEditor />}
-                    {topTab === 'audios' && <AudiosSection />}
+                    {topTab === 'characters' && (
+                        <CharacterSection onSaveStateChange={setCharacterSaveState} />
+                    )}
+                    {topTab === 'drops' && (
+                        <DropsSection onSaveStateChange={setModuleSaveState} />
+                    )}
+                    {topTab === 'monsters' && (
+                        <MonstersSectionEditor onSaveStateChange={setModuleSaveState} />
+                    )}
+                    {topTab === 'weapons' && (
+                        <WeaponsSectionEditor onSaveStateChange={setModuleSaveState} />
+                    )}
+                    {topTab === 'audios' && (
+                        <AudiosSection onSaveStateChange={setModuleSaveState} />
+                    )}
                 </div>
                 <div className="border-t border-neutral-800 p-3 flex flex-col gap-1.5">
-                    {error && <div className="text-red-400 text-[11px]">{error}</div>}
+                    {(error ?? moduleSaveState?.error ?? characterSaveState?.error) && (
+                        <div className="text-red-400 text-[11px]">
+                            {error ?? moduleSaveState?.error ?? characterSaveState?.error}
+                        </div>
+                    )}
                     <Button
-                        disabled={!dirty || saving || !level}
+                        disabled={!isAnyDirty || isAnySaving || (topTab === 'scenes' && !level)}
                         onClick={handleSave}
                         className="self-end bg-cyan-500 hover:bg-cyan-400 text-black font-semibold disabled:bg-neutral-700 disabled:text-neutral-500"
                     >
-                        {saving ? 'Saving…' : 'Save'}
+                        {isAnySaving ? 'Saving…' : 'Save'}
                     </Button>
                 </div>
+                <CheatPanel />
             </aside>
             {level && overlayTarget && open && topTab === 'scenes' &&
                 createPortal(

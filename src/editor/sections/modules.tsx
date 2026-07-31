@@ -7,7 +7,7 @@
  * validation happens server-side on save.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,19 @@ import { Textarea } from '@/components/ui/textarea';
 
 type ModuleSlug = 'drops' | 'monsters' | 'weapons' | 'audios-sfx' | 'audios-music';
 
+/**
+ * Save-state snapshot the panel consumes to drive its single outer Save
+ * button. `save` is a closure that performs the actual network call —
+ * the panel calls it when the user clicks Save and a module edit is
+ * pending.
+ */
+export interface ModuleSaveState {
+    dirty: boolean;
+    saving: boolean;
+    error: string | null;
+    save: () => Promise<void>;
+}
+
 interface ModuleShellProps {
     slug: ModuleSlug;
     label: string;
@@ -39,6 +52,10 @@ interface ModuleShellProps {
     renderForm: (spec: any, onPatch: (p: any) => void) => React.ReactNode;
     /** Optional section headers shown above the form. */
     sectionHint?: string;
+    /** Fired whenever dirty / saving / error / save closure changes.
+     *  Pass `null` when there's no pending edit so the panel can disable
+     *  the outer Save button. */
+    onSaveStateChange?: (state: ModuleSaveState | null) => void;
 }
 
 /**
@@ -52,6 +69,7 @@ export function ModuleShell({
     newTemplate,
     renderForm,
     sectionHint,
+    onSaveStateChange,
 }: ModuleShellProps) {
     const [ids, setIds] = useState<string[]>([]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -140,7 +158,7 @@ export function ModuleShell({
         setDirty(true);
     }
 
-    async function handleSave() {
+    const handleSave = useCallback(async () => {
         if (!spec || !expandedId) return;
         setSaving(true);
         setError(null);
@@ -158,7 +176,18 @@ export function ModuleShell({
         } finally {
             setSaving(false);
         }
-    }
+    }, [spec, expandedId, slug]);
+
+    // Lift dirty / saving / error / save up to the panel so the single
+    // outer Save button can dispatch. Null when there's no pending edit.
+    useEffect(() => {
+        if (!onSaveStateChange) return;
+        if (!dirty && !saving && !error) {
+            onSaveStateChange(null);
+            return;
+        }
+        onSaveStateChange({ dirty, saving, error, save: handleSave });
+    }, [dirty, saving, error, handleSave, onSaveStateChange]);
 
     return (
         <div className="flex flex-col gap-3 text-xs">
@@ -224,13 +253,6 @@ export function ModuleShell({
                                                 </div>
                                             )}
                                             {renderForm(spec, patch)}
-                                            <Button
-                                                disabled={!dirty || saving}
-                                                onClick={handleSave}
-                                                className="self-end bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs h-7 px-3 disabled:bg-neutral-700 disabled:text-neutral-500"
-                                            >
-                                                {saving ? 'Saving…' : 'Save'}
-                                            </Button>
                                         </>
                                     )}
                                 </div>
@@ -306,11 +328,16 @@ export function ModuleShell({
 
 // ─── Drops ────────────────────────────────────────────────────────────────
 
-export function DropsSection() {
+export function DropsSection({
+    onSaveStateChange,
+}: {
+    onSaveStateChange?: (state: ModuleSaveState | null) => void;
+}) {
     return (
         <ModuleShell
             slug="drops"
             label="Drops"
+            onSaveStateChange={onSaveStateChange}
             newTemplate={(id, name) => ({
                 id,
                 name,
@@ -447,11 +474,16 @@ function DropsForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
 
 // ─── Monsters ─────────────────────────────────────────────────────────────
 
-export function MonstersSectionEditor() {
+export function MonstersSectionEditor({
+    onSaveStateChange,
+}: {
+    onSaveStateChange?: (state: ModuleSaveState | null) => void;
+}) {
     return (
         <ModuleShell
             slug="monsters"
             label="Monsters"
+            onSaveStateChange={onSaveStateChange}
             newTemplate={(id, name) => ({
                 id,
                 name,
@@ -617,11 +649,16 @@ function DropsEditor({
 
 // ─── Weapons ──────────────────────────────────────────────────────────────
 
-export function WeaponsSectionEditor() {
+export function WeaponsSectionEditor({
+    onSaveStateChange,
+}: {
+    onSaveStateChange?: (state: ModuleSaveState | null) => void;
+}) {
     return (
         <ModuleShell
             slug="weapons"
             label="Weapons"
+            onSaveStateChange={onSaveStateChange}
             newTemplate={(id, name) => ({
                 id,
                 name,
@@ -1184,7 +1221,11 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
 
 // ─── Audios (sfx + music) ─────────────────────────────────────────────────
 
-export function AudiosSection() {
+export function AudiosSection({
+    onSaveStateChange,
+}: {
+    onSaveStateChange?: (state: ModuleSaveState | null) => void;
+}) {
     const [tab, setTab] = useState<'sfx' | 'music'>('sfx');
     return (
         <div className="flex flex-col gap-2">
@@ -1212,17 +1253,30 @@ export function AudiosSection() {
                     Music
                 </Button>
             </nav>
-            {tab === 'sfx' && <AudioEditor slug="audios-sfx" label="SFX" />}
-            {tab === 'music' && <AudioEditor slug="audios-music" label="Music" />}
+            {tab === 'sfx' && (
+                <AudioEditor slug="audios-sfx" label="SFX" onSaveStateChange={onSaveStateChange} />
+            )}
+            {tab === 'music' && (
+                <AudioEditor slug="audios-music" label="Music" onSaveStateChange={onSaveStateChange} />
+            )}
         </div>
     );
 }
 
-function AudioEditor({ slug, label }: { slug: ModuleSlug; label: string }) {
+function AudioEditor({
+    slug,
+    label,
+    onSaveStateChange,
+}: {
+    slug: ModuleSlug;
+    label: string;
+    onSaveStateChange?: (state: ModuleSaveState | null) => void;
+}) {
     return (
         <ModuleShell
             slug={slug}
             label={label}
+            onSaveStateChange={onSaveStateChange}
             newTemplate={(id, name) =>
                 slug === 'audios-sfx'
                     ? {

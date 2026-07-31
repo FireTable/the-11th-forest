@@ -15,7 +15,7 @@
  * / 4-col default that matches the AI-gen prompt.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Upload, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,17 @@ import { Textarea } from '@/components/ui/textarea';
 interface CharacterRow {
     id: string;
     name: string;
+}
+
+/**
+ * Save-state snapshot the panel consumes to drive its single outer Save
+ * button. See `ModuleSaveState` for the equivalent on the module shell.
+ */
+export interface CharacterSaveState {
+    dirty: boolean;
+    saving: boolean;
+    error: string | null;
+    save: () => Promise<void>;
 }
 
 // Mirrors the Zod schema in src/lib/characters/schema.ts. We don't
@@ -84,7 +95,7 @@ interface CharacterSpec {
     >;
 }
 
-export function CharacterSection() {
+export function CharacterSection({ onSaveStateChange }: { onSaveStateChange?: (state: CharacterSaveState | null) => void }) {
     const [chars, setChars] = useState<CharacterRow[]>([]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [spec, setSpec] = useState<CharacterSpec | null>(null);
@@ -177,7 +188,7 @@ export function CharacterSection() {
         setDirty(true);
     }
 
-    async function handleSave() {
+    const handleSave = useCallback(async () => {
         if (!spec || !expandedId) return;
         setSaving(true);
         setError(null);
@@ -195,7 +206,18 @@ export function CharacterSection() {
         } finally {
             setSaving(false);
         }
-    }
+    }, [spec, expandedId]);
+
+    // Lift dirty / saving / error / save up to the panel so the single
+    // outer Save button can dispatch. Null when there's no pending edit.
+    useEffect(() => {
+        if (!onSaveStateChange) return;
+        if (!dirty && !saving && !error) {
+            onSaveStateChange(null);
+            return;
+        }
+        onSaveStateChange({ dirty, saving, error, save: handleSave });
+    }, [dirty, saving, error, handleSave, onSaveStateChange]);
 
     return (
         <div className="flex flex-col gap-3 text-xs">
@@ -257,11 +279,8 @@ export function CharacterSection() {
                                     {spec && (
                                         <CharacterForm
                                             spec={spec}
-                                            dirty={dirty}
-                                            saving={saving}
                                             onPatch={patch}
                                             onPatchDeep={patchDeep}
-                                            onSave={handleSave}
                                         />
                                     )}
                                 </div>
@@ -338,17 +357,14 @@ export function CharacterSection() {
 
 interface FormProps {
     spec: CharacterSpec;
-    dirty: boolean;
-    saving: boolean;
     onPatch: (p: Partial<CharacterSpec>) => void;
     onPatchDeep: <K extends keyof CharacterSpec>(
         key: K,
         p: Partial<NonNullable<CharacterSpec[K]>>,
     ) => void;
-    onSave: () => void;
 }
 
-function CharacterForm({ spec, dirty, saving, onPatch, onPatchDeep, onSave }: FormProps) {
+function CharacterForm({ spec, onPatch, onPatchDeep }: FormProps) {
     return (
         <div className="flex flex-col gap-2 px-2.5 py-2.5">
             <Section title="Identity">
@@ -471,14 +487,6 @@ function CharacterForm({ spec, dirty, saving, onPatch, onPatchDeep, onSave }: Fo
                     className="col-span-2 text-[11px] bg-neutral-950 border-neutral-700 min-h-20"
                 />
             </Section>
-
-            <Button
-                disabled={!dirty || saving}
-                onClick={onSave}
-                className="self-end bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs h-7 px-3 disabled:bg-neutral-700 disabled:text-neutral-500"
-            >
-                {saving ? 'Saving…' : 'Save'}
-            </Button>
         </div>
     );
 }
