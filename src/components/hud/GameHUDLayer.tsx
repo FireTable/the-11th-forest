@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CharacterHUDOverlay } from './CharacterHUDOverlay';
+import { DeathOverlay } from './DeathOverlay';
 import { WeaponHUDOverlay } from './WeaponHUDOverlay';
 import { SceneHubOverlay } from './SceneHubOverlay';
 import { PixelCrosshair } from './PixelCrosshair';
@@ -60,6 +61,7 @@ export const GameHUDLayer: React.FC = () => {
             <CharacterHUDOverlay />
             <WeaponHUDOverlay />
             <PixelCrosshair />
+            <DeathOverlay />
         </div>
     );
 };

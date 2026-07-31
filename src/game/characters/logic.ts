@@ -40,6 +40,7 @@ import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
+import { useGameStore } from '@/store/game-store';
 
 import { animKey } from './keys';
 
@@ -295,13 +296,22 @@ export class CharacterController {
 
     /** Apply HP/SP healing (clamped to [0, max]). Negative values damage.
      *  Dev cheat: when `infiniteHp` is on, negative HP deltas are
-     *  silently ignored so the player can't die. */
+     *  silently ignored so the player can't die.
+     *
+     *  Death: when HP falls to 0 from a positive value, flip the
+     *  `isDead` flag in the UI store and pause the Phaser scene. The
+     *  React death overlay reads `isDead` and offers a Restart
+     *  button; restart triggers a fresh scene start (the constructor
+     *  reseeds HP from the spec). */
     heal(hpDelta: number, spDelta: number): void {
         const hpBlocked = this.infiniteHp && hpDelta < 0;
         if (hpDelta !== 0 && !hpBlocked) {
             const oldHp = this.hp;
             this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
             const actualDelta = this.hp - oldHp;
+            if (oldHp > 0 && this.hp === 0 && !hpBlocked) {
+                this.handleDeath();
+            }
             if (actualDelta !== 0 && this.parts.statusHud?.showFloatingNumber) {
                 this.parts.statusHud.showFloatingNumber(actualDelta, actualDelta > 0 ? 'heal' : 'damage');
             }
@@ -750,5 +760,22 @@ export class CharacterController {
             canvas.removeEventListener('pointerup', stop);
             canvas.removeEventListener('pointerleave', onLeave);
         });
+    }
+
+    /**
+     * React to HP reaching 0 from a positive value. Flips the UI store
+     * flag (the React <DeathOverlay> watches it) and pauses the Phaser
+     * scene so the world freezes while the player decides to restart.
+     *
+     * Restart is handled by React: the overlay button calls
+     * `scene.scene.start('GameScene')` which re-runs init() + create()
+     * — the Character constructor reseeds HP from the spec.
+     */
+    private handleDeath(): void {
+        useGameStore.getState().setDead(true);
+        EventBus.emit('player-died');
+        // Pause stops the matter physics step + animation ticks. The
+        // scene remains in memory; restart resumes / re-creates it.
+        this.scene.scene.pause();
     }
 }

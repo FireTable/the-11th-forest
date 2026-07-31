@@ -41,6 +41,19 @@ export interface ResolvedScene {
     music: Map<string, MusicSpec>;
 }
 
+/** Most-recently-resolved scene bundle. Set by main.ts after the initial
+ *  boot resolve; read by the death overlay's Restart button so it can
+ *  call `restartSceneWith` without re-fetching YAML. */
+let _cached: ResolvedScene | null = null;
+
+export function cacheResolvedScene(r: ResolvedScene): void {
+    _cached = r;
+}
+
+export function getCachedResolvedScene(): ResolvedScene | null {
+    return _cached;
+}
+
 /**
  * Resolve `sceneId` into a full ResolvedScene. Scene id is taken verbatim —
  * caller decides where it comes from (URL ?scene=, index.yaml[0], editor

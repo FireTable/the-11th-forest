@@ -33,6 +33,11 @@ export interface GameUIState {
     // Visibility
     hubsVisible: boolean;
 
+    // Death state — set true by the character controller when HP hits 0.
+    // The HUD overlays a restart prompt; the Phaser scene pauses until
+    // the user clicks Restart.
+    isDead: boolean;
+
     // Setters
     setLevelTitle: (title: string) => void;
     setLevelElapsedMs: (ms: number) => void;
@@ -47,6 +52,7 @@ export interface GameUIState {
         slots: WeaponSlotData[];
     }) => void;
     setHubsVisible: (visible: boolean) => void;
+    setDead: (dead: boolean) => void;
 }
 
 export const useGameStore = create<GameUIState>((set) => ({
@@ -68,6 +74,7 @@ export const useGameStore = create<GameUIState>((set) => ({
     levelElapsedMs: 0,
 
     hubsVisible: true,
+    isDead: false,
 
     setLevelTitle: (title) => set({ levelTitle: title }),
     setLevelElapsedMs: (ms) => set({ levelElapsedMs: ms }),
@@ -95,4 +102,6 @@ export const useGameStore = create<GameUIState>((set) => ({
         })),
 
     setHubsVisible: (visible) => set({ hubsVisible: visible }),
+
+    setDead: (dead) => set({ isDead: dead }),
 }));
