@@ -94,6 +94,10 @@ export const CharacterSfxSchema = z
         lowHpHeartbeat: z.string().min(1).optional(),
         lowHpThreshold: z.number().gt(0).lte(1).optional(),
         lowHpPulseMs: z.number().gt(0).optional(),
+        /** Per-character throttle on the `hurt` SFX variants so
+         *  repeated damage events don't stack overlapping scream
+         *  instances. Keyed per-character. */
+        throttleMs: z.number().gt(0).optional(),
     })
     .strict();
 

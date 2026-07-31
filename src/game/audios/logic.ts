@@ -27,6 +27,8 @@ import {
 import { EventBus } from '@/lib/events/bus';
 import type { MusicSpec, SfxSpec, SoundSpec } from '@/lib/audios';
 
+import { SfxThrottle } from './throttle';
+
 const audioKey = (spec: SoundSpec): string => {
     if (spec.kind === 'sfx') return `sfx:${spec.id}`;
     return `music:${spec.id}`;
@@ -57,6 +59,7 @@ export class AudioController {
     private readonly musicSpecs: Map<string, MusicSpec>;
     private currentMusic?: Phaser.Sound.BaseSound;
     private currentMusicSpec?: MusicSpec;
+    private readonly throttle = new SfxThrottle();
     private readonly unsubscribers: Array<() => void> = [];
 
     constructor(
@@ -73,16 +76,32 @@ export class AudioController {
         this.subscribe();
     }
 
-    /** Play a registered SFX by id. Spawns a new sound instance — polyphonic. */
-    playSfx(id: string): void {
+    /**
+     * Play a registered SFX by id. Spawns a new sound instance —
+     * polyphonic — unless a throttle blocks it.
+     *
+     * @param id    SFX spec id
+     * @param opts.key         throttle bucket. Defaults to `id` (one
+     *                         global slot per SFX). Emitters pass
+     *                         `` `monster:${id}` `` / `` `weapon:${id}` ``
+     *                         etc. so different entities don't share a
+     *                         throttle window.
+     * @param opts.throttleMs  optional gap in ms between plays; omit to
+     *                         disable throttling for this call.
+     */
+    playSfx(id: string, opts: { key?: string; throttleMs?: number } = {}): void {
         const spec = this.sfxSpecs.get(id);
         if (!spec) return;
-        const key = audioKey(spec);
-        if (!this.scene.cache.audio.exists(key)) {
+        const throttleKey = opts.key ?? id;
+        if (!this.throttle.allow(throttleKey, this.scene.time.now, opts.throttleMs)) {
+            return;
+        }
+        const aKey = audioKey(spec);
+        if (!this.scene.cache.audio.exists(aKey)) {
             // ponytail: fail silent — a missing audio file shouldn't break gameplay.
             return;
         }
-        const sound = this.scene.sound.add(key, {
+        const sound = this.scene.sound.add(aKey, {
             volume: spec.volume,
             rate: spec.rate,
             loop: spec.loop,
@@ -177,7 +196,8 @@ export class AudioController {
     private subscribe(): void {
         for (const id of this.sfxSpecs.keys()) {
             const event = SFX_EVENT(id);
-            const handler = () => this.playSfx(id);
+            const handler = (payload?: { key?: string; throttleMs?: number }) =>
+                this.playSfx(id, payload ?? {});
             EventBus.on(event, handler);
             this.unsubscribers.push(() => EventBus.removeListener(event, handler));
         }

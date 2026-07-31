@@ -413,6 +413,11 @@ function DropsForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                         className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
+                <NumberField
+                    label="throttleMs"
+                    value={spec.throttleMs ?? 0}
+                    onChange={(v) => patch({ throttleMs: v > 0 ? v : undefined })}
+                />
             </Section>
             <Section title="Visual">
                 <NumberField
@@ -526,6 +531,15 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                         className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
+                <NumberField
+                    label="throttleMs (hit)"
+                    value={spec.sfx?.throttleMs ?? 0}
+                    onChange={(v) =>
+                        patch({
+                            sfx: { ...spec.sfx, throttleMs: v > 0 ? v : undefined },
+                        })
+                    }
+                />
             </Section>
             <Section title="Drops">
                 <DropsEditor
@@ -1145,6 +1159,15 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                         className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
+                <NumberField
+                    label="throttleMs (bulletWall)"
+                    value={spec.sfx?.throttleMs ?? 0}
+                    onChange={(v) =>
+                        patch({
+                            sfx: { ...spec.sfx, throttleMs: v > 0 ? v : undefined },
+                        })
+                    }
+                />
             </Section>
             <Section title="AI prompt (regen)">
                 <Textarea

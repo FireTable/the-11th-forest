@@ -69,6 +69,7 @@ interface CharacterSpec {
         lowHpHeartbeat?: string;
         lowHpThreshold?: number;
         lowHpPulseMs?: number;
+        throttleMs?: number;
     };
     sprite?: {
         texture: string;
@@ -1116,6 +1117,16 @@ function SfxEditor({
                 label="lowHpPulseMs"
                 value={sfx.lowHpPulseMs ?? 900}
                 onChange={(v) => onChange({ ...sfx, lowHpPulseMs: v })}
+            />
+            <NumberField
+                label="throttleMs (hurt variants)"
+                value={sfx.throttleMs ?? 0}
+                onChange={(v) =>
+                    onChange({
+                        ...sfx,
+                        throttleMs: v > 0 ? v : undefined,
+                    })
+                }
             />
         </div>
     );

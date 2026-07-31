@@ -278,7 +278,12 @@ export class CharacterController {
             }
             if (hpDelta < 0) {
                 const sfx = resolveHurtSfx(this.spec);
-                if (sfx) EventBus.emit(SFX_EVENT(sfx));
+                if (sfx) {
+                    EventBus.emit(SFX_EVENT(sfx), {
+                        key: `character:${this.spec.id}`,
+                        throttleMs: this.spec.sfx?.throttleMs,
+                    });
+                }
             }
         }
         if (spDelta !== 0) this.sp = Math.max(0, Math.min(this.spec.sp, this.sp + spDelta));

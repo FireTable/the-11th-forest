@@ -401,7 +401,11 @@ export class DropController {
         // before the pickup animation / freeze-frame finishes. Falls
         // back to a generic pickup tone when the spec doesn't declare
         // its own.
-        EventBus.emit(SFX_EVENT(spec.sfx ?? 'pickup-generic'));
+        const sfxId = spec.sfx ?? 'pickup-generic';
+        EventBus.emit(SFX_EVENT(sfxId), {
+            key: `drop:${spec.id}`,
+            throttleMs: spec.throttleMs,
+        });
         planDropEffect(spec, {
             heal: (hp, sp) => this.character.heal(hp, sp),
             refillAmmo: (f) => this.character.refillAmmo(f),

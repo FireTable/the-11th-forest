@@ -75,6 +75,10 @@ export const DropSpecSchema = z
         /** SFX id to play on pickup. Falls back to a generic pickup tone
          *  in the controller when omitted. */
         sfx: z.string().min(1).optional(),
+        /** Per-drop throttle on the pickup SFX so simultaneous kills
+         *  dropping the same item don't stack overlapping pickup tones.
+         *  Keyed per-drop-id. */
+        throttleMs: z.number().gt(0).optional(),
         sprite: SpriteSchema.optional(),
         anims: z.record(z.string(), AnimSpecSchema).optional(),
         prompt: z.string().optional(),

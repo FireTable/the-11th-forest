@@ -2,144 +2,156 @@ id: wanderer
 name: Wanderer
 imageSize: 2048x2048
 prompt: |
-    The 11th Forest — Wanderer sprite sheet
+  The 11th Forest — Wanderer sprite sheet
 
-    HARD NEGATIVE PROMPTS (must NOT appear in the image):
-      - No visible grid, no dividers, no borders, no ground, no scene,
-        no text, no logo, no watermark.
-      - No grid lines, no cell borders, no cell separators, no dividers
-        of any kind between the 4×4 frames.
-      - No guide marks, no reference crosses, no axis labels, no frame
-        numbers, no "Frame N" text, no index annotations.
-      - No checkerboard pattern, no tile outline overlays, no debug
-        visualizations.
-      - No watermarks, no logos, no signatures, no UI elements.
-      - The 4×4 layout is COMPLETELY IMPLIED by the character's position
-        — the magenta background is one continuous flat field everywhere
-        except where the character is drawn.
+  HARD NEGATIVE PROMPTS (must NOT appear in the image):
+    - No visible grid, no dividers, no borders, no ground, no scene,
+      no text, no logo, no watermark.
+    - No grid lines, no cell borders, no cell separators, no dividers
+      of any kind between the 4×4 frames.
+    - No guide marks, no reference crosses, no axis labels, no frame
+      numbers, no "Frame N" text, no index annotations.
+    - No checkerboard pattern, no tile outline overlays, no debug
+      visualizations.
+    - No watermarks, no logos, no signatures, no UI elements.
+    - The 4×4 layout is COMPLETELY IMPLIED by the character's position
+      — the magenta background is one continuous flat field everywhere
+      except where the character is drawn.
 
-    CRITICAL LAYOUT (must be EXACTLY this — 16 cells, no more, no less,
-    4 rows × 4 columns, every cell the same size):
+  CRITICAL LAYOUT (must be EXACTLY this — 16 cells, no more, no less,
+  4 rows × 4 columns, every cell the same size):
 
-      ┌────┬────┬────┬────┐
-      │  0 │  1 │  2 │  3 │   row 1: idle
-      ├────┼────┼────┼────┤
-      │  4 │  5 │  6 │  7 │   row 2: idle + walk
-      ├────┼────┼────┼────┤
-      │  8 │  9 │ 10 │ 11 │   row 3: walk + dodge
-      ├────┼────┼────┼────┤
-      │ 12 │ 13 │ 14 │    │   row 4: dodge (last cell empty)
-      └────┴────┴────┴────┘
+    ┌────┬────┬────┬────┐
+    │  0 │  1 │  2 │  3 │   row 1: idle
+    ├────┼────┼────┼────┤
+    │  4 │  5 │  6 │  7 │   row 2: idle + walk
+    ├────┼────┼────┼────┤
+    │  8 │  9 │ 10 │ 11 │   row 3: walk + dodge
+    ├────┼────┼────┼────┤
+    │ 12 │ 13 │ 14 │    │   row 4: dodge (last cell empty)
+    └────┴────┴────┴────┘
 
-    The bottom-right cell (cell #15) MUST be empty magenta — do NOT
-    place a frame there. Total: exactly 15 character frames + 1 empty
-    cell = 16 cells in a 4×4 grid. No other layout is acceptable.
+  The bottom-right cell (cell #15) MUST be empty magenta — do NOT
+  place a frame there. Total: exactly 15 character frames + 1 empty
+  cell = 16 cells in a 4×4 grid. No other layout is acceptable.
 
-    Create a ** 4×4 grid ** of pixel-art chibi character frames on a SOLID MAGENTA
-    (#FF00FF) BACKGROUND for chroma keying. The magenta must be saturated
-    and uniform — no gradients, no shadows, no anti-aliased corners on
-    the bg. Leave the bottom-right cell of the grid empty (15 frames + 1
-    blank cell). No grid lines, no guide marks, no cell borders, no
-    reference crosses between cells — the grid is implicit, the bg is
-    pure flat magenta everywhere except where the character is drawn.
+  Create a ** 4×4 grid ** of pixel-art chibi character frames on a SOLID MAGENTA
+  (#FF00FF) BACKGROUND for chroma keying. The magenta must be saturated
+  and uniform — no gradients, no shadows, no anti-aliased corners on
+  the bg. Leave the bottom-right cell of the grid empty (15 frames + 1
+  blank cell). No grid lines, no guide marks, no cell borders, no
+  reference crosses between cells — the grid is implicit, the bg is
+  pure flat magenta everywhere except where the character is drawn.
 
-    Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
-    512×512 px. The character is ~360×520 px in each cell, centered
-    horizontally, with feet at ~80% cell height. No overlapping between
-    cells. The character faces RIGHT in every frame (her right side =
-    screen right); left-facing or back-facing poses are wrong.
+  Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
+  512×512 px. The character is ~360×520 px in each cell, centered
+  horizontally, with feet at ~80% cell height. No overlapping between
+  cells. The character faces RIGHT in every frame (her right side =
+  screen right); left-facing or back-facing poses are wrong.
 
-    Character: a young girl with long blonde hair in a side ponytail
-    tied with a small purple bow. Bright blue eyes, no glasses. Wearing
-    a Japanese sailor uniform — white button-up shirt with a dark navy
-    sailor collar, dark purple pleated skirt, black knee-high socks,
-    black shoes. Chibi head-to-body ratio (~1:2). Outline: 1-pixel dark
-    navy outline, clean pixel-art shading with 2-3 tonal steps per material
-    (no smooth gradients).
+  Character: a young girl with long blonde hair in a side ponytail
+  tied with a small purple bow. Bright blue eyes, no glasses. Wearing
+  a Japanese sailor uniform — white button-up shirt with a dark navy
+  sailor collar, dark purple pleated skirt, black knee-high socks,
+  black shoes. Chibi head-to-body ratio (~1:2). Outline: 1-pixel dark
+  navy outline, clean pixel-art shading with 2-3 tonal steps per material
+  (no smooth gradients).
 
-    Same character in every frame — face, hair, outfit, proportions are
-    identical. Only the pose changes.
+  Same character in every frame — face, hair, outfit, proportions are
+  identical. Only the pose changes.
 
-    15 frames in row order (left-to-right, top-to-bottom), distributed as:
+  15 frames in row order (left-to-right, top-to-bottom), distributed as:
 
-    Frames 0–4 (idle, 5 frames, frames 0-3 in row 1, frame 4 starting row 2):
-      Character standing still, gentle body sway, slow breathing, an
-      occasional blink. Arms relaxed at sides or on hips. Hair settles.
+  Frames 0–4 (idle, 5 frames, frames 0-3 in row 1, frame 4 starting row 2):
+    Character standing still, gentle body sway, slow breathing, an
+    occasional blink. Arms relaxed at sides or on hips. Hair settles.
 
-    Frames 5–9 (walk, 5 frames, finishing row 2 and starting row 3):
-      A single WALK CYCLE — the character walks in place. One full
-      loop = 5 frames that returns to the starting pose so the
-      animation can repeat seamlessly (frame 5 ≈ frame 9). Legs
-      alternate step-by-step: left foot forward, right foot catches up,
-      right foot forward, left foot catches up, then a neutral pose
-      to close the loop. Arms swing in counter-rhythm to the legs
-      (opposite arm to opposite leg). Body stays roughly upright,
-      hair settles. This is a WALK — slow, controlled, casual — not
-      a run. No leaning forward, no pumping arms, no motion blur.
+  Frames 5–9 (walk, 5 frames, finishing row 2 and starting row 3):
+    A single WALK CYCLE — the character walks in place. One full
+    loop = 5 frames that returns to the starting pose so the
+    animation can repeat seamlessly (frame 5 ≈ frame 9). Legs
+    alternate step-by-step: left foot forward, right foot catches up,
+    right foot forward, left foot catches up, then a neutral pose
+    to close the loop. Arms swing in counter-rhythm to the legs
+    (opposite arm to opposite leg). Body stays roughly upright,
+    hair settles. This is a WALK — slow, controlled, casual — not
+    a run. No leaning forward, no pumping arms, no motion blur.
 
-    Frames 10–14 (dodge, 5 frames, finishing row 3 and in row 4):
-      Character performing a forward roll / dive recovery. Body diagonal
-      or upside-down in the middle frames, then landing pose in the
-      final frame. Dynamic, mid-action, suggests momentum.
+  Frames 10–14 (dodge, 5 frames, finishing row 3 and in row 4):
+    Character performing a forward roll / dive recovery. Body diagonal
+    or upside-down in the middle frames, then landing pose in the
+    final frame. Dynamic, mid-action, suggests momentum.
 
-    Style requirements:
-    - High-end handcrafted 16-bit RPG aesthetic.
-    - Inspired by Chrono Trigger, Eastward, Children of Morta, Hyper Light
-      Drifter, and premium modern indie pixel games.
-    - Hard clean pixel edges, no anti-aliasing on the silhouette.
-    - Limited muted color palette: ~32 colors total per character.
-    - No purple, magenta, or pink in the character body itself. The bow
-      may be a slightly desaturated purple but never full magenta. The
-      background is the only place magenta appears.
+  Style requirements:
+  - High-end handcrafted 16-bit RPG aesthetic.
+  - Inspired by Chrono Trigger, Eastward, Children of Morta, Hyper Light
+    Drifter, and premium modern indie pixel games.
+  - Hard clean pixel edges, no anti-aliasing on the silhouette.
+  - Limited muted color palette: ~32 colors total per character.
+  - No purple, magenta, or pink in the character body itself. The bow
+    may be a slightly desaturated purple but never full magenta. The
+    background is the only place magenta appears.
 
-    Avoid: pure magenta clothing, hair, or skin; red hair; pink anywhere
-    in the character; any color that would be lost in chroma keying.
+  Avoid: pure magenta clothing, hair, or skin; red hair; pink anywhere
+  in the character; any color that would be lost in chroma keying.
 hp: 9999
 sp: 60
 moveSpeed: 4
 spRegenMs: 5000
-sfx:
-    dodge: dodge
-    hurtFemale: player-hurt-female
-    footstep: footstep
-    footstepThrottleMs: 200
-    lowHpHeartbeat: low-hp-heartbeat
-    lowHpThreshold: 0.3
-    lowHpPulseMs: 900
+gender: female
 body:
-    halfW: 28
-    halfH: 24
+  halfW: 28
+  halfH: 24
 dodge:
-    spCost: 15
-    speed: 14
-    durationMs: 220
-    cooldownMs: 600
+  spCost: 15
+  speed: 14
+  durationMs: 220
+  cooldownMs: 600
 hotbar:
-    - assault-rifle
-    - laser-cannon
-    - plasma-sword
-    - shotgun
-    - arcana-staff
-    - rocket-launcher
+  - assault-rifle
+  - laser-cannon
+  - plasma-sword
+  - shotgun
+  - arcana-staff
+  - rocket-launcher
+sfx:
+  dodge: dodge
+  hurtFemale: player-hurt-female
+  throttleMs: 1200
+  footstep: footstep
+  footstepThrottleMs: 200
+  lowHpHeartbeat: low-hp-heartbeat
+  lowHpThreshold: 0.3
+  lowHpPulseMs: 900
 sprite:
-    texture: assets/image/characters/wanderer.png
-    grid: { rows: 4, cols: 4 }
-    scale: 1.2
-    offset: { left: -6, bottom: -2 }
-    script:
-        downsample: 4
-        colors: 32
-        pad: 2
+  texture: assets/image/characters/wanderer.png
+  grid:
+    rows: 4
+    cols: 4
+  scale: 1.2
+  offset:
+    left: -6
+    bottom: -2
+  script:
+    downsample: 4
+    colors: 32
+    pad: 2
 anims:
-    idle:
-        frames: [0, 4]
-        frameRate: 3
-        repeat: -1
-    walk:
-        frames: [5, 9]
-        frameRate: 12
-        repeat: -1
-    dodge:
-        frames: [10, 14]
-        frameRate: 16
-        repeat: 0
+  idle:
+    frames:
+      - 0
+      - 4
+    frameRate: 3
+    repeat: -1
+  walk:
+    frames:
+      - 5
+      - 9
+    frameRate: 12
+    repeat: -1
+  dodge:
+    frames:
+      - 10
+      - 14
+    frameRate: 16
+    repeat: 0

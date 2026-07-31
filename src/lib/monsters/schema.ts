@@ -77,6 +77,10 @@ export const MonsterSfxSchema = z
         hit: z.string().min(1).optional(),
         death: z.string().min(1).optional(),
         aggro: z.string().min(1).optional(),
+        /** Per-monster throttle on the `hit` SFX so a shotgun shell
+         *  hitting one monster doesn't stack overlapping instances.
+         *  Keyed per-monster, so different monsters fire independently. */
+        throttleMs: z.number().gt(0).optional(),
     })
     .strict();
 

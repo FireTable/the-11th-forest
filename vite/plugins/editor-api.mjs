@@ -226,6 +226,7 @@ const DropSpecSaveSchema = z
         visual: DropVisualSchema,
         effect: DropEffectSchema,
         sfx: z.string().min(1).optional(),
+        throttleMs: z.number().gt(0).optional(),
         sprite: SpriteSchema.optional(),
         anims: z.record(z.string(), AnimSpecSchema).optional(),
         prompt: z.string().optional(),
@@ -252,6 +253,7 @@ const MonsterSfxSchema = z
         hit: z.string().min(1).optional(),
         death: z.string().min(1).optional(),
         aggro: z.string().min(1).optional(),
+        throttleMs: z.number().gt(0).optional(),
     })
     .strict();
 
@@ -324,6 +326,7 @@ const WeaponSfxSchema = z
         bulletWall: z.string().min(1).optional(),
         reloadStart: z.string().min(1).optional(),
         reloadFinish: z.string().min(1).optional(),
+        throttleMs: z.number().gt(0).optional(),
     })
     .strict();
 
@@ -436,6 +439,7 @@ const CharacterSpecSaveSchema = z
                 lowHpHeartbeat: z.string().min(1).optional(),
                 lowHpThreshold: z.number().gt(0).lte(1).optional(),
                 lowHpPulseMs: z.number().gt(0).optional(),
+                throttleMs: z.number().gt(0).optional(),
             })
             .strict()
             .optional(),

@@ -43,6 +43,10 @@ export const WeaponSfxSchema = z
         bulletWall: z.string().min(1).optional(),
         reloadStart: z.string().min(1).optional(),
         reloadFinish: z.string().min(1).optional(),
+        /** Per-weapon throttle on the `bulletWall` SFX so sustained fire
+         *  against a wall doesn't stack overlapping instances.
+         *  Keyed per-weapon, so different weapons fire independently. */
+        throttleMs: z.number().gt(0).optional(),
     })
     .strict();
 

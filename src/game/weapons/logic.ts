@@ -124,7 +124,10 @@ export class WeaponController {
                         if (this.bullets[i].body === bulletBody) {
                             this.destroyBullet(i);
                             const sfx = ownerSpec?.sfx?.bulletWall ?? 'bullet-wall';
-                            EventBus.emit(SFX_EVENT(sfx));
+                            EventBus.emit(SFX_EVENT(sfx), {
+                                key: ownerSpec?.id ? `weapon:${ownerSpec.id}` : sfx,
+                                throttleMs: ownerSpec?.sfx?.throttleMs,
+                            });
                             break;
                         }
                     }

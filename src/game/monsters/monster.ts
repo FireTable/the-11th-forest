@@ -676,7 +676,10 @@ export class MonsterController {
             target.hp -= bulletDamage;
             target.lastHitAt = this.scene.time.now;
             target.statusHud.showFloatingNumber(bulletDamage, 'damage');
-            EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'));
+            EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'), {
+                key: `monster:${target.spec.id}`,
+                throttleMs: target.spec.sfx?.throttleMs,
+            });
 
             if (target.hp <= 0) {
                 this.kill(target);
