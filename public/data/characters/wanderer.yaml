@@ -94,7 +94,7 @@ prompt: |
 
   Avoid: pure magenta clothing, hair, or skin; red hair; pink anywhere
   in the character; any color that would be lost in chroma keying.
-hp: 9999
+hp: 100
 sp: 60
 moveSpeed: 4
 spRegenMs: 5000
