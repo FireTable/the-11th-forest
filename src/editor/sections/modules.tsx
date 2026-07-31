@@ -11,7 +11,6 @@ import { useEffect, useState } from 'react';
 import { Plus, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
     Dialog,
     DialogContent,
@@ -20,6 +19,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 type ModuleSlug = 'drops' | 'monsters' | 'weapons' | 'audios-sfx' | 'audios-music';
 
@@ -45,7 +54,7 @@ export function ModuleShell({
     sectionHint,
 }: ModuleShellProps) {
     const [ids, setIds] = useState<string[]>([]);
-    const [selected, setSelected] = useState<string | null>(null);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
     const [spec, setSpec] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
@@ -60,7 +69,7 @@ export function ModuleShell({
     }, []);
 
     useEffect(() => {
-        if (!selected) {
+        if (!expandedId) {
             setSpec(null);
             return;
         }
@@ -70,7 +79,7 @@ export function ModuleShell({
         fetch('/api/editor/get-module-spec', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ module: slug, id: selected }),
+            body: JSON.stringify({ module: slug, id: expandedId }),
         })
             .then((r) => r.json())
             .then((b) => {
@@ -78,7 +87,7 @@ export function ModuleShell({
                 setSpec(b.spec);
             })
             .catch((e) => setError(String((e as Error).message ?? e)));
-    }, [selected]);
+    }, [expandedId]);
 
     async function refresh() {
         try {
@@ -113,12 +122,16 @@ export function ModuleShell({
             setNewId('');
             setNewName('');
             await refresh();
-            setSelected(id);
+            setExpandedId(id);
         } catch (e) {
             setError(String((e as Error).message ?? e));
         } finally {
             setCreating(false);
         }
+    }
+
+    function toggleExpand(id: string) {
+        setExpandedId((cur) => (cur === id ? null : id));
     }
 
     function patch(p: any) {
@@ -128,14 +141,14 @@ export function ModuleShell({
     }
 
     async function handleSave() {
-        if (!spec || !selected) return;
+        if (!spec || !expandedId) return;
         setSaving(true);
         setError(null);
         try {
             const r = await fetch('/api/editor/save-module-spec', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ module: slug, id: selected, spec }),
+                body: JSON.stringify({ module: slug, id: expandedId, spec }),
             });
             const b = await r.json();
             if (!r.ok) throw new Error(b.error);
@@ -163,48 +176,69 @@ export function ModuleShell({
                 </Button>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
                 {ids.map((id) => {
-                    const isSel = id === selected;
+                    const isExpanded = id === expandedId;
+                    const isLoadingThis = isExpanded && spec === null && !error;
                     return (
-                        <button
+                        <div
                             key={id}
-                            onClick={() => setSelected(id)}
-                            className={`flex items-center gap-2 border rounded px-2 py-1.5 text-left transition ${
-                                isSel
-                                    ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200'
-                                    : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-neutral-700'
+                            className={`border rounded transition ${
+                                isExpanded
+                                    ? 'bg-neutral-900 border-cyan-500/60'
+                                    : 'bg-neutral-900 border-neutral-800'
                             }`}
                         >
-                            <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate text-[12px] font-mono">
-                                    {id}
+                            <Button
+                                variant="ghost"
+                                onClick={() => toggleExpand(id)}
+                                className={`w-full justify-between h-auto px-2 py-1.5 rounded-[inherit] ${
+                                    isExpanded
+                                        ? 'bg-cyan-950/40 text-cyan-200 hover:bg-cyan-950/50'
+                                        : 'text-neutral-300 hover:bg-neutral-800'
+                                }`}
+                            >
+                                <div className="flex items-center min-w-0 flex-1">
+                                    <div className="font-medium truncate text-[12px] font-mono">
+                                        {id}
+                                    </div>
                                 </div>
-                            </div>
-                            <ChevronRight className="size-3 text-neutral-500" />
-                        </button>
+                                <ChevronRight
+                                    className={`size-3 text-neutral-500 shrink-0 transition-transform ${
+                                        isExpanded ? 'rotate-90' : ''
+                                    }`}
+                                />
+                            </Button>
+                            {isExpanded && (
+                                <div className="border-t border-neutral-800 px-2.5 py-2.5 flex flex-col gap-2">
+                                    {isLoadingThis && (
+                                        <div className="text-[11px] text-neutral-500 italic">
+                                            Loading…
+                                        </div>
+                                    )}
+                                    {spec && (
+                                        <>
+                                            {sectionHint && (
+                                                <div className="text-[11px] text-neutral-500 italic">
+                                                    {sectionHint}
+                                                </div>
+                                            )}
+                                            {renderForm(spec, patch)}
+                                            <Button
+                                                disabled={!dirty || saving}
+                                                onClick={handleSave}
+                                                className="self-end bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs h-7 px-3 disabled:bg-neutral-700 disabled:text-neutral-500"
+                                            >
+                                                {saving ? 'Saving…' : 'Save'}
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     );
                 })}
             </div>
-
-            {spec && (
-                <div className="border-t border-neutral-800 pt-3 flex flex-col gap-2">
-                    <div className="font-semibold text-neutral-300 text-[12px]">
-                        Edit · {selected}
-                    </div>
-                    {sectionHint && (
-                        <div className="text-[11px] text-neutral-500 italic">{sectionHint}</div>
-                    )}
-                    {renderForm(spec, patch)}
-                    <Button
-                        disabled={!dirty || saving}
-                        onClick={handleSave}
-                        className="self-end bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs h-7 px-3 disabled:bg-neutral-700 disabled:text-neutral-500"
-                    >
-                        {saving ? 'Saving…' : 'Save'}
-                    </Button>
-                </div>
-            )}
 
             <Dialog open={newOpen} onOpenChange={setNewOpen}>
                 <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
@@ -216,7 +250,9 @@ export function ModuleShell({
                     </DialogHeader>
                     <div className="flex flex-col gap-2">
                         <div>
-                            <label className="text-[11px] text-neutral-400">ID</label>
+                            <Label className="text-[11px] text-neutral-400 leading-none font-normal mb-0.5">
+                                ID
+                            </Label>
                             <Input
                                 autoFocus
                                 value={newId}
@@ -233,7 +269,9 @@ export function ModuleShell({
                             />
                         </div>
                         <div>
-                            <label className="text-[11px] text-neutral-400">Name</label>
+                            <Label className="text-[11px] text-neutral-400 leading-none font-normal mb-0.5">
+                                Name
+                            </Label>
                             <Input
                                 value={newName}
                                 onChange={(e) => setNewName(e.target.value)}
@@ -300,33 +338,37 @@ function DropsForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     />
                 </Field>
                 <Field label="Kind">
-                    <select
-                        value={spec.kind}
-                        onChange={(e) => patch({ kind: e.target.value })}
-                        className="h-7 text-xs bg-neutral-950 border border-neutral-700 rounded px-1.5 text-neutral-200 w-full"
-                    >
-                        <option value="static">static</option>
-                        <option value="monster">monster</option>
-                    </select>
+                    <Select value={spec.kind} onValueChange={(v) => patch({ kind: v })}>
+                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="static">static</SelectItem>
+                            <SelectItem value="monster">monster</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </Field>
             </Section>
             <Section title="Effect">
                 <Field label="Type">
-                    <select
+                    <Select
                         value={spec.effect.type}
-                        onChange={(e) => {
-                            const t = e.target.value;
+                        onValueChange={(t) => {
                             if (t === 'instant') setEffect({ type: 'instant', hp: 10, sp: 0 });
                             else if (t === 'refill-ammo')
                                 setEffect({ type: 'refill-ammo', ammoFraction: 0.5 });
                             else setEffect({ type: 'weapon', weaponId: 'assault-rifle' });
                         }}
-                        className="h-7 text-xs bg-neutral-950 border border-neutral-700 rounded px-1.5 text-neutral-200 w-full"
                     >
-                        <option value="instant">instant</option>
-                        <option value="refill-ammo">refill-ammo</option>
-                        <option value="weapon">weapon</option>
-                    </select>
+                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="instant">instant</SelectItem>
+                            <SelectItem value="refill-ammo">refill-ammo</SelectItem>
+                            <SelectItem value="weapon">weapon</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </Field>
                 {spec.effect.type === 'instant' && (
                     <>
@@ -383,6 +425,15 @@ function DropsForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     value={spec.visual.tint}
                     step={1}
                     onChange={(v) => patch({ visual: { ...spec.visual, tint: v } })}
+                />
+            </Section>
+            <Section title="AI prompt (regen)">
+                <Textarea
+                    value={spec.prompt ?? ''}
+                    onChange={(e) => patch({ prompt: e.target.value || undefined })}
+                    rows={3}
+                    placeholder="Optional — used by AI regen pipeline."
+                    className="col-span-2 text-[11px] bg-neutral-950 border-neutral-700 min-h-20"
                 />
             </Section>
         </div>
@@ -480,6 +531,15 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                 <DropsEditor
                     drops={spec.drops ?? []}
                     onChange={(d) => patch({ drops: d })}
+                />
+            </Section>
+            <Section title="AI prompt (regen)">
+                <Textarea
+                    value={spec.prompt ?? ''}
+                    onChange={(e) => patch({ prompt: e.target.value || undefined })}
+                    rows={3}
+                    placeholder="Optional — used by AI regen pipeline."
+                    className="col-span-2 text-[11px] bg-neutral-950 border-neutral-700 min-h-20"
                 />
             </Section>
         </div>
@@ -596,14 +656,18 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     />
                 </Field>
                 <Field label="Kind">
-                    <select
+                    <Select
                         value={isMelee ? 'melee' : 'ranged'}
-                        onChange={(e) => setKind(e.target.value as 'ranged' | 'melee')}
-                        className="h-7 text-xs bg-neutral-950 border border-neutral-700 rounded px-1.5 text-neutral-200 w-full"
+                        onValueChange={(v) => setKind(v as 'ranged' | 'melee')}
                     >
-                        <option value="ranged">ranged</option>
-                        <option value="melee">melee</option>
-                    </select>
+                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ranged">ranged</SelectItem>
+                            <SelectItem value="melee">melee</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </Field>
             </Section>
             <Section title="Combat">
@@ -662,6 +726,372 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     value={spec.reloadTimeMs ?? 0}
                     onChange={(v) => patch({ reloadTimeMs: v })}
                 />
+                <NumberField
+                    label="bulletsPerShot"
+                    value={spec.bulletsPerShot ?? 1}
+                    onChange={(v) => patch({ bulletsPerShot: v })}
+                />
+            </Section>
+            <Section title="Projectile visual (ranged)">
+                {!isMelee && spec.projectile?.visual ? (
+                    <>
+                        <NumberField
+                            label="radius"
+                            value={spec.projectile.visual.radius}
+                            onChange={(v) =>
+                                patch({
+                                    projectile: {
+                                        ...spec.projectile,
+                                        visual: { ...spec.projectile.visual, radius: v },
+                                    },
+                                })
+                            }
+                        />
+                        <NumberField
+                            label="width"
+                            value={spec.projectile.visual.width}
+                            onChange={(v) =>
+                                patch({
+                                    projectile: {
+                                        ...spec.projectile,
+                                        visual: { ...spec.projectile.visual, width: v },
+                                    },
+                                })
+                            }
+                        />
+                        <NumberField
+                            label="height"
+                            value={spec.projectile.visual.height}
+                            onChange={(v) =>
+                                patch({
+                                    projectile: {
+                                        ...spec.projectile,
+                                        visual: { ...spec.projectile.visual, height: v },
+                                    },
+                                })
+                            }
+                        />
+                        <NumberField
+                            label="color (hex)"
+                            value={spec.projectile.visual.color}
+                            step={1}
+                            onChange={(v) =>
+                                patch({
+                                    projectile: {
+                                        ...spec.projectile,
+                                        visual: { ...spec.projectile.visual, color: v },
+                                    },
+                                })
+                            }
+                        />
+                    </>
+                ) : (
+                    <div className="col-span-2 text-[11px] text-neutral-500 italic">
+                        Melee weapon — no projectile.
+                    </div>
+                )}
+            </Section>
+            <Section title="Bullet / attack visual">
+                <Field label="texture">
+                    <Input
+                        value={spec.bullet?.texture ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                bullet: {
+                                    ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                    texture: e.target.value || undefined,
+                                },
+                            })
+                        }
+                        placeholder="assets/image/weapons/..."
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono"
+                    />
+                </Field>
+                <Field label="type">
+                    <Select
+                        value={spec.bullet?.type ?? 'projectile'}
+                        onValueChange={(v) =>
+                            patch({
+                                bullet: {
+                                    ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                    type: v as 'projectile' | 'beam' | 'melee',
+                                },
+                            })
+                        }
+                    >
+                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="projectile">projectile</SelectItem>
+                            <SelectItem value="beam">beam</SelectItem>
+                            <SelectItem value="melee">melee</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </Field>
+                <NumberField
+                    label="scale"
+                    value={spec.bullet?.scale ?? 1}
+                    step={0.05}
+                    onChange={(v) =>
+                        patch({
+                            bullet: {
+                                ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                scale: v,
+                            },
+                        })
+                    }
+                />
+                <Field label="color (string)">
+                    <Input
+                        value={spec.bullet?.color ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                bullet: {
+                                    ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                    color: e.target.value || undefined,
+                                },
+                            })
+                        }
+                        placeholder="(optional)"
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono"
+                    />
+                </Field>
+                <NumberField
+                    label="beamWidth"
+                    value={spec.bullet?.beamWidth ?? 0}
+                    onChange={(v) =>
+                        patch({
+                            bullet: {
+                                ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                beamWidth: v || undefined,
+                            },
+                        })
+                    }
+                />
+                <NumberField
+                    label="beamDuration"
+                    value={spec.bullet?.beamDuration ?? 0}
+                    onChange={(v) =>
+                        patch({
+                            bullet: {
+                                ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                beamDuration: v || undefined,
+                            },
+                        })
+                    }
+                />
+                <Field label="anchor[0]">
+                    <Input
+                        type="number"
+                        step={0.05}
+                        value={spec.bullet?.anchor?.[0] ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                bullet: {
+                                    ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                    anchor: [
+                                        Number(e.target.value),
+                                        spec.bullet?.anchor?.[1] ?? 0.5,
+                                    ],
+                                },
+                            })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+                <Field label="anchor[1]">
+                    <Input
+                        type="number"
+                        step={0.05}
+                        value={spec.bullet?.anchor?.[1] ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                bullet: {
+                                    ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                    anchor: [
+                                        spec.bullet?.anchor?.[0] ?? 0.5,
+                                        Number(e.target.value),
+                                    ],
+                                },
+                            })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+                <Field label="rotationOffset">
+                    <Input
+                        type="number"
+                        value={spec.bullet?.rotationOffset ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                bullet: {
+                                    ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                    rotationOffset:
+                                        e.target.value === ''
+                                            ? undefined
+                                            : Number(e.target.value),
+                                },
+                            })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+                <Field label="spawnOffset[0]">
+                    <Input
+                        type="number"
+                        value={spec.bullet?.spawnOffset?.[0] ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                bullet: {
+                                    ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                    spawnOffset: [
+                                        Number(e.target.value),
+                                        spec.bullet?.spawnOffset?.[1] ?? 0,
+                                    ],
+                                },
+                            })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+                <Field label="spawnOffset[1]">
+                    <Input
+                        type="number"
+                        value={spec.bullet?.spawnOffset?.[1] ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                bullet: {
+                                    ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
+                                    spawnOffset: [
+                                        spec.bullet?.spawnOffset?.[0] ?? 0,
+                                        Number(e.target.value),
+                                    ],
+                                },
+                            })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+            </Section>
+            <Section title="Weapon visual">
+                <Field label="texture">
+                    <Input
+                        value={spec.visual?.texture ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                visual: {
+                                    ...(spec.visual ?? {}),
+                                    texture: e.target.value || undefined,
+                                },
+                            })
+                        }
+                        placeholder="assets/image/weapons/..."
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono"
+                    />
+                </Field>
+                <NumberField
+                    label="scale"
+                    value={spec.visual?.scale ?? 0.16}
+                    step={0.05}
+                    onChange={(v) =>
+                        patch({
+                            visual: { ...(spec.visual ?? {}), scale: v },
+                        })
+                    }
+                />
+                <NumberField
+                    label="orbitRadius"
+                    value={spec.visual?.orbitRadius ?? 16}
+                    onChange={(v) =>
+                        patch({
+                            visual: { ...(spec.visual ?? {}), orbitRadius: v },
+                        })
+                    }
+                />
+                <Field label="anchor[0]">
+                    <Input
+                        type="number"
+                        step={0.05}
+                        value={spec.visual?.anchor?.[0] ?? 0.2}
+                        onChange={(e) =>
+                            patch({
+                                visual: {
+                                    ...(spec.visual ?? {}),
+                                    anchor: [
+                                        Number(e.target.value),
+                                        spec.visual?.anchor?.[1] ?? 0.5,
+                                    ],
+                                },
+                            })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+                <Field label="anchor[1]">
+                    <Input
+                        type="number"
+                        step={0.05}
+                        value={spec.visual?.anchor?.[1] ?? 0.5}
+                        onChange={(e) =>
+                            patch({
+                                visual: {
+                                    ...(spec.visual ?? {}),
+                                    anchor: [
+                                        spec.visual?.anchor?.[0] ?? 0.2,
+                                        Number(e.target.value),
+                                    ],
+                                },
+                            })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+                <NumberField
+                    label="muzzleOffset"
+                    value={spec.visual?.muzzleOffset ?? 400}
+                    onChange={(v) =>
+                        patch({
+                            visual: { ...(spec.visual ?? {}), muzzleOffset: v },
+                        })
+                    }
+                />
+                <NumberField
+                    label="recoilDistance"
+                    value={spec.visual?.recoilDistance ?? 6}
+                    onChange={(v) =>
+                        patch({
+                            visual: { ...(spec.visual ?? {}), recoilDistance: v },
+                        })
+                    }
+                />
+                <NumberField
+                    label="recoilDuration"
+                    value={spec.visual?.recoilDuration ?? 80}
+                    onChange={(v) =>
+                        patch({
+                            visual: { ...(spec.visual ?? {}), recoilDuration: v },
+                        })
+                    }
+                />
+                <NumberField
+                    label="swingAngle"
+                    value={spec.visual?.swingAngle ?? 120}
+                    onChange={(v) =>
+                        patch({
+                            visual: { ...(spec.visual ?? {}), swingAngle: v },
+                        })
+                    }
+                />
+                <NumberField
+                    label="rotationOffset"
+                    value={spec.visual?.rotationOffset ?? 0}
+                    onChange={(v) =>
+                        patch({
+                            visual: { ...(spec.visual ?? {}), rotationOffset: v },
+                        })
+                    }
+                />
             </Section>
             <Section title="SFX">
                 <Field label="shoot">
@@ -669,6 +1099,26 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                         value={spec.sfx?.shoot ?? ''}
                         onChange={(e) =>
                             patch({ sfx: { ...spec.sfx, shoot: e.target.value || undefined } })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+                <Field label="dryFire">
+                    <Input
+                        value={spec.sfx?.dryFire ?? ''}
+                        onChange={(e) =>
+                            patch({ sfx: { ...spec.sfx, dryFire: e.target.value || undefined } })
+                        }
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                    />
+                </Field>
+                <Field label="bulletWall">
+                    <Input
+                        value={spec.sfx?.bulletWall ?? ''}
+                        onChange={(e) =>
+                            patch({
+                                sfx: { ...spec.sfx, bulletWall: e.target.value || undefined },
+                            })
                         }
                         className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
@@ -695,6 +1145,15 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                         className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
+            </Section>
+            <Section title="AI prompt (regen)">
+                <Textarea
+                    value={spec.prompt ?? ''}
+                    onChange={(e) => patch({ prompt: e.target.value || undefined })}
+                    rows={3}
+                    placeholder="Optional — used by AI regen pipeline."
+                    className="col-span-2 text-[11px] bg-neutral-950 border-neutral-700 min-h-20"
+                />
             </Section>
         </div>
     );
@@ -818,24 +1277,28 @@ function AudioForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                             onChange={(v) => patch({ rate: v })}
                         />
                         <Field label="loop">
-                            <select
+                            <Select
                                 value={spec.loop ? 'true' : 'false'}
-                                onChange={(e) => patch({ loop: e.target.value === 'true' })}
-                                className="h-7 text-xs bg-neutral-950 border border-neutral-700 rounded px-1.5 text-neutral-200 w-full"
+                                onValueChange={(v) => patch({ loop: v === 'true' })}
                             >
-                                <option value="false">false</option>
-                                <option value="true">true</option>
-                            </select>
+                                <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="false">false</SelectItem>
+                                    <SelectItem value="true">true</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </Field>
                     </>
                 )}
             </Section>
             <Section title="AI prompt (ElevenLabs / MiniMax regen)">
-                <textarea
+                <Textarea
                     value={spec.prompt ?? ''}
                     onChange={(e) => patch({ prompt: e.target.value || undefined })}
                     rows={3}
-                    className="col-span-2 w-full text-[11px] bg-neutral-950 border border-neutral-700 rounded p-1.5 text-neutral-200 resize-y"
+                    className="col-span-2 text-[11px] bg-neutral-950 border-neutral-700 min-h-20"
                 />
             </Section>
         </div>
@@ -858,7 +1321,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="text-[10px] text-neutral-400">{label}</label>
+            <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                {label}
+            </Label>
             {children}
         </div>
     );

@@ -15,11 +15,10 @@
  * / 4-col default that matches the AI-gen prompt.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Upload, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
     Dialog,
     DialogContent,
@@ -28,6 +27,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 interface CharacterRow {
     id: string;
@@ -76,7 +85,7 @@ interface CharacterSpec {
 
 export function CharacterSection() {
     const [chars, setChars] = useState<CharacterRow[]>([]);
-    const [selected, setSelected] = useState<string | null>(null);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
     const [spec, setSpec] = useState<CharacterSpec | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
@@ -91,7 +100,7 @@ export function CharacterSection() {
     }, []);
 
     useEffect(() => {
-        if (!selected) {
+        if (!expandedId) {
             setSpec(null);
             return;
         }
@@ -101,7 +110,7 @@ export function CharacterSection() {
         fetch('/api/editor/get-character', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: selected }),
+            body: JSON.stringify({ id: expandedId }),
         })
             .then((r) => r.json())
             .then((body) => {
@@ -109,7 +118,7 @@ export function CharacterSection() {
                 setSpec(body.spec);
             })
             .catch((e) => setError(String(e?.message ?? e)));
-    }, [selected]);
+    }, [expandedId]);
 
     async function refreshList() {
         try {
@@ -139,12 +148,16 @@ export function CharacterSection() {
             setNewId('');
             setNewName('');
             await refreshList();
-            setSelected(id);
+            setExpandedId(id);
         } catch (e) {
             setError(String((e as Error).message ?? e));
         } finally {
             setCreating(false);
         }
+    }
+
+    function toggleExpand(id: string) {
+        setExpandedId((cur) => (cur === id ? null : id));
     }
 
     function patch(p: Partial<CharacterSpec>) {
@@ -164,14 +177,14 @@ export function CharacterSection() {
     }
 
     async function handleSave() {
-        if (!spec || !selected) return;
+        if (!spec || !expandedId) return;
         setSaving(true);
         setError(null);
         try {
             const res = await fetch('/api/editor/save-character', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: selected, spec }),
+                body: JSON.stringify({ id: expandedId, spec }),
             });
             const body = await res.json();
             if (!res.ok) throw new Error(body.error);
@@ -199,41 +212,63 @@ export function CharacterSection() {
                 </Button>
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
                 {chars.map((c) => {
-                    const isSel = c.id === selected;
+                    const isExpanded = c.id === expandedId;
+                    const isLoadingThis = isExpanded && spec === null && !error;
                     return (
-                        <button
+                        <div
                             key={c.id}
-                            onClick={() => setSelected(c.id)}
-                            className={`flex items-center gap-2 border rounded px-2 py-1.5 text-left transition ${
-                                isSel
-                                    ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200'
-                                    : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-neutral-700'
+                            className={`border rounded transition ${
+                                isExpanded
+                                    ? 'bg-neutral-900 border-cyan-500/60'
+                                    : 'bg-neutral-900 border-neutral-800'
                             }`}
                         >
-                            <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate text-[12px]">{c.name}</div>
-                                <div className="text-[10px] font-mono text-neutral-500 truncate">
-                                    {c.id}
+                            <Button
+                                variant="ghost"
+                                onClick={() => toggleExpand(c.id)}
+                                className={`w-full justify-between h-auto px-2 py-1.5 rounded-[inherit] ${
+                                    isExpanded
+                                        ? 'bg-cyan-950/40 text-cyan-200 hover:bg-cyan-950/50'
+                                        : 'text-neutral-300 hover:bg-neutral-800'
+                                }`}
+                            >
+                                <div className="flex flex-col items-start min-w-0 flex-1">
+                                    <div className="font-medium truncate text-[12px]">{c.name}</div>
+                                    <div className="text-[10px] font-mono text-neutral-500 truncate">
+                                        {c.id}
+                                    </div>
                                 </div>
-                            </div>
-                            <ChevronRight className="size-3 text-neutral-500" />
-                        </button>
+                                <ChevronRight
+                                    className={`size-3 text-neutral-500 shrink-0 transition-transform ${
+                                        isExpanded ? 'rotate-90' : ''
+                                    }`}
+                                />
+                            </Button>
+                            {isExpanded && (
+                                <div className="border-t border-neutral-800">
+                                    {isLoadingThis && (
+                                        <div className="px-2.5 py-3 text-[11px] text-neutral-500 italic">
+                                            Loading…
+                                        </div>
+                                    )}
+                                    {spec && (
+                                        <CharacterForm
+                                            spec={spec}
+                                            dirty={dirty}
+                                            saving={saving}
+                                            onPatch={patch}
+                                            onPatchDeep={patchDeep}
+                                            onSave={handleSave}
+                                        />
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     );
                 })}
             </div>
-
-            {spec && (
-                <CharacterForm
-                    spec={spec}
-                    dirty={dirty}
-                    saving={saving}
-                    onPatch={patch}
-                    onPatchDeep={patchDeep}
-                    onSave={handleSave}
-                />
-            )}
 
             <Dialog open={newOpen} onOpenChange={setNewOpen}>
                 <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
@@ -246,7 +281,9 @@ export function CharacterSection() {
                     </DialogHeader>
                     <div className="flex flex-col gap-2">
                         <div>
-                            <label className="text-[11px] text-neutral-400">ID (kebab-case)</label>
+                            <Label className="text-[11px] text-neutral-400 leading-none font-normal mb-0.5">
+                                ID (kebab-case)
+                            </Label>
                             <Input
                                 autoFocus
                                 value={newId}
@@ -263,7 +300,9 @@ export function CharacterSection() {
                             />
                         </div>
                         <div>
-                            <label className="text-[11px] text-neutral-400">Name (shown in HUD)</label>
+                            <Label className="text-[11px] text-neutral-400 leading-none font-normal mb-0.5">
+                                Name (shown in HUD)
+                            </Label>
                             <Input
                                 value={newName}
                                 onChange={(e) => setNewName(e.target.value)}
@@ -310,9 +349,7 @@ interface FormProps {
 
 function CharacterForm({ spec, dirty, saving, onPatch, onPatchDeep, onSave }: FormProps) {
     return (
-        <div className="flex flex-col gap-2 border-t border-neutral-800 pt-3">
-            <div className="font-semibold text-neutral-300 text-[12px]">Edit · {spec.id}</div>
-
+        <div className="flex flex-col gap-2 px-2.5 py-2.5">
             <Section title="Identity">
                 <Field label="Name">
                     <Input
@@ -322,22 +359,26 @@ function CharacterForm({ spec, dirty, saving, onPatch, onPatchDeep, onSave }: Fo
                     />
                 </Field>
                 <Field label="Gender">
-                    <select
-                        value={spec.gender ?? ''}
-                        onChange={(e) =>
+                    <Select
+                        value={spec.gender ?? '_none'}
+                        onValueChange={(v) =>
                             onPatch({
                                 gender:
-                                    e.target.value === ''
+                                    v === '_none'
                                         ? undefined
-                                        : (e.target.value as 'male' | 'female'),
+                                        : (v as 'male' | 'female'),
                             })
                         }
-                        className="h-7 text-xs bg-neutral-950 border border-neutral-700 rounded px-1.5 text-neutral-200 w-full"
                     >
-                        <option value="">(none)</option>
-                        <option value="male">male</option>
-                        <option value="female">female</option>
-                    </select>
+                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                            <SelectValue placeholder="(none)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="_none">(none)</SelectItem>
+                            <SelectItem value="male">male</SelectItem>
+                            <SelectItem value="female">female</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </Field>
             </Section>
 
@@ -418,6 +459,18 @@ function CharacterForm({ spec, dirty, saving, onPatch, onPatchDeep, onSave }: Fo
                 />
             </Section>
 
+            <Section title="AI prompt (regen)">
+                <Textarea
+                    value={spec.prompt ?? ''}
+                    onChange={(e) =>
+                        onPatch({ prompt: e.target.value || undefined })
+                    }
+                    rows={3}
+                    placeholder="Optional — used by AI regen pipeline."
+                    className="col-span-2 text-[11px] bg-neutral-950 border-neutral-700 min-h-20"
+                />
+            </Section>
+
             <Button
                 disabled={!dirty || saving}
                 onClick={onSave}
@@ -443,7 +496,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="text-[10px] text-neutral-400">{label}</label>
+            <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                {label}
+            </Label>
             {children}
         </div>
     );
@@ -535,6 +590,7 @@ function SpriteEditor({
 }: Pick<FormProps, 'onPatch' | 'onPatchDeep'> & { spec: CharacterSpec }) {
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     async function handleUpload(file: File) {
         setUploading(true);
@@ -594,8 +650,11 @@ function SpriteEditor({
                     No sprite uploaded yet.
                 </div>
             )}
-            <label
-                className={`flex items-center justify-center h-8 rounded px-3 font-medium transition cursor-pointer text-center ${
+            <Button
+                size="sm"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                className={`h-8 font-medium ${
                     uploading
                         ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                         : 'bg-cyan-600 hover:bg-cyan-500 text-white'
@@ -603,20 +662,21 @@ function SpriteEditor({
             >
                 <Upload className="size-3 mr-1.5" />
                 {uploading ? 'Processing…' : 'Upload & process sprite'}
-                <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    disabled={uploading}
-                    onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                            handleUpload(f);
-                            e.target.value = '';
-                        }
-                    }}
-                    className="hidden"
-                />
-            </label>
+            </Button>
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={uploading}
+                onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                        handleUpload(f);
+                        e.target.value = '';
+                    }
+                }}
+                className="hidden"
+            />
             {spec.sprite && (
                 <div className="grid grid-cols-4 gap-1.5">
                     <NumberField
@@ -732,7 +792,9 @@ function AnimsEditor({
                                 <span className="text-neutral-300 font-medium text-[11px]">
                                     {name} · frames {a.frames[0]}–{a.frames[1]}
                                 </span>
-                                <button
+                                <Button
+                                    variant="ghost"
+                                    size="icon-xs"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         const { [name]: _omit, ...rest } = anims;
@@ -740,10 +802,10 @@ function AnimsEditor({
                                         onChange(rest);
                                         if (activeName === name) setActiveName(null);
                                     }}
-                                    className="text-red-400 text-[10px] hover:text-red-300"
+                                    className="text-red-400 hover:text-red-300 hover:bg-transparent"
                                 >
-                                    ✕
-                                </button>
+                                    <span className="text-[10px] leading-none">✕</span>
+                                </Button>
                             </div>
                             <div className="grid grid-cols-4 gap-1.5">
                                 <NumberField
@@ -830,15 +892,17 @@ function AnimsEditor({
                               )}. Type a name + Add.`}
                 </div>
                 {(pickStart !== null || pickEnd !== null) && (
-                    <button
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                             setPickStart(null);
                             setPickEnd(null);
                         }}
-                        className="self-start text-[10px] text-neutral-500 hover:text-neutral-300"
+                        className="self-start h-6 px-2 text-[10px] text-neutral-500 hover:text-neutral-300 hover:bg-transparent"
                     >
                         Clear pick
-                    </button>
+                    </Button>
                 )}
             </div>
         </div>
@@ -951,17 +1015,19 @@ function FramePicker({
             </div>
             <div className="flex flex-wrap gap-1">
                 {Object.entries(anims).map(([name, a]) => (
-                    <button
+                    <Button
                         key={name}
+                        variant={activeName === name ? 'default' : 'outline'}
+                        size="xs"
                         onClick={() => onAnimClick(name)}
-                        className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
+                        className={`h-6 px-2 text-[10px] ${
                             activeName === name
-                                ? 'border-cyan-400 text-cyan-200 bg-cyan-950/40'
-                                : 'border-neutral-700 text-neutral-400 hover:border-neutral-500'
+                                ? 'bg-cyan-950/40 border-cyan-400 text-cyan-200 hover:bg-cyan-950/50'
+                                : 'bg-transparent border-neutral-700 text-neutral-400 hover:border-neutral-500'
                         }`}
                     >
                         {name} [{a.frames[0]}–{a.frames[1]}]
-                    </button>
+                    </Button>
                 ))}
             </div>
         </div>

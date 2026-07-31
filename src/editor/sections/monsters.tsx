@@ -19,6 +19,14 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import type { Level, MonsterSpawn, MonsterTrigger } from '@/lib/levels/types';
 
 interface Props {
@@ -198,18 +206,24 @@ function MonsterRow({
                 <span className="text-neutral-500 font-mono text-[10px] w-5 text-center">
                     #{index + 1}
                 </span>
-                <select
+                <Select
                     value={spawn.type}
-                    onChange={(e) => onPatch(index, { type: e.target.value })}
-                    className="h-7 text-xs bg-neutral-950 border border-neutral-700 rounded px-1 text-neutral-200 flex-1 min-w-0"
+                    onValueChange={(v) => onPatch(index, { type: v })}
                 >
-                    {availableTypes.length === 0 && <option value={spawn.type}>{spawn.type}</option>}
-                    {availableTypes.map((t) => (
-                        <option key={t} value={t}>
-                            {t}
-                        </option>
-                    ))}
-                </select>
+                    <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700 flex-1 min-w-0">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {availableTypes.length === 0 && (
+                            <SelectItem value={spawn.type}>{spawn.type}</SelectItem>
+                        )}
+                        {availableTypes.map((t) => (
+                            <SelectItem key={t} value={t}>
+                                {t}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
                 <Button
                     size="icon-xs"
                     variant="ghost"
@@ -241,7 +255,9 @@ function MonsterRow({
 
             <div className="grid grid-cols-3 gap-1.5">
                 <div>
-                    <label className="text-[10px] text-neutral-400">waveId</label>
+                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                        waveId
+                    </Label>
                     <Input
                         value={spawn.waveId ?? ''}
                         onChange={(e) =>
@@ -254,7 +270,9 @@ function MonsterRow({
                     />
                 </div>
                 <div>
-                    <label className="text-[10px] text-neutral-400">x</label>
+                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                        x
+                    </Label>
                     <Input
                         type="number"
                         value={spawn.x}
@@ -263,7 +281,9 @@ function MonsterRow({
                     />
                 </div>
                 <div>
-                    <label className="text-[10px] text-neutral-400">y</label>
+                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                        y
+                    </Label>
                     <Input
                         type="number"
                         value={spawn.y}
@@ -279,13 +299,15 @@ function MonsterRow({
                         Trigger
                     </span>
                     {trigger && (
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="xs"
                             onClick={() => onClearTrigger(index)}
-                            className="text-[10px] text-neutral-500 hover:text-red-400 transition"
+                            className="h-6 px-2 text-[10px] text-neutral-500 hover:text-red-400 hover:bg-transparent"
                             title="Fire immediately at level start"
                         >
                             Clear
-                        </button>
+                        </Button>
                     )}
                 </div>
                 {!trigger && (
@@ -295,19 +317,23 @@ function MonsterRow({
                 )}
                 {trigger && (
                     <div className="grid grid-cols-3 gap-1.5">
-                        <select
+                        <Select
                             value={trigger.kind}
-                            onChange={(e) =>
-                                onPatchTrigger(index, { kind: e.target.value as MonsterTrigger['kind'] })
+                            onValueChange={(v) =>
+                                onPatchTrigger(index, { kind: v as MonsterTrigger['kind'] })
                             }
-                            className="h-6 text-[11px] bg-neutral-950 border border-neutral-700 rounded px-1 text-neutral-200"
                         >
-                            {TRIGGER_KINDS.map((k) => (
-                                <option key={k} value={k}>
-                                    {k}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger size="sm" className="h-6 text-[11px] bg-neutral-950 border-neutral-700">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {TRIGGER_KINDS.map((k) => (
+                                    <SelectItem key={k} value={k}>
+                                        {k}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         <Input
                             type="number"
                             min={0}

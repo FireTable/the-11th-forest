@@ -18,6 +18,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { resolveAndRestart } from '@/lib/phaser-game';
 
 interface SceneRow {
@@ -170,9 +171,9 @@ export function ScenesListSection({ currentSceneId, onSceneChange }: Props) {
                     </DialogHeader>
                     <div className="flex flex-col gap-2">
                         <div>
-                            <label className="text-[11px] text-neutral-400">
+                            <Label className="text-[11px] text-neutral-400 leading-none font-normal mb-0.5">
                                 ID (kebab-case, used as filename)
-                            </label>
+                            </Label>
                             <Input
                                 autoFocus
                                 value={newId}
@@ -189,9 +190,9 @@ export function ScenesListSection({ currentSceneId, onSceneChange }: Props) {
                             />
                         </div>
                         <div>
-                            <label className="text-[11px] text-neutral-400">
+                            <Label className="text-[11px] text-neutral-400 leading-none font-normal mb-0.5">
                                 Title (shown in HUD)
-                            </label>
+                            </Label>
                             <Input
                                 value={newTitle}
                                 onChange={(e) => setNewTitle(e.target.value)}

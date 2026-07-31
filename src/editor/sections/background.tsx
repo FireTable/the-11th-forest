@@ -113,24 +113,27 @@ export function BackgroundSection({ sceneId, level, setLevel, onAfterSave }: Pro
 
             <div className="bg-neutral-900 border border-neutral-800 rounded p-2.5 flex flex-col gap-2">
                 <div className="font-semibold text-neutral-300">Replace background</div>
-                <label
-                    className={`flex items-center justify-center h-9 rounded px-3 font-medium transition cursor-pointer text-center ${
+                <Button
+                    size="sm"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`h-9 font-medium ${
                         uploading
-                            ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                            ? 'bg-neutral-800 text-neutral-500'
                             : 'bg-cyan-600 hover:bg-cyan-500 text-white'
                     }`}
                 >
                     <Upload className="size-3 mr-1.5" />
                     {uploading ? 'Uploading…' : 'Choose PNG'}
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        disabled={uploading}
-                        onChange={handleFile}
-                        className="hidden"
-                    />
-                </label>
+                </Button>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    disabled={uploading}
+                    onChange={handleFile}
+                    className="hidden"
+                />
                 <div className="text-[11px] text-neutral-500 italic">
                     Replaces the PNG file. If the new size differs, you'll be asked to confirm
                     the <code>imageSize</code> change. Air walls are NOT auto-scaled.

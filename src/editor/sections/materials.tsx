@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -9,6 +9,14 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { EventBus } from '@/lib/events/bus';
 import type { Level, MaterialMode, PlacedMaterial } from '@/lib/levels/types';
 
@@ -30,6 +38,10 @@ export function MaterialsSection({ level, setLevel }: Props) {
     const [statusMsg, setStatusMsg] = useState('');
     // Collapsed state for material folders (default all expanded)
     const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
+    // Hidden file-input refs triggered by shadcn Button clicks.
+    const packInputRef = useRef<HTMLInputElement>(null);
+    const appendInputRef = useRef<HTMLInputElement>(null);
+    const appendTargetFolder = useRef<string>('');
 
     const toggleFolderCollapse = (folderName: string) => {
         setCollapsedFolders((prev) => ({
@@ -260,22 +272,22 @@ export function MaterialsSection({ level, setLevel }: Props) {
                     onChange={(e) => setFolderName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     className="h-8 text-xs bg-neutral-950 border-neutral-700"
                 />
-                <label
-                    className={`flex items-center justify-center h-8 rounded px-3 font-medium transition cursor-pointer text-center ${
-                        folderName.trim() && !uploading
-                            ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
-                            : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-                    }`}
+                <Button
+                    size="sm"
+                    disabled={!folderName.trim() || uploading}
+                    onClick={() => packInputRef.current?.click()}
+                    className="h-8 bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
                 >
-                    <span>{uploading ? 'Processing…' : 'Upload & Slice Image'}</span>
-                    <input
-                        type="file"
-                        accept="image/*"
-                        disabled={!folderName.trim() || uploading}
-                        onChange={handleFileUpload}
-                        className="hidden"
-                    />
-                </label>
+                    {uploading ? 'Processing…' : 'Upload & Slice Image'}
+                </Button>
+                <input
+                    ref={packInputRef}
+                    type="file"
+                    accept="image/*"
+                    disabled={!folderName.trim() || uploading}
+                    onChange={handleFileUpload}
+                    className="hidden"
+                />
                 {statusMsg && <div className="text-[11px] text-neutral-400 italic">{statusMsg}</div>}
             </div>
 
@@ -326,7 +338,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                             <span className="uppercase text-[9px] bg-neutral-800 px-1 rounded text-neutral-400">
                                                 {m.mode || 'y-sort'}
                                             </span>
-                                            <button
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-xs"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     const targetId = m.id;
@@ -335,11 +349,11 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                     if (selectedMat?.id === targetId) setSelectedMat(null);
                                                     EventBus.emit('material-delete', targetId);
                                                 }}
-                                                className="w-4 h-4 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800 flex items-center justify-center text-[11px] font-bold transition"
+                                                className="w-4 h-4 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
                                                 title="Remove this material from scene"
                                             >
-                                                ✕
-                                            </button>
+                                                <span className="text-[11px] font-bold leading-none">✕</span>
+                                            </Button>
                                             <span className="text-[11px] ml-0.5">{isSelected ? '▼' : '▶'}</span>
                                         </div>
                                     </div>
@@ -349,7 +363,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                         <div className="p-2.5 border-t border-neutral-800/80 flex flex-col gap-2 bg-neutral-950/70">
                                             <div className="grid grid-cols-3 gap-1.5">
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-400">Pos X</label>
+                                                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                                                        Pos X
+                                                    </Label>
                                                     <Input
                                                         type="number"
                                                         value={selectedMat.x}
@@ -358,7 +374,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-400">Pos Y</label>
+                                                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                                                        Pos Y
+                                                    </Label>
                                                     <Input
                                                         type="number"
                                                         value={selectedMat.y}
@@ -367,7 +385,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-400">Scale</label>
+                                                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                                                        Scale
+                                                    </Label>
                                                     <Input
                                                         type="number"
                                                         step="0.1"
@@ -381,7 +401,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
 
                                             <div className="grid grid-cols-2 gap-2">
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-400">Rotation (°)</label>
+                                                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                                                        Rotation (°)
+                                                    </Label>
                                                     <Input
                                                         type="number"
                                                         step="15"
@@ -391,7 +413,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-400">Flip Mirror</label>
+                                                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                                                        Flip Mirror
+                                                    </Label>
                                                     <div className="flex gap-1.5 pt-0.5">
                                                         <Button
                                                             size="sm"
@@ -415,7 +439,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
 
                                             <div>
                                                 <div className="flex items-center gap-1">
-                                                    <label className="text-[10px] text-neutral-400">Occlusion Mode</label>
+                                                    <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                                                        Occlusion Mode
+                                                    </Label>
                                                     <span
                                                         className="cursor-help text-neutral-400 hover:text-cyan-400 text-[11px] font-bold"
                                                         title="Depth Rules:&#10;• Y-Sort: depth = mat.y (Dynamic 2.5D occlusion with Player/Enemies)&#10;• Background: depth = 10 (Renders on map floor, BELOW characters & bullets)&#10;• Foreground: depth = 10000 (Renders on top, OVER characters & enemies)"
@@ -423,19 +449,27 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                         ❓
                                                     </span>
                                                 </div>
-                                                <select
+                                                <Select
                                                     value={selectedMat.mode || 'y-sort'}
-                                                    onChange={(e) => handleUpdateSelected({ mode: e.target.value as MaterialMode })}
-                                                    className="w-full h-7 text-xs bg-neutral-900 border border-neutral-700 rounded px-1.5 text-neutral-200 mt-0.5"
+                                                    onValueChange={(v) =>
+                                                        handleUpdateSelected({ mode: v as MaterialMode })
+                                                    }
                                                 >
-                                                    <option value="y-sort">Y-Sort (Dynamic Depth: mat.Y)</option>
-                                                    <option value="background">Background (Floor: depth 10)</option>
-                                                    <option value="foreground">Foreground (Top: depth 10000)</option>
-                                                </select>
+                                                    <SelectTrigger size="sm" className="mt-0.5 h-7 text-xs bg-neutral-900 border-neutral-700 w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="y-sort">Y-Sort (Dynamic Depth: mat.Y)</SelectItem>
+                                                        <SelectItem value="background">Background (Floor: depth 10)</SelectItem>
+                                                        <SelectItem value="foreground">Foreground (Top: depth 10000)</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
 
                                             <div>
-                                                <label className="text-[10px] text-neutral-400">Depth Offset</label>
+                                                <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
+                                                    Depth Offset
+                                                </Label>
                                                 <Input
                                                     type="number"
                                                     value={selectedMat.depthOffset || 0}
@@ -479,16 +513,32 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                         <span className="text-[10px] text-neutral-500">{isCollapsed ? '▶' : '▼'}</span>
                                         <span>{f.name} ({f.images.length})</span>
                                     </div>
-                                    <label className="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-semibold">
+                                    <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        disabled={uploading}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            appendTargetFolder.current = f.name;
+                                            appendInputRef.current?.click();
+                                        }}
+                                        className="h-6 px-2 text-[10px] text-cyan-400 hover:text-cyan-300 hover:bg-transparent font-semibold"
+                                    >
                                         + Append Sheet
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            disabled={uploading}
-                                            onChange={(e) => handleFolderUpload(f.name, e)}
-                                            className="hidden"
-                                        />
-                                    </label>
+                                    </Button>
+                                    <input
+                                        ref={appendInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        disabled={uploading}
+                                        onChange={(e) => {
+                                            if (appendTargetFolder.current) {
+                                                handleFolderUpload(appendTargetFolder.current, e);
+                                                appendTargetFolder.current = '';
+                                            }
+                                        }}
+                                        className="hidden"
+                                    />
                                 </div>
 
                                 {!isCollapsed && (
@@ -505,13 +555,15 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                     alt="material tile"
                                                     className="max-w-full max-h-full object-contain group-hover:scale-110 transition"
                                                 />
-                                                <button
+                                                <Button
+                                                    variant="destructive"
+                                                    size="icon-xs"
                                                     onClick={(e) => handleDeleteMaterialFile(img, e)}
-                                                    className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-600/90 hover:bg-red-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold opacity-0 group-hover:opacity-100 transition shadow"
+                                                    className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full p-0 bg-red-600/90 hover:bg-red-500 text-white text-[8px] font-bold opacity-0 group-hover:opacity-100 shadow"
                                                     title="Delete asset file permanently"
                                                 >
                                                     ×
-                                                </button>
+                                                </Button>
                                             </div>
                                         ))}
                                     </div>

@@ -132,6 +132,347 @@ function formatZodIssues(issues) {
         .join('; ');
 }
 
+// ─── Server-side schema mirrors ──────────────────────────────────────────
+//
+// These mirror src/lib/<module>/schema.ts. The editor panel posts JSON
+// before serializing; the server validates the JSON shape so a typo /
+// future divergence in the panel doesn't silently write a malformed YAML
+// that the game then refuses to load.
+//
+// Drift risk: when you add a field to the TS schema, mirror it here
+// too — otherwise saves that include the new field are rejected with
+// "unrecognized key" instead of being persisted.
+
+const SpriteOffsetSchema = z
+    .object({
+        left: z.number().optional(),
+        bottom: z.number().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+    })
+    .strict();
+
+const SpriteSchema = z
+    .object({
+        texture: z.string().min(1),
+        grid: z
+            .object({
+                rows: z.number().gt(0),
+                cols: z.number().gt(0),
+            })
+            .strict()
+            .optional(),
+        scale: z.number().gt(0).optional(),
+        offset: SpriteOffsetSchema.optional(),
+        script: z
+            .object({
+                downsample: z.number().optional(),
+                colors: z.number().optional(),
+                pad: z.number().optional(),
+            })
+            .strict()
+            .optional(),
+    })
+    .strict();
+
+const AnimSpecSchema = z
+    .object({
+        frames: z.tuple([z.number(), z.number()]),
+        frameRate: z.number().gt(0),
+        repeat: z.number().optional(),
+    })
+    .strict();
+
+const DropVisualSchema = z
+    .object({
+        size: z.number().gt(0),
+        tint: z.number(),
+    })
+    .strict();
+
+const DropInstantEffect = z
+    .object({
+        type: z.literal('instant'),
+        hp: z.number().gte(0).default(0),
+        sp: z.number().gte(0).default(0),
+    })
+    .strict();
+
+const DropRefillAmmoEffect = z
+    .object({
+        type: z.literal('refill-ammo'),
+        ammoFraction: z.number().gt(0).lte(1),
+    })
+    .strict();
+
+const DropWeaponEffect = z
+    .object({
+        type: z.literal('weapon'),
+        weaponId: z.string().min(1),
+    })
+    .strict();
+
+const DropEffectSchema = z.discriminatedUnion('type', [
+    DropInstantEffect,
+    DropRefillAmmoEffect,
+    DropWeaponEffect,
+]);
+
+const DropSpecSaveSchema = z
+    .object({
+        id: z.string().min(1).optional(),
+        name: z.string().min(1),
+        kind: z.enum(['static', 'monster']),
+        visual: DropVisualSchema,
+        effect: DropEffectSchema,
+        sfx: z.string().min(1).optional(),
+        sprite: SpriteSchema.optional(),
+        anims: z.record(z.string(), AnimSpecSchema).optional(),
+        prompt: z.string().optional(),
+    })
+    .strict();
+
+const MonsterBodySchema = z
+    .object({
+        halfW: z.number().gt(0).default(14),
+        halfH: z.number().gt(0).default(14),
+    })
+    .strict()
+    .default({ halfW: 14, halfH: 14 });
+
+const MonsterDropRef = z
+    .object({
+        dropId: z.string().min(1),
+        chance: z.number().gte(0).lte(1),
+    })
+    .strict();
+
+const MonsterSfxSchema = z
+    .object({
+        hit: z.string().min(1).optional(),
+        death: z.string().min(1).optional(),
+        aggro: z.string().min(1).optional(),
+    })
+    .strict();
+
+const MonsterSpecSaveSchema = z
+    .object({
+        id: z.string().min(1).optional(),
+        name: z.string().min(1),
+        imageSize: z.string().regex(/^\d+x\d+$/).optional(),
+        prompt: z.string().optional(),
+        hp: z.number().gte(0),
+        moveSpeed: z.number().gt(0),
+        body: MonsterBodySchema,
+        weaponId: z.string().min(1),
+        drops: z.array(MonsterDropRef).default([]),
+        sfx: MonsterSfxSchema.optional(),
+        sprite: SpriteSchema.optional(),
+        anims: z.record(z.string(), AnimSpecSchema).optional(),
+    })
+    .strict();
+
+const ProjectileVisualSchema = z
+    .object({
+        radius: z.number().gt(0),
+        width: z.number().gt(0),
+        height: z.number().gt(0),
+        color: z.number(),
+    })
+    .strict();
+
+const ProjectileSchema = z
+    .object({
+        speed: z.number().gt(0),
+        visual: ProjectileVisualSchema,
+    })
+    .strict();
+
+const WeaponVisualSchema = z
+    .object({
+        texture: z.string().optional(),
+        scale: z.number().gt(0).default(0.16),
+        orbitRadius: z.number().default(16),
+        anchor: z.tuple([z.number(), z.number()]).default([0.2, 0.5]),
+        muzzleOffset: z.number().default(400),
+        recoilDistance: z.number().default(6),
+        recoilDuration: z.number().default(80),
+        swingAngle: z.number().default(120),
+        rotationOffset: z.number().default(0),
+    })
+    .strict();
+
+const WeaponPairedBulletSchema = z
+    .object({
+        texture: z.string().optional(),
+        type: z.enum(['projectile', 'beam', 'melee']).default('projectile'),
+        speed: z.number().gt(0).optional(),
+        scale: z.number().gt(0).default(1),
+        color: z.string().optional(),
+        beamWidth: z.number().gt(0).optional(),
+        beamDuration: z.number().gt(0).optional(),
+        anchor: z.tuple([z.number(), z.number()]).optional(),
+        rotationOffset: z.number().optional(),
+        spawnOffset: z.tuple([z.number(), z.number()]).optional(),
+    })
+    .strict();
+
+const WeaponSfxSchema = z
+    .object({
+        shoot: z.string().min(1).optional(),
+        dryFire: z.string().min(1).optional(),
+        bulletWall: z.string().min(1).optional(),
+        reloadStart: z.string().min(1).optional(),
+        reloadFinish: z.string().min(1).optional(),
+    })
+    .strict();
+
+const WeaponSpecSaveSchema = z
+    .object({
+        id: z.string().min(1).optional(),
+        name: z.string().min(1),
+        damage: z.number().gt(0),
+        cooldownMs: z.number().gte(0),
+        range: z.number().gt(0),
+        visual: WeaponVisualSchema.optional(),
+        bullet: WeaponPairedBulletSchema.optional(),
+        projectile: ProjectileSchema.optional(),
+        clipSize: z.number().gt(0).optional(),
+        reloadTimeMs: z.number().gt(0).optional(),
+        bulletsPerShot: z.number().gt(0).optional(),
+        hitWidth: z.number().gt(0).optional(),
+        hitHeight: z.number().gt(0).optional(),
+        sfx: WeaponSfxSchema.optional(),
+    })
+    .strict()
+    .superRefine((val, ctx) => {
+        const hasProjectile = val.projectile !== undefined;
+        const hasMelee = val.hitWidth !== undefined || val.hitHeight !== undefined;
+        if (hasProjectile === hasMelee) {
+            ctx.addIssue({
+                code: 'custom',
+                message:
+                    'must be either ranged (projectile) or melee (hitWidth + hitHeight), not both or neither',
+            });
+        }
+        if (hasMelee) {
+            if (val.hitWidth === undefined) {
+                ctx.addIssue({
+                    code: 'custom',
+                    path: ['hitWidth'],
+                    message: 'melee weapon needs hitWidth',
+                });
+            }
+            if (val.hitHeight === undefined) {
+                ctx.addIssue({
+                    code: 'custom',
+                    path: ['hitHeight'],
+                    message: 'melee weapon needs hitHeight',
+                });
+            }
+        }
+    });
+
+const SfxSpecSaveSchema = z
+    .object({
+        kind: z.literal('sfx'),
+        id: z.string().min(1),
+        name: z.string().min(1),
+        source: z.string().min(1),
+        volume: z.number().gte(0).lte(1).default(1),
+        rate: z.number().gt(0).default(1),
+        loop: z.boolean().default(false),
+        prompt: z.string().optional(),
+    })
+    .strict();
+
+const MusicSpecSaveSchema = z
+    .object({
+        kind: z.literal('music'),
+        id: z.string().min(1),
+        name: z.string().min(1),
+        source: z.string().min(1),
+        volume: z.number().gte(0).lte(1).default(0.5),
+        fadeIn: z.number().gte(0).default(0),
+        fadeOut: z.number().gte(0).default(0),
+        prompt: z.string().optional(),
+    })
+    .strict();
+
+const CharacterSpecSaveSchema = z
+    .object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        imageSize: z.string().regex(/^\d+x\d+$/).optional(),
+        prompt: z.string().optional(),
+        hp: z.number().gte(0),
+        sp: z.number().gte(0),
+        moveSpeed: z.number().gt(0),
+        spRegenMs: z.number().gt(0),
+        gender: z.enum(['male', 'female']).optional(),
+        body: z
+            .object({
+                halfW: z.number().gt(0),
+                halfH: z.number().gt(0),
+            })
+            .strict(),
+        dodge: z
+            .object({
+                spCost: z.number().gte(0),
+                speed: z.number().gt(0),
+                durationMs: z.number().gt(0),
+                cooldownMs: z.number().gt(0),
+            })
+            .strict(),
+        hotbar: z.array(z.string().min(1)).min(1),
+        sfx: z
+            .object({
+                dodge: z.string().min(1).optional(),
+                hurt: z.string().min(1).optional(),
+                hurtMale: z.string().min(1).optional(),
+                hurtFemale: z.string().min(1).optional(),
+                footstep: z.string().min(1).optional(),
+                footstepThrottleMs: z.number().gt(0).optional(),
+                lowHpHeartbeat: z.string().min(1).optional(),
+                lowHpThreshold: z.number().gt(0).lte(1).optional(),
+                lowHpPulseMs: z.number().gt(0).optional(),
+            })
+            .strict()
+            .optional(),
+        sprite: z
+            .object({
+                texture: z.string().min(1),
+                grid: z
+                    .object({
+                        rows: z.number().gt(0),
+                        cols: z.number().gt(0),
+                    })
+                    .strict(),
+                scale: z.number().gt(0),
+                offset: SpriteOffsetSchema.optional(),
+                script: z
+                    .object({
+                        downsample: z.number().optional(),
+                        colors: z.number().optional(),
+                        pad: z.number().optional(),
+                    })
+                    .strict()
+                    .optional(),
+            })
+            .strict()
+            .optional(),
+        anims: z.record(z.string(), AnimSpecSchema).optional(),
+    })
+    .strict();
+
+const MODULE_SCHEMAS = {
+    drops: DropSpecSaveSchema,
+    monsters: MonsterSpecSaveSchema,
+    weapons: WeaponSpecSaveSchema,
+    'audios-sfx': SfxSpecSaveSchema,
+    'audios-music': MusicSpecSaveSchema,
+};
+
 /**
  * Server-side mirror of src/lib/editor/yaml.ts → serializeLevelYaml.
  *
@@ -528,14 +869,21 @@ async function handleSaveCharacter(req, res) {
     if (!spec || typeof spec !== 'object') {
         return sendJson(res, 400, { error: 'spec required' });
     }
-    // Server-side mirror of CharacterSpecSchema (minimal: only enforce
-    // the fields the editor exposes). Full validation happens when the
-    // game loads the yaml via the Zod schema.
-    if (typeof spec.id !== 'string' || spec.id !== id) {
+    // Validate against the mirrored CharacterSpecSaveSchema so a typo /
+    // future divergence in the editor can't silently write a YAML the
+    // game refuses to load. spec.id must also match the file id — kept
+    // here rather than the schema so the error message stays actionable.
+    const result = CharacterSpecSaveSchema.safeParse(spec);
+    if (!result.success) {
+        return sendJson(res, 400, {
+            error: `character validation failed: ${formatZodIssues(result.error.issues)}`,
+        });
+    }
+    if (result.data.id !== id) {
         return sendJson(res, 400, { error: 'spec.id must match the file id' });
     }
     const out = path.join(PUBLIC_DIR, 'data/characters', `${id}.yaml`);
-    await writeFile(out, stringifyYaml(spec, { lineWidth: -1, noRefs: true }), 'utf8');
+    await writeFile(out, stringifyYaml(result.data, { lineWidth: -1, noRefs: true }), 'utf8');
     return sendJson(res, 200, { ok: true });
 }
 
@@ -713,8 +1061,18 @@ async function handleSaveModuleSpec(req, res) {
     if (!spec || typeof spec !== 'object') {
         return sendJson(res, 400, { error: 'spec required' });
     }
+    const schema = MODULE_SCHEMAS[mod];
+    if (!schema) {
+        return sendJson(res, 400, { error: `no validator registered for module: ${mod}` });
+    }
+    const result = schema.safeParse(spec);
+    if (!result.success) {
+        return sendJson(res, 400, {
+            error: `${mod} validation failed: ${formatZodIssues(result.error.issues)}`,
+        });
+    }
     const out = path.join(PUBLIC_DIR, root.dir, `${id}.yaml`);
-    await writeFile(out, stringifyYaml(spec, { lineWidth: -1, noRefs: true }), 'utf8');
+    await writeFile(out, stringifyYaml(result.data, { lineWidth: -1, noRefs: true }), 'utf8');
     return sendJson(res, 200, { ok: true });
 }
 
@@ -724,6 +1082,19 @@ async function handleCreateModuleSpec(req, res) {
     if (!root) return sendJson(res, 400, { error: `unknown module: ${mod}` });
     if (typeof id !== 'string' || !ID_PATTERN_GENERIC.test(id)) {
         return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    if (!spec || typeof spec !== 'object') {
+        return sendJson(res, 400, { error: 'spec required' });
+    }
+    const schema = MODULE_SCHEMAS[mod];
+    if (!schema) {
+        return sendJson(res, 400, { error: `no validator registered for module: ${mod}` });
+    }
+    const result = schema.safeParse(spec);
+    if (!result.success) {
+        return sendJson(res, 400, {
+            error: `${mod} validation failed: ${formatZodIssues(result.error.issues)}`,
+        });
     }
     // Append to index.yaml
     const idxPath = path.join(PUBLIC_DIR, root.dir.split('/').slice(0, 2).join('/'), 'index.yaml');
@@ -741,7 +1112,7 @@ async function handleCreateModuleSpec(req, res) {
     const out = path.join(PUBLIC_DIR, root.dir, `${id}.yaml`);
     await writeFile(
         out,
-        stringifyYaml(spec, { lineWidth: -1, noRefs: true }),
+        stringifyYaml(result.data, { lineWidth: -1, noRefs: true }),
         'utf8',
     );
     return sendJson(res, 200, { ok: true });

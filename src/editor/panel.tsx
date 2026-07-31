@@ -20,6 +20,7 @@ import {
 } from './sections/modules';
 import { MonstersSection } from './sections/monsters';
 import { ScenesListSection } from './sections/scenes-list';
+import { SettingsSection } from './sections/settings';
 import { WallCanvas } from './wall-canvas';
 
 interface ScenePayload {
@@ -28,7 +29,7 @@ interface ScenePayload {
 }
 
 type TopTab = 'scenes' | 'characters' | 'drops' | 'monsters' | 'weapons' | 'audios';
-type SceneSubTab = 'scenes' | 'background' | 'monsters' | 'air-walls' | 'materials';
+type SceneSubTab = 'scenes' | 'background' | 'settings' | 'monsters' | 'air-walls' | 'materials';
 
 const TOP_TABS: { id: TopTab; label: string }[] = [
     { id: 'scenes', label: 'Scenes' },
@@ -42,6 +43,7 @@ const TOP_TABS: { id: TopTab; label: string }[] = [
 const SCENE_SUB_TABS: { id: SceneSubTab; label: string }[] = [
     { id: 'scenes', label: 'Scenes' },
     { id: 'background', label: 'Background' },
+    { id: 'settings', label: 'Settings' },
     { id: 'monsters', label: 'Monsters' },
     { id: 'air-walls', label: 'Air walls' },
     { id: 'materials', label: 'Materials' },
@@ -224,6 +226,9 @@ export function EditorPanel() {
                             setLevel={handleLevelChange}
                             onAfterSave={handleBackgroundSave}
                         />
+                    )}
+                    {level && topTab === 'scenes' && sceneSubTab === 'settings' && (
+                        <SettingsSection level={level} setLevel={handleLevelChange} />
                     )}
                     {level && topTab === 'scenes' && sceneSubTab === 'monsters' && (
                         <MonstersSection
