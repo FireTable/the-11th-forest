@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { IdPicker, SpritePicker } from '@/editor/asset-picker';
 import {
     Select,
     SelectContent,
@@ -433,11 +434,11 @@ function DropsForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
             </Section>
             <Section title="Audio">
                 <Field label="sfx">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx ?? ''}
-                        onChange={(e) => patch({ sfx: e.target.value || undefined })}
-                        placeholder="(default pickup)"
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        placeholder="(default pickup-generic)"
+                        onChange={(v) => patch({ sfx: v || undefined })}
                     />
                 </Field>
                 <NumberField
@@ -510,10 +511,10 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     />
                 </Field>
                 <Field label="weaponId">
-                    <Input
+                    <IdPicker
+                        kind="weapons"
                         value={spec.weaponId}
-                        onChange={(e) => patch({ weaponId: e.target.value })}
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        onChange={(v) => patch({ weaponId: v })}
                     />
                 </Field>
             </Section>
@@ -537,30 +538,30 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
             </Section>
             <Section title="SFX">
                 <Field label="hit">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx?.hit ?? ''}
-                        onChange={(e) =>
-                            patch({ sfx: { ...spec.sfx, hit: e.target.value || undefined } })
+                        onChange={(v) =>
+                            patch({ sfx: { ...spec.sfx, hit: v || undefined } })
                         }
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
                 <Field label="death">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx?.death ?? ''}
-                        onChange={(e) =>
-                            patch({ sfx: { ...spec.sfx, death: e.target.value || undefined } })
+                        onChange={(v) =>
+                            patch({ sfx: { ...spec.sfx, death: v || undefined } })
                         }
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
                 <Field label="aggro">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx?.aggro ?? ''}
-                        onChange={(e) =>
-                            patch({ sfx: { ...spec.sfx, aggro: e.target.value || undefined } })
+                        onChange={(v) =>
+                            patch({ sfx: { ...spec.sfx, aggro: v || undefined } })
                         }
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
                 <NumberField
@@ -599,20 +600,48 @@ function DropsEditor({
     drops: { dropId: string; chance: number }[];
     onChange: (next: typeof drops) => void;
 }) {
+    const [dropIds, setDropIds] = useState<string[]>([]);
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/editor/list-module', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ module: 'drops' }),
+        })
+            .then((r) => r.json())
+            .then((b) => !cancelled && setDropIds(b.ids ?? []))
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, []);
     return (
         <div className="col-span-2 flex flex-col gap-1.5">
             {drops.map((d, i) => (
                 <div key={i} className="grid grid-cols-[1fr_80px_auto] gap-1.5">
-                    <Input
-                        value={d.dropId}
-                        onChange={(e) => {
+                    <Select
+                        value={d.dropId || '_none'}
+                        onValueChange={(v) => {
                             const next = [...drops];
-                            next[i] = { ...d, dropId: e.target.value };
+                            next[i] = { ...d, dropId: v === '_none' ? '' : v };
                             onChange(next);
                         }}
-                        placeholder="drop-id"
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
-                    />
+                    >
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono"
+                        >
+                            <SelectValue placeholder="(no drop)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="_none">(no drop)</SelectItem>
+                            {dropIds.map((id) => (
+                                <SelectItem key={id} value={id}>
+                                    {id}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Input
                         type="number"
                         step={0.05}
@@ -844,18 +873,17 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
             </Section>
             <Section title="Bullet / attack visual">
                 <Field label="texture">
-                    <Input
+                    <SpritePicker
+                        folder="weapons"
                         value={spec.bullet?.texture ?? ''}
-                        onChange={(e) =>
+                        onChange={(v) =>
                             patch({
                                 bullet: {
                                     ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
-                                    texture: e.target.value || undefined,
+                                    texture: v || undefined,
                                 },
                             })
                         }
-                        placeholder="assets/image/weapons/..."
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono"
                     />
                 </Field>
                 <Field label="type">
@@ -1027,18 +1055,17 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
             </Section>
             <Section title="Weapon visual">
                 <Field label="texture">
-                    <Input
+                    <SpritePicker
+                        folder="weapons"
                         value={spec.visual?.texture ?? ''}
-                        onChange={(e) =>
+                        onChange={(v) =>
                             patch({
                                 visual: {
                                     ...(spec.visual ?? {}),
-                                    texture: e.target.value || undefined,
+                                    texture: v || undefined,
                                 },
                             })
                         }
-                        placeholder="assets/image/weapons/..."
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono"
                     />
                 </Field>
                 <NumberField
@@ -1146,54 +1173,54 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
             </Section>
             <Section title="SFX">
                 <Field label="shoot">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx?.shoot ?? ''}
-                        onChange={(e) =>
-                            patch({ sfx: { ...spec.sfx, shoot: e.target.value || undefined } })
+                        onChange={(v) =>
+                            patch({ sfx: { ...spec.sfx, shoot: v || undefined } })
                         }
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
                 <Field label="dryFire">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx?.dryFire ?? ''}
-                        onChange={(e) =>
-                            patch({ sfx: { ...spec.sfx, dryFire: e.target.value || undefined } })
+                        onChange={(v) =>
+                            patch({ sfx: { ...spec.sfx, dryFire: v || undefined } })
                         }
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
                 <Field label="bulletWall">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx?.bulletWall ?? ''}
-                        onChange={(e) =>
+                        onChange={(v) =>
                             patch({
-                                sfx: { ...spec.sfx, bulletWall: e.target.value || undefined },
+                                sfx: { ...spec.sfx, bulletWall: v || undefined },
                             })
                         }
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
                 <Field label="reloadStart">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx?.reloadStart ?? ''}
-                        onChange={(e) =>
+                        onChange={(v) =>
                             patch({
-                                sfx: { ...spec.sfx, reloadStart: e.target.value || undefined },
+                                sfx: { ...spec.sfx, reloadStart: v || undefined },
                             })
                         }
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
                 <Field label="reloadFinish">
-                    <Input
+                    <IdPicker
+                        kind="audios-sfx"
                         value={spec.sfx?.reloadFinish ?? ''}
-                        onChange={(e) =>
+                        onChange={(v) =>
                             patch({
-                                sfx: { ...spec.sfx, reloadFinish: e.target.value || undefined },
+                                sfx: { ...spec.sfx, reloadFinish: v || undefined },
                             })
                         }
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
                 <NumberField

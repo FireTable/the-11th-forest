@@ -612,6 +612,40 @@ async function handleListMaterials(res) {
     }
 }
 
+/** Sprite folders the editor picker can enumerate. Each maps to a
+ *  directory under `public/assets/image/<key>`. Whitelisted so the
+ *  endpoint can't be pointed at arbitrary paths. */
+const SPRITE_FOLDERS = {
+    characters: 'assets/image/characters',
+    monsters: 'assets/image/monsters',
+    drops: 'assets/image/drops',
+    weapons: 'assets/image/weapons',
+};
+
+async function handleListSprites(req, res) {
+    const { folder } = await readJsonBody(req);
+    if (typeof folder !== 'string' || !(folder in SPRITE_FOLDERS)) {
+        return sendJson(res, 400, { error: `unknown folder: ${JSON.stringify(folder)}` });
+    }
+    const folderRel = SPRITE_FOLDERS[folder];
+    const folderPath = path.join(PUBLIC_DIR, folderRel);
+    try {
+        const { readdir } = await import('node:fs/promises');
+        const files = await readdir(folderPath);
+        const sprites = files
+            .filter((f) => /\.png$/i.test(f) && !/^raws?$/i.test(f))
+            .map((f) => ({
+                id: f.replace(/\.png$/i, ''),
+                path: `${folderRel}/${f}`,
+                url: `/${folderRel}/${f}`,
+            }))
+            .sort((a, b) => a.id.localeCompare(b.id));
+        return sendJson(res, 200, { sprites });
+    } catch {
+        return sendJson(res, 200, { sprites: [] });
+    }
+}
+
 async function handleUploadMaterial(req, res) {
     const { folder, fileData } = await readJsonBody(req);
     if (typeof folder !== 'string' || !ID_PATTERN.test(folder)) {
@@ -1267,6 +1301,14 @@ export function editorApiPlugin() {
                 if (req.method !== 'POST') return next();
                 try {
                     await handleCreateModuleSpec(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/list-sprites', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleListSprites(req, res);
                 } catch (e) {
                     sendJson(res, 500, { error: String(e?.message ?? e) });
                 }
