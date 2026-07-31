@@ -1,21 +1,21 @@
 {
-  "name": "template-react-ts",
+  "name": "the-11th-forest",
   "description": "The 11th Forest — a top-down, anime-styled pixel art shooter built on Phaser 4 + React + Vite + TypeScript.",
   "version": "1.1.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/phaserjs/template-react-ts.git"
+    "url": "git+https://github.com/FireTable/the-11th-forest.git"
   },
-  "author": "Phaser Studio <support@phaser.io> (https://phaser.io/)",
+  "author": "Yongzhuo Liang <firetable@foxmail.com>",
   "license": "MIT",
   "licenseUrl": "http://www.opensource.org/licenses/mit-license.php",
   "bugs": {
-    "url": "https://github.com/phaserjs/template-react-ts/issues"
+    "url": "https://github.com/FireTable/the-11th-forest/issues"
   },
-  "homepage": "https://github.com/phaserjs/template-react-ts#readme",
+  "homepage": "https://github.com/FireTable/the-11th-forest#readme",
   "keywords": [
     "phaser",
-    "phaser3",
+    "phaser4",
     "react",
     "vite",
     "typescript"
