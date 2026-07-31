@@ -42,11 +42,15 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
         throw new Error('Phaser game not initialised — setPhaserGame never called');
     }
 
-    // Stop every active scene (calls shutdown() on each). Running scenes
-    // by themselves so paused/menu ones are left alone.
+    // Stop + REMOVE every active scene before adding the new one.
+    // `scene.stop()` alone keeps the scene registered with its key, so
+    // a subsequent `scene.add()` with the same key throws "duplicate
+    // key". `scene.remove(key)` calls destroy() and frees the slot.
     const active = game.scene.getScenes(true);
     for (const s of active) {
+        const key = s.scene.key;
         s.scene.stop();
+        game.scene.remove(key);
     }
 
     // Dynamic import so the editor's restart path doesn't pull in Phaser
