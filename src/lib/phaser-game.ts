@@ -16,6 +16,7 @@
  * us pass a freshly-resolved scene spec bundle.
  */
 
+import { LoadingScene } from '@/game/scenes/loading-scene';
 import { resolveScene, type ResolvedScene } from '@/game/resolve-scene';
 
 let game: Phaser.Game | null = null;
@@ -29,9 +30,15 @@ export function getPhaserGame(): Phaser.Game | null {
 }
 
 /**
- * Stop every running scene and start a fresh LoadScene for `newId`.
- * Caller has already saved any pending edits — this is the final step
- * after the user clicks "Jump to scene".
+ * Stop the dead LoadScene and re-launch LoadingScene, which sees all
+ * assets already cached and fires `complete` immediately, then adds a
+ * fresh LoadScene with full HP.
+ *
+ * We deliberately do NOT `scene.remove()` the LoadingScene instance:
+ * in production builds removing it appears to evict the texture cache
+ * (texture missing → black background + invisible character), even
+ * though the docs say the cache is game-scoped. Re-starting the
+ * existing LoadingScene avoids touching its lifecycle state.
  *
  * @param resolved Pre-fetched scene bundle. Caller (the API endpoint)
  *                 computes this so the UI shows a loading state while
@@ -42,40 +49,26 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
         throw new Error('Phaser game not initialised — setPhaserGame never called');
     }
 
-    // Stop + REMOVE every LoadScene / LoadingScene before adding the new one.
-    // `scene.stop()` alone keeps the scene registered with its key, so a
-    // subsequent `scene.add()` with the same key throws "duplicate key".
-    // `scene.remove(key)` destroys the instance and frees the slot.
-    //
-    // `getScenes(true)` only returns RUNNING scenes — but the dead-state
-    // LoadScene is PAUSED, so we'd miss it. `getScenes(false)` returns
-    // every scene still registered with the manager, paused/stopped too.
-    const allScenes = game.scene.getScenes(false);
-    for (const s of allScenes) {
-        const key = s.scene.key;
-        if (key.startsWith('LoadScene:') || key === 'LoadingScene') {
-            s.scene.stop();
-            game.scene.remove(key);
-        }
+    // Stop + remove only the dead LoadScene (paused). LoadingScene stays
+    // registered so its already-cached texture references survive.
+    const deadKey = `LoadScene:${resolved.id}`;
+    const dead = game.scene.getScene(deadKey);
+    if (dead) {
+        dead.scene.stop();
+        game.scene.remove(deadKey);
     }
 
-    // Dynamic import so the editor's restart path doesn't pull in Phaser
-    // scene code into its lazy chunk.
-    const { LoadScene } = await import('@/game/scenes/scene');
-    game.scene.add(
-        `LoadScene:${resolved.id}`,
-        new LoadScene(resolved.id, resolved.level, {
-            weapons: resolved.weapons,
-            weaponsById: resolved.weaponsById,
-            character: resolved.character,
-            spriteCell: resolved.spriteCell,
-            monsterSpecs: resolved.monsters,
-            dropSpecs: resolved.drops,
-            sfxSpecs: resolved.sfx,
-            musicSpecs: resolved.music,
-        }),
-        true,
-    );
+    // Re-launch the existing LoadingScene. Its queueAssets() re-adds
+    // already-cached assets, the loader fires 'complete' immediately,
+    // and the on-complete handler adds a fresh LoadScene with full HP.
+    const loader = game.scene.getScene('LoadingScene');
+    if (loader) {
+        loader.scene.start();
+    } else {
+        // LoadingScene was somehow never registered — bootstrap a fresh
+        // one. Shouldn't happen on a normal boot path.
+        game.scene.add('LoadingScene', new LoadingScene(), true);
+    }
 }
 
 /**
