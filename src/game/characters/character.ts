@@ -164,16 +164,16 @@ export function loadCharacter(
     debugBodyRect.setStrokeStyle(1.5, 0x22c55e, 0.9);
     debugBodyRect.setVisible(false);
 
-    // Visual: debug hitbox rectangle (purple outline) matching full Sprite
+    // Visual: debug hitbox rectangle (red outline) matching full Sprite
     const debugHitboxRect = scene.add.rectangle(
         spawnX,
         spawnY - spec.body.halfH,
         spec.body.halfW * 2,
         spec.body.halfH * 2,
-        0xa855f7,
+        0xef4444,
         0.25,
     );
-    debugHitboxRect.setStrokeStyle(1.5, 0xa855f7, 0.9);
+    debugHitboxRect.setStrokeStyle(1.5, 0xef4444, 0.9);
     debugHitboxRect.setVisible(false);
 
     // Visual: shadow under feet based on spec.body halfW / halfH

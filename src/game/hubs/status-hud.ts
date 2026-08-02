@@ -61,6 +61,7 @@ export interface StatusHudState {
     dodgeActive?: boolean;
     dodgeCooldownStartedAt?: number;
     dodgeCooldownTimeMs?: number;
+    barWidth?: number;
 }
 
 interface FloatingText {
@@ -109,10 +110,10 @@ export class StatusHud extends BaseHud {
         this.nameLabel = scene.add
             .text(0, -2, '', {
                 fontFamily: 'monospace',
-                fontSize: '10px',
+                fontSize: '11px',
                 color: '#ffffff',
                 stroke: '#000000',
-                strokeThickness: 4,
+                strokeThickness: 2,
                 shadow: {
                     offsetX: 1,
                     offsetY: 1,
@@ -122,6 +123,7 @@ export class StatusHud extends BaseHud {
                     fill: true,
                 },
             })
+            .setResolution(2)
             .setOrigin(0.5, 1);
         this.root.add(this.nameLabel);
 
@@ -131,8 +133,9 @@ export class StatusHud extends BaseHud {
                 fontSize: HUD_FONT_LABEL,
                 color: HUD_STATUS_LABEL_COLOR,
                 stroke: '#000000',
-                strokeThickness: 3,
+                strokeThickness: 2,
             })
+            .setResolution(2)
             .setOrigin(0.5, 1);
         this.root.add(this.label);
     }
@@ -186,7 +189,7 @@ export class StatusHud extends BaseHud {
      */
     update(state: StatusHudState, time: number, topOffset: number): void {
         const pos = this.body.position;
-        const BAR_W = HUD_STATUS_BAR_W;
+        const BAR_W = state.barWidth ?? HUD_STATUS_BAR_W;
         const BAR_H = 6;
         const SP_BAR_H = 2;
         const RADIUS = 2;
@@ -225,10 +228,10 @@ export class StatusHud extends BaseHud {
             );
         }
 
-        // 2. Draw Name Label (Positioned cleanly above the status bar)
+        // 2. Draw Name Label (Positioned cleanly 2px above the HP bar top)
         if (state.name) {
             this.nameLabel.setText(state.name);
-            this.nameLabel.setPosition(cx, cy - 3);
+            this.nameLabel.setPosition(cx, cy - 2);
             this.nameLabel.setVisible(true);
         } else {
             this.nameLabel.setVisible(false);

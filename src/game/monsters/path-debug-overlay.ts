@@ -71,10 +71,6 @@ export function createPathDebugOverlay(
                     gridGfx.fillRect(x, y, cellSize, cellSize);
                     gridGfx.lineStyle(1, 0xef4444, 0.6);
                     gridGfx.strokeRect(x, y, cellSize, cellSize);
-                } else if (cell === 2) {
-                    // Buffer zone — amber
-                    gridGfx.fillStyle(0xf59e0b, 0.18);
-                    gridGfx.fillRect(x, y, cellSize, cellSize);
                 }
             }
         }

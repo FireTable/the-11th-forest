@@ -133,7 +133,7 @@ export class PathfindingService {
     private getEasystarForInflation(inflation: number): EasyStarInstance {
         const cached = this.inflatedEasystars.get(inflation);
         if (cached) return cached;
-        const derived = this.inflateGrid(inflation);
+        const derived = this.inflateGrid(Math.max(1, inflation));
         const es = new EasyStarCtor();
         es.enableSync();
         es.enableDiagonals();
@@ -144,16 +144,11 @@ export class PathfindingService {
         return es;
     }
 
-    /** Return a fresh grid where each wall cell's `radius`-Chebyshev
-     *  neighbourhood is also marked as wall. Caller passes the result
-     *  to a new easystar instance (or caches it). */
+    /** Return grid where wall cells and body-inflation margin are marked as wall (1). */
     private inflateGrid(radius: number): number[][] {
         const out: number[][] = Array.from({ length: this.gridHeight }, (_, gy) =>
             Array.from({ length: this.gridWidth }, (_, gx) => {
                 if (this.grid[gy][gx] === 1) return 1;
-                // Stay 0 unless a wall is within `radius` Chebyshev
-                // distance — cheap O(n·r²) loop, fine for the small
-                // grids we have.
                 for (let dy = -radius; dy <= radius; dy++) {
                     for (let dx = -radius; dx <= radius; dx++) {
                         if (dx === 0 && dy === 0) continue;
@@ -263,7 +258,10 @@ export class PathfindingService {
     }
 
     /** Smooths raw A* path by skipping intermediate waypoints using line-of-sight raycasts. */
-    private smoothPath(rawPath: { x: number; y: number }[]): { x: number; y: number }[] {
+    private smoothPath(
+        rawPath: { x: number; y: number }[],
+        bodyRadius = 18,
+    ): { x: number; y: number }[] {
         if (rawPath.length <= 2) return rawPath;
 
         const smoothed: { x: number; y: number }[] = [rawPath[0]];
@@ -271,9 +269,8 @@ export class PathfindingService {
 
         while (curr < rawPath.length - 1) {
             let next = rawPath.length - 1;
-            // Look ahead for the farthest reachable waypoint with clear line of sight
             while (next > curr + 1) {
-                if (this.hasLineOfSight(rawPath[curr], rawPath[next])) {
+                if (this.hasLineOfSight(rawPath[curr], rawPath[next], bodyRadius)) {
                     break;
                 }
                 next--;
@@ -382,16 +379,7 @@ export class PathfindingService {
      */
     skipBufferZoneWaypoints(path: readonly { x: number; y: number }[], startIdx: number): number {
         if (!path || path.length === 0) return 0;
-        let idx = Math.max(0, Math.min(path.length - 1, startIdx));
-        while (idx < path.length - 1) {
-            const g = this.worldToGrid(path[idx]);
-            // grid === 1 (solid) can't happen here — findPath never
-            // returns it — but defending against it keeps a future
-            // refactor cheap.
-            if (this.grid[g.y][g.x] !== 2) return idx;
-            idx++;
-        }
-        return idx;
+        return Math.max(0, Math.min(path.length - 1, startIdx));
     }
 
     /**
@@ -409,31 +397,11 @@ export class PathfindingService {
         end: { x: number; y: number },
         bodyHalfW = 0,
         bodyHalfH = 0,
-        safety = 1.0,
+        _safety = 1.0,
     ): { x: number; y: number }[] | null {
-        // Try a series of inflation radii, starting at the body's safe
-        // value and shrinking if the inflated grid can't reach the
-        // target (e.g. a corridor narrower than 2 * inflation). Each
-        // shrink brings us closer to the wall — but never below 0
-        // (no inflation, just walls). Falls back to a straight line
-        // if even inflation=0 can't connect.
-        const idealInflation = Math.max(
-            0,
-            Math.ceil((Math.max(bodyHalfW, bodyHalfH) * 2 * safety) / this.cellSize),
-        );
-        for (let inflation = idealInflation; inflation >= 0; inflation--) {
-            const result = this.findPathWithInflation(
-                start,
-                end,
-                bodyHalfW,
-                bodyHalfH,
-                inflation,
-            );
-            if (result !== null) return result;
-        }
-        // Last resort: straight line to target. The collisionstart
-        // escape will keep the monster from wedging itself when it
-        // hits a wall on the way.
+        // Set inflation = 0 for 100% flush wall alignment (green body box touches wall edge)
+        const result = this.findPathWithInflation(start, end, bodyHalfW, bodyHalfH, 0);
+        if (result !== null) return result;
         return [start, end];
     }
 
@@ -456,12 +424,6 @@ export class PathfindingService {
             return [end];
         }
 
-        // Fast path: LoS uses the inflated grid so we don't return a
-        // straight line that grazes a wall the body can't fit through.
-        if (this.hasLineOfSightGrid(startG, endG, inflation)) {
-            return [start, end];
-        }
-
         const es = this.getEasystarForInflation(inflation);
         let result: { x: number; y: number }[] | null = null;
         let found = false;
@@ -472,23 +434,10 @@ export class PathfindingService {
             endG.y,
             (path: { x: number; y: number }[]) => {
                 if (!path || path.length === 0) return;
-                const worldPoints = path.map((p) => this.gridToWorld(p));
+                const worldPoints = path.map((p) => this.gridToWorldFlush(p, bodyHalfW, bodyHalfH));
                 worldPoints[0] = start;
-                const smoothed = this.smoothPath(worldPoints);
-                // Shift every interior waypoint BACKWARDS along the
-                // chase direction by body half-extent. A* grid centres describe
-                // "where the path point is"; for a body of half-extent
-                // H, the FEET sit H below the body centre. We start
-                // the path at the foot (mp + halfH) and want every
-                // waypoint to live in the same foot coord convention
-                // — so shift every interior waypoint FORWARD by H
-                // along the bisector of its incoming and outgoing
-                // segments. The body centre then sits halfH BEHIND
-                // the waypoint, with the body extending forward by
-                // halfH into the next cell. Walls stay clear because
-                // the inflated grid already excludes them.
-                const shift = Math.max(bodyHalfW, bodyHalfH);
-                result = this.shiftWaypointsBack(smoothed, shift);
+                const bodyRadius = Math.max(bodyHalfW, bodyHalfH);
+                result = this.smoothPath(worldPoints, bodyRadius);
                 found = true;
             },
         );
@@ -496,55 +445,39 @@ export class PathfindingService {
         return found ? result : null;
     }
 
-    /** Shift each interior waypoint backwards along the chase
-     *  direction by `shift` world units. First and last waypoints
-     *  stay put (those are the start / goal positions the monster
-     *  has to reach exactly). */
-    private shiftWaypointsBack(
-        path: { x: number; y: number }[],
-        shift: number,
-    ): { x: number; y: number }[] {
-        if (path.length <= 2 || shift <= 0) return path;
-        const out: { x: number; y: number }[] = [path[0]];
-        for (let i = 1; i < path.length - 1; i++) {
-            const prev = path[i - 1];
-            const curr = path[i];
-            const next = path[i + 1];
-            // Direction: average of "back" (curr → prev) and "forward"
-            // (curr → next) so a sharp bend doesn't pick the wrong
-            // way. When one direction is zero-length, fall back to
-            // the other.
-            let dxB = prev.x - curr.x;
-            let dyB = prev.y - curr.y;
-            let lenB = Math.hypot(dxB, dyB);
-            let dxF = next.x - curr.x;
-            let dyF = next.y - curr.y;
-            let lenF = Math.hypot(dxF, dyF);
-            if (lenB === 0 && lenF === 0) {
-                out.push(curr);
-                continue;
-            }
-            // Sum the two unit vectors, normalised. If both contribute,
-            // the result is the bisector; if only one, that's the
-            // direction.
-            const ux = (lenB > 0 ? dxB / lenB : 0) + (lenF > 0 ? dxF / lenF : 0);
-            const uy = (lenB > 0 ? dyB / lenB : 0) + (lenF > 0 ? dyF / lenF : 0);
-            const ulen = Math.hypot(ux, uy);
-            if (ulen === 0) {
-                out.push(curr);
-                continue;
-            }
-            // Shift FORWARD by `shift` (foot coord convention —
-            // start point is at the monster's foot, waypoints should
-            // be too).
-            out.push({
-                x: curr.x + (ux / ulen) * shift,
-                y: curr.y + (uy / ulen) * shift,
-            });
+    /** Convert grid cell to world coordinate adjusted flush to adjacent wall edges (zero gap, zero overlap). */
+    private gridToWorldFlush(
+        gridPos: PathGridPoint,
+        bodyHalfW: number,
+        bodyHalfH: number,
+    ): { x: number; y: number } {
+        let x = gridPos.x * this.cellSize + this.cellSize / 2;
+        let y = gridPos.y * this.cellSize + this.cellSize / 2;
+
+        if (bodyHalfW <= 0 && bodyHalfH <= 0) return { x, y };
+
+        // Align X flush with right wall
+        if (this.grid[gridPos.y]?.[gridPos.x + 1] === 1) {
+            x = (gridPos.x + 1) * this.cellSize - bodyHalfW;
         }
-        out.push(path[path.length - 1]);
-        return out;
+        // Align X flush with left wall
+        else if (this.grid[gridPos.y]?.[gridPos.x - 1] === 1) {
+            x = gridPos.x * this.cellSize + bodyHalfW;
+        }
+
+        // Align Y flush with bottom wall
+        if (this.grid[gridPos.y + 1]?.[gridPos.x] === 1) {
+            y = (gridPos.y + 1) * this.cellSize - bodyHalfH;
+        }
+        // Align Y flush with top wall
+        else if (this.grid[gridPos.y - 1]?.[gridPos.x] === 1) {
+            y = gridPos.y * this.cellSize + bodyHalfH;
+        }
+
+        return { x, y };
     }
+
+
 
     /** If a grid cell sits on an inflated wall, walk outward to the nearest
      *  non-wall cell in the same inflation's grid. Prevents null results
@@ -583,38 +516,7 @@ export class PathfindingService {
         return start;
     }
 
-    /** Cheap grid LoS using the inflated grid. Bresenham-ish: walk
-     *  start → end and check every cell on the way. */
-    private hasLineOfSightGrid(
-        a: PathGridPoint,
-        b: PathGridPoint,
-        inflation: number,
-    ): boolean {
-        const inflated = this.inflateGrid(inflation);
-        const dx = Math.abs(b.x - a.x);
-        const dy = Math.abs(b.y - a.y);
-        const sx = a.x < b.x ? 1 : -1;
-        const sy = a.y < b.y ? 1 : -1;
-        let err = dx - dy;
-        let x = a.x;
-        let y = a.y;
-        const w = inflated[0]?.length ?? 0;
-        const h = inflated.length;
-        while (true) {
-            if (x < 0 || x >= w || y < 0 || y >= h) return false;
-            if (inflated[y][x] === 1) return false;
-            if (x === b.x && y === b.y) return true;
-            const e2 = 2 * err;
-            if (e2 > -dy) {
-                err -= dy;
-                x += sx;
-            }
-            if (e2 < dx) {
-                err += dx;
-                y += sy;
-            }
-        }
-    }
+
 
     /** Simple Point-in-Polygon check (Ray casting). */
     private pointInPolygon(px: number, py: number, poly: readonly [number, number][]): boolean {

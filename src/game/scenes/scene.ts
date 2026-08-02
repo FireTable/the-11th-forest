@@ -267,7 +267,7 @@ export class LoadScene extends Phaser.Scene {
                     a.label === 'player-bullet' ? a : b.label === 'player-bullet' ? b : null;
                 if (!bullet) continue;
                 const other = bullet === a ? b : a;
-                if (other.label !== 'monster') continue;
+                if (other.label !== 'monster' && other.label !== 'monster-hitbox') continue;
                 this.monsterSystem.applyBulletDamage(
                     this.character.weapons.getActive().damage,
                     other,
