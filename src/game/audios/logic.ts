@@ -29,6 +29,7 @@ import { EventBus } from '@/lib/events/bus';
 import type { MusicSpec, SfxSpec, SoundSpec } from '@/lib/audios';
 
 import { SfxThrottle } from './throttle';
+import { visibilityAction } from './visibility';
 
 const audioKey = (spec: SoundSpec): string => {
     if (spec.kind === 'sfx') return `sfx:${spec.id}`;
@@ -77,6 +78,23 @@ export class AudioController {
         }
 
         this.subscribe();
+
+        // Browsers auto-suspend the AudioContext on tab hidden. If we
+        // don't pause the sound manager in lockstep, samples accumulate
+        // and play all at once on return — a short, distorted burst
+        // over the music / ambient loops. See src/game/audios/visibility.ts.
+        const onVisibility = () => {
+            const action = visibilityAction(document.hidden);
+            if (action === 'pause') {
+                this.scene.sound.pauseAll();
+            } else {
+                this.scene.sound.resumeAll();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        this.unsubscribers.push(() =>
+            document.removeEventListener('visibilitychange', onVisibility),
+        );
     }
 
     /**

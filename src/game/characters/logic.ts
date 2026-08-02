@@ -40,6 +40,7 @@ import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
+import { useGameStore } from '@/store/game-store';
 
 import { animKey } from './keys';
 
@@ -333,6 +334,9 @@ export class CharacterController {
             const oldHp = this.hp;
             this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
             const actualDelta = this.hp - oldHp;
+            if (oldHp > 0 && this.hp === 0 && !hpBlocked) {
+                this.handleDeath();
+            }
             if (actualDelta !== 0 && this.parts.statusHud?.showFloatingNumber) {
                 this.parts.statusHud.showFloatingNumber(
                     actualDelta,
@@ -913,5 +917,22 @@ export class CharacterController {
             window.removeEventListener('pointermove', onWindowMove);
             window.removeEventListener('pointerleave', onLeave);
         });
+    }
+
+    /**
+     * React to HP reaching 0 from a positive value. Flips the UI store
+     * flag (the React <DeathOverlay> watches it) and pauses the Phaser
+     * scene so the world freezes while the player decides to restart.
+     *
+     * Restart is handled by React: the overlay button calls
+     * `restartSceneWith` with the cached ResolvedScene — the LoadScene
+     * constructor reseeds HP from the spec.
+     */
+    private handleDeath(): void {
+        useGameStore.getState().setDead(true);
+        EventBus.emit('player-died');
+        // Pause stops the matter physics step + animation ticks. The
+        // scene remains in memory; restart rebuilds it.
+        this.scene.scene.pause();
     }
 }
