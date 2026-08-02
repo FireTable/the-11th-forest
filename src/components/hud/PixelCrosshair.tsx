@@ -77,44 +77,49 @@ export const PixelCrosshair: React.FC = () => {
         };
     }, [rect]);
 
-    // Track the canvas's bounding rect. Phaser game creation is async —
-    // poll until `#game-container canvas` exists, then install the
-    // ResizeObserver + window listeners. Without polling, the mount-time
-    // querySelector returns null and `rect` stays null forever (and the
-    // crosshair never renders).
+    // Track the canvas's bounding rect. Phaser game creation is async:
+// `StartGame()` first awaits `resolveDefaultSceneId` + `resolveScene`
+// (HTTP round-trips) and only then constructs the `Phaser.Game` that
+// appends the canvas. In production those fetches can outlast a short
+// poll, leaving `rect` null forever — the crosshair then renders at the
+// 0,0 fallback and looks "missing" because it's pinned to the top-left
+// corner instead of the cursor. We use a MutationObserver on
+// `#game-container` so the wait is event-driven (zero polling) and has
+// no timeout — the canvas WILL appear eventually, even on cold prod
+// cache.
     useEffect(() => {
         let ro: ResizeObserver | null = null;
         let canvas: HTMLCanvasElement | null = null;
+        let observer: MutationObserver | null = null;
         const update = (): void => {
             if (!canvas) return;
             const r = canvas.getBoundingClientRect();
             setRect({ left: r.left, top: r.top, width: r.width, height: r.height });
         };
-        const install = (): void => {
+        const install = (): boolean => {
+            if (canvas) return true;
             canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
-            if (!canvas) return;
+            if (!canvas) return false;
             update();
             ro = new ResizeObserver(update);
             ro.observe(canvas);
             window.addEventListener('resize', update);
             window.visualViewport?.addEventListener('resize', update);
+            return true;
         };
-        install();
-        let ticks = 0;
-        const poll = window.setInterval(() => {
-            if (canvas) {
-                window.clearInterval(poll);
-                return;
+        // Synchronous first try — canvas may already exist if the game
+        // mounted before React painted this component.
+        if (!install()) {
+            const container = document.getElementById('game-container');
+            if (container) {
+                observer = new MutationObserver(() => {
+                    if (install()) observer?.disconnect();
+                });
+                observer.observe(container, { childList: true, subtree: true });
             }
-            ticks++;
-            if (ticks > 30) {
-                window.clearInterval(poll);
-                return;
-            }
-            install();
-        }, 16);
+        }
         return () => {
-            window.clearInterval(poll);
+            observer?.disconnect();
             ro?.disconnect();
             window.removeEventListener('resize', update);
             window.visualViewport?.removeEventListener('resize', update);
