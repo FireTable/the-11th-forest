@@ -63,6 +63,9 @@ export class AudioController {
     private currentMusicSpec?: MusicSpec;
     private readonly throttle = new SfxThrottle();
     private readonly unsubscribers: Array<() => void> = [];
+    /** Music id deferred until Phaser unlocks the AudioContext (first
+     *  user gesture). Cleared once played. */
+    private pendingMusic: string | null = null;
 
     constructor(scene: Phaser.Scene, sfxSpecs: Iterable<SfxSpec>, musicSpecs: Iterable<MusicSpec>) {
         this.scene = scene;
@@ -79,22 +82,52 @@ export class AudioController {
 
         this.subscribe();
 
-        // Browsers auto-suspend the AudioContext on tab hidden. If we
-        // don't pause the sound manager in lockstep, samples accumulate
-        // and play all at once on return — a short, distorted burst
-        // over the music / ambient loops. See src/game/audios/visibility.ts.
-        const onVisibility = () => {
-            const action = visibilityAction(document.hidden);
-            if (action === 'pause') {
-                this.scene.sound.pauseAll();
-            } else {
-                this.scene.sound.resumeAll();
-            }
+        // Browsers auto-suspend the AudioContext when the tab hides OR when
+        // the window blurs (e.g. Cmd+Tab to another app on macOS — the
+        // window stays visible but loses focus, so `visibilitychange`
+        // never fires; only `blur` does). `pauseAll` alone is not enough:
+        // gameplay scenes keep running their update loop, SFX requests
+        // keep flowing into the audio engine, and the queued samples all
+        // drain on resume — a short, distorted burst over the music /
+        // ambient loops.
+        //
+        // `game.pause()` is the right hammer: it sets `game.isPaused = true`
+        // and Phaser's Step returns early, so update/tween/timer/physics
+        // all freeze — no new SFX are emitted while the tab is hidden.
+        // We resume on tab return. No per-scene bookkeeping needed; the
+        // death path uses `scene.scene.pause()` (independent of
+        // `game.pause()`), so a dead LoadScene stays dead across a tab
+        // hide/show. See src/game/audios/visibility.ts.
+        const game = this.scene.game;
+        let stoppedByUs = false;
+        const stop = (): void => {
+            if (stoppedByUs) return;
+            stoppedByUs = true;
+            this.scene.sound.pauseAll();
+            if (!game.isPaused) game.pause();
         };
+        const start = (): void => {
+            if (!stoppedByUs) return;
+            stoppedByUs = false;
+            if (game.isPaused) game.resume();
+            this.scene.sound.resumeAll();
+        };
+        const onVisibility = () => {
+            if (visibilityAction(document.hidden) === 'pause') stop();
+            else start();
+        };
+        // Window blur covers Cmd+Tab to another app: the page stays
+        // visible but loses focus, so `visibilitychange` doesn't fire.
+        const onBlur = () => stop();
+        const onFocus = () => start();
         document.addEventListener('visibilitychange', onVisibility);
-        this.unsubscribers.push(() =>
-            document.removeEventListener('visibilitychange', onVisibility),
-        );
+        window.addEventListener('blur', onBlur);
+        window.addEventListener('focus', onFocus);
+        this.unsubscribers.push(() => {
+            document.removeEventListener('visibilitychange', onVisibility);
+            window.removeEventListener('blur', onBlur);
+            window.removeEventListener('focus', onFocus);
+        });
     }
 
     /**
@@ -140,6 +173,17 @@ export class AudioController {
         const key = audioKey(spec);
         if (!this.scene.cache.audio.exists(key)) return;
         if (this.currentMusicSpec?.id === id && this.currentMusic?.isPlaying) return;
+
+        // Browser autoplay policy keeps AudioContext suspended until the
+        // first user gesture. If we play now, the WebAudio source is
+        // scheduled but produces no audio — and `AudioBufferSourceNode`
+        // is one-shot, so resuming the context later won't replay it.
+        // Defer until Phaser emits UNLOCKED (fires after the user's
+        // first click/keypress unlocks the context).
+        if (this.scene.sound.locked) {
+            this.pendingMusic = id;
+            return;
+        }
 
         const next = this.scene.sound.add(key, {
             volume: 0,
@@ -241,5 +285,21 @@ export class AudioController {
         };
         EventBus.on('dev:cheat:muted', muteHandler);
         this.unsubscribers.push(() => EventBus.removeListener('dev:cheat:muted', muteHandler));
+
+        // Browser autoplay policy: AudioContext is suspended until the
+        // first user gesture. Phaser emits `UNLOCKED` once the context
+        // resumes — that's when we play the music that was queued by
+        // `playMusic` while `sound.locked` was true.
+        const unlockedHandler = () => {
+            if (this.pendingMusic !== null) {
+                const id = this.pendingMusic;
+                this.pendingMusic = null;
+                this.playMusic(id);
+            }
+        };
+        this.scene.sound.once(Phaser.Sound.Events.UNLOCKED, unlockedHandler);
+        this.unsubscribers.push(() =>
+            this.scene.sound.off(Phaser.Sound.Events.UNLOCKED, unlockedHandler),
+        );
     }
 }
