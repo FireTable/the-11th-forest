@@ -452,7 +452,11 @@ export class MonsterController {
             // automatically. Otherwise the path grazes the wall top
             // and the body bottom collides.
             const monsterBodyHalfH = m.spec.body.halfH;
-            const footPos = { x: mp.x, y: mp.y + monsterBodyHalfH };
+            const footY = Math.round(
+                mp.y + (m.sprite ? m.sprite.displayHeight / 2 - monsterBodyHalfH : 0),
+            );
+            const footX = mp.x;
+            const footPos = { x: footX, y: footY };
 
             // Per-monster Active Stuck Detector — 60ms window so escape fires
             // before the player sees a single bounce. Measures
@@ -723,11 +727,6 @@ export class MonsterController {
             }
 
             // ── Visual sync & animation ───────────────────────────────
-            const footY = Math.round(
-                mp.y + (m.sprite ? m.sprite.displayHeight / 2 - m.spec.body.halfH : 0),
-            );
-            const footX = mp.x;
-
             // Align feet shadow and green debug rect with actual feet position
             m.shadow.setPosition(footX, footY);
             m.shadow.setDepth(footY - 1);

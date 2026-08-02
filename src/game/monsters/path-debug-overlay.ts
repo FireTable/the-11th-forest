@@ -114,9 +114,19 @@ export function createPathDebugOverlay(
             // Waypoint dots
             for (let i = 0; i < path.length; i++) {
                 const wp = path[i];
+                const isStart = i === 0;
                 const isCurrent = i === idx;
-                pathGfx.fillStyle(isCurrent ? 0xfacc15 : 0x06b6d4, 0.9);
-                pathGfx.fillCircle(wp.x, wp.y, isCurrent ? 3 : 2);
+
+                if (isStart) {
+                    // Start point: prominent bright green dot with white border
+                    pathGfx.lineStyle(1.5, 0xffffff, 1.0);
+                    pathGfx.fillStyle(0x22c55e, 1.0);
+                    pathGfx.fillCircle(wp.x, wp.y, 5);
+                    pathGfx.strokeCircle(wp.x, wp.y, 5);
+                } else {
+                    pathGfx.fillStyle(isCurrent ? 0xfacc15 : 0x06b6d4, 0.9);
+                    pathGfx.fillCircle(wp.x, wp.y, isCurrent ? 4 : 2.5);
+                }
             }
             // Marker at monster's own position for context — show the actual
             // body rectangle so the player can see the gap between the

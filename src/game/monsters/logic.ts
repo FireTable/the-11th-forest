@@ -473,6 +473,7 @@ export class PathfindingService {
             (path: { x: number; y: number }[]) => {
                 if (!path || path.length === 0) return;
                 const worldPoints = path.map((p) => this.gridToWorld(p));
+                worldPoints[0] = start;
                 const smoothed = this.smoothPath(worldPoints);
                 // Shift every interior waypoint BACKWARDS along the
                 // chase direction by body half-extent. A* grid centres describe

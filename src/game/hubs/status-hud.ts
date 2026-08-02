@@ -83,7 +83,7 @@ export class StatusHud extends BaseHud {
     private floatingTexts: FloatingText[] = [];
 
     constructor(scene: Phaser.Scene, body: MatterJS.BodyType) {
-        super(scene, 0, 0, 1000);
+        super(scene, 0, 0, 9999);
         this.body = body;
 
         this.bg = scene.add.graphics();
