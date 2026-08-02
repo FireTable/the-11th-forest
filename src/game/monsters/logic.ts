@@ -8,10 +8,7 @@
 export type MonsterAIState = 'chase' | 'attack';
 
 /** Euclidean distance between two points. */
-export function distBetween(
-    a: { x: number; y: number },
-    b: { x: number; y: number },
-): number {
+export function distBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
     return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
@@ -84,9 +81,7 @@ export class PathfindingService {
         this.gridHeight = Math.ceil(levelSize.height / cellSize);
 
         // Initialize empty walkable grid
-        this.grid = Array.from({ length: this.gridHeight }, () =>
-            Array(this.gridWidth).fill(0),
-        );
+        this.grid = Array.from({ length: this.gridHeight }, () => Array(this.gridWidth).fill(0));
 
         // Rasterize air-wall polygons onto grid with boundary padding
         this.rasterizeAirWalls(airWalls);
@@ -109,7 +104,10 @@ export class PathfindingService {
     }
 
     /** Helper for single raycast check on grid. */
-    private checkSingleRay(start: { x: number; y: number }, end: { x: number; y: number }): boolean {
+    private checkSingleRay(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+    ): boolean {
         const p1 = this.worldToGrid(start);
         const p2 = this.worldToGrid(end);
 
@@ -145,7 +143,11 @@ export class PathfindingService {
     }
 
     /** Check line-of-sight raycast between two world positions with body corridor clearance. */
-    hasLineOfSight(start: { x: number; y: number }, end: { x: number; y: number }, bodyRadius = 10): boolean {
+    hasLineOfSight(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+        bodyRadius = 10,
+    ): boolean {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const len = Math.hypot(dx, dy);
@@ -193,6 +195,115 @@ export class PathfindingService {
         }
 
         return smoothed;
+    }
+
+    /**
+     * Pick a unit-vector direction that the monster can actually travel
+     * along without immediately running into a wall. Used by the
+     * stuck-recovery escape impulse.
+     *
+     * Strategy: probe 8 directions in order — first opposite to the
+     * nearest cardinal of `targetAway` (so the monster steps AWAY from
+     * the target on the assumption it overshot into a corner), then
+     * sweep clockwise from there. Return the first candidate whose
+     * 32-px probe point has a clear LoS from `from`.
+     *
+     * Pure: no side effects. Returns null if every direction is
+     * blocked (deep dead-end — caller should fall back to a different
+     * recovery path).
+     */
+    pickEscapeDirection(
+        from: { x: number; y: number },
+        targetAway?: { x: number; y: number },
+    ): { x: number; y: number } | null {
+        // Previous version raycast-probed 32 px in 8 directions. That
+        // failed on tight corners: cellSize is 16 px, monsters are
+        // 32-40 px wide, and the ray would land inside the monster's
+        // own body or in the next cell which is often a wall. Result:
+        // every direction rejected → null → fallback to the old
+        // constant angle → still ramming the wall.
+        //
+        // New approach: ask the GRID which of the 8 neighbours of the
+        // monster's current cell are walkable (grid !== 1). Pick the
+        // walkable neighbour that points MOST away from targetAway.
+        // This is a purely grid-level query — no raycast, no probe
+        // distance — so it succeeds as long as the monster has any
+        // open neighbour at all (which is always true outside a
+        // physical dead-end).
+        const g = this.worldToGrid(from);
+        const myCell = this.grid[g.y]?.[g.x];
+        // If the monster's own cell is solid (shouldn't happen but
+        // defends against a future refactor that lets A* spawn inside
+        // walls), bail out — caller falls back to the constant angle.
+        if (myCell === undefined || myCell === 1) return null;
+
+        // Bias order: start at the direction opposite targetAway,
+        // sweep clockwise. Same idea as before — pick the neighbour
+        // that heads "out of the corner" first.
+        const baseAngle = targetAway
+            ? Math.atan2(targetAway.y - from.y, targetAway.x - from.x) + Math.PI
+            : 0;
+
+        let best: { x: number; y: number } | null = null;
+        let bestScore = -Infinity;
+
+        for (let k = 0; k < 8; k++) {
+            const ang = baseAngle + (k / 8) * Math.PI * 2;
+            // Round to nearest of {-1, 0, 1} — explicit so the round
+            // never lands on ±2 when cos/sin drift past 0.5 in the
+            // wrong direction.
+            const stepX = Math.max(-1, Math.min(1, Math.round(Math.cos(ang))));
+            const stepY = Math.max(-1, Math.min(1, Math.round(Math.sin(ang))));
+            const nx = g.x + stepX;
+            const ny = g.y + stepY;
+            if (nx < 0 || nx >= this.gridWidth) continue;
+            if (ny < 0 || ny >= this.gridHeight) continue;
+            const cell = this.grid[ny][nx];
+            if (cell === 1) continue; // solid wall
+
+            // Score: how much this direction points away from
+            // targetAway. Higher = better. Using (1 - alignment)
+            // means cells directly opposite the target score ~2,
+            // perpendicular score ~1, toward-target score ~0.
+            const dirX = Math.cos(ang);
+            const dirY = Math.sin(ang);
+            let score = 1;
+            if (targetAway) {
+                const tx = targetAway.x - from.x;
+                const ty = targetAway.y - from.y;
+                const tlen = Math.hypot(tx, ty);
+                if (tlen > 0) {
+                    const alignment = (dirX * tx + dirY * ty) / tlen;
+                    score = 1 - alignment; // [-1..2]
+                }
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                best = { x: dirX, y: dirY };
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Skip leading waypoints that sit in the 1-cell buffer zone
+     * (grid === 2). The first chase step heading along the A* path
+     * shouldn't be a buffer-zone waypoint hugging the wall — that's
+     * exactly what makes a monster grind along a wall edge. Pure:
+     * returns the new index, clamped to the last waypoint.
+     */
+    skipBufferZoneWaypoints(path: readonly { x: number; y: number }[], startIdx: number): number {
+        if (!path || path.length === 0) return 0;
+        let idx = Math.max(0, Math.min(path.length - 1, startIdx));
+        while (idx < path.length - 1) {
+            const g = this.worldToGrid(path[idx]);
+            // grid === 1 (solid) can't happen here — findPath never
+            // returns it — but defending against it keeps a future
+            // refactor cheap.
+            if (this.grid[g.y][g.x] !== 2) return idx;
+            idx++;
+        }
+        return idx;
     }
 
     /** Synchronous pure A* pathfinding with string-pulling smoothing. Returns world positions or null. */
@@ -323,11 +434,11 @@ export class PathfindingService {
     private pointInPolygon(px: number, py: number, poly: readonly [number, number][]): boolean {
         let inside = false;
         for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-            const xi = poly[i][0], yi = poly[i][1];
-            const xj = poly[j][0], yj = poly[j][1];
-            const intersect =
-                yi > py !== yj > py &&
-                px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+            const xi = poly[i][0],
+                yi = poly[i][1];
+            const xj = poly[j][0],
+                yj = poly[j][1];
+            const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
             if (intersect) inside = !inside;
         }
         return inside;
@@ -399,11 +510,9 @@ export class PathfindingService {
  * Caller pre-filters by kind if needed (e.g. melee-only for contact damage).
  * Pure: returns null if nothing matches.
  */
-export function pickClosestMonster<M extends { dead: boolean; body: { position: { x: number; y: number } } }>(
-    point: { x: number; y: number },
-    monsters: readonly M[],
-    maxDist: number,
-): M | null {
+export function pickClosestMonster<
+    M extends { dead: boolean; body: { position: { x: number; y: number } } },
+>(point: { x: number; y: number }, monsters: readonly M[], maxDist: number): M | null {
     let best: M | null = null;
     let bestDistSq = maxDist * maxDist;
     for (const m of monsters) {
@@ -423,12 +532,9 @@ export function pickClosestMonster<M extends { dead: boolean; body: { position: 
 /**
  * Calculate separation (repulsion) vector to prevent monsters from stacking or blocking each other.
  */
-export function calcSeparationForce<M extends { dead: boolean; body: { position: { x: number; y: number } } }>(
-    current: M,
-    allMonsters: readonly M[],
-    radius = 32,
-    maxForce = 1.0,
-): { x: number; y: number } {
+export function calcSeparationForce<
+    M extends { dead: boolean; body: { position: { x: number; y: number } } },
+>(current: M, allMonsters: readonly M[], radius = 32, maxForce = 1.0): { x: number; y: number } {
     if (current.dead) return { x: 0, y: 0 };
     const myPos = current.body.position;
     let pushX = 0;
@@ -465,7 +571,11 @@ export function calcSeparationForce<M extends { dead: boolean; body: { position:
 /**
  * Calculate surround slot position around player for a monster index to avoid single-file bottlenecks.
  */
-export function getSurroundOffset(monsterIndex: number, totalMonsters: number, radius = 28): { x: number; y: number } {
+export function getSurroundOffset(
+    monsterIndex: number,
+    totalMonsters: number,
+    radius = 28,
+): { x: number; y: number } {
     if (totalMonsters <= 1) return { x: 0, y: 0 };
     const angle = (monsterIndex / totalMonsters) * Math.PI * 2;
     return {
@@ -485,7 +595,8 @@ export function getPathLookAheadPoint(
     checkLoS?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => boolean,
 ): { target: { x: number; y: number }; nextIdx: number } {
     if (!path || path.length === 0) return { target: currentPos, nextIdx: currentIdx };
-    if (currentIdx >= path.length) return { target: path[path.length - 1], nextIdx: path.length - 1 };
+    if (currentIdx >= path.length)
+        return { target: path[path.length - 1], nextIdx: path.length - 1 };
 
     let idx = currentIdx;
     while (idx < path.length - 1 && distBetween(currentPos, path[idx]) < 12) {
