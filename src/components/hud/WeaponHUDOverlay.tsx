@@ -55,11 +55,10 @@ export const WeaponHUDOverlay: React.FC = () => {
                             }}
                             aria-label={`Switch to ${slot.name}`}
                             data-testid={`weapon-slot-${index}`}
-                            className={`relative flex items-center justify-center border-2 transition-all active:scale-95 pointer-events-auto ${
-                                isActive
-                                    ? 'bg-amber-950/90 border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
-                                    : 'bg-stone-950/70 border-stone-700 hover:border-amber-700/60'
-                            }`}
+                            className={`relative flex items-center justify-center border-2 transition-all active:scale-95 pointer-events-auto ${isActive
+                                ? 'bg-amber-950/90 border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
+                                : 'bg-stone-950/70 border-stone-700 hover:border-amber-700/60'
+                                }`}
                             style={{ width: SLOT_PX, height: SLOT_PX }}
                         >
                             {slot.texture ? (
@@ -77,22 +76,20 @@ export const WeaponHUDOverlay: React.FC = () => {
                             )}
                             {/* Index badge — top-left corner */}
                             <span
-                                className={`absolute top-0 left-0 px-1 text-[9px] font-bold leading-none ${
-                                    isActive
-                                        ? 'bg-amber-400 text-black'
-                                        : 'bg-stone-800 text-stone-400'
-                                }`}
+                                className={`absolute top-0 left-0 px-1 text-[9px] font-bold leading-none ${isActive
+                                    ? 'bg-amber-400 text-black'
+                                    : 'bg-stone-800 text-stone-400'
+                                    }`}
                             >
                                 {index + 1}
                             </span>
                             {/* Ammo badge — bottom-right corner */}
                             {slot.clipSize > 1 && (
                                 <span
-                                    className={`absolute bottom-0 right-0 px-1 text-[9px] font-bold font-mono leading-none border ${
-                                        isActive
-                                            ? 'bg-black/85 text-amber-300 border-amber-700'
-                                            : 'bg-black/70 text-stone-400 border-stone-700'
-                                    }`}
+                                    className={`absolute bottom-0 right-0 px-1 text-[9px] font-bold font-mono leading-none border ${isActive
+                                        ? 'bg-black/85 text-amber-300 border-amber-700'
+                                        : 'bg-black/70 text-stone-400 border-stone-700'
+                                        }`}
                                 >
                                     {String(slot.ammo).padStart(2, '0')}
                                 </span>
@@ -143,11 +140,10 @@ export const WeaponHUDOverlay: React.FC = () => {
                             }}
                             aria-label={`Switch to ${slot.name}`}
                             data-testid={`desktop-weapon-slot-${index}`}
-                            className={`relative border-2 transition-all duration-150 pointer-events-auto cursor-pointer backdrop-blur-sm h-[64px] overflow-hidden ${
-                                isActive
-                                    ? 'bg-amber-950/85 border-amber-400 shadow-[0_4px_12px_rgba(0,0,0,0.45),inset_0_0_8px_rgba(245,158,11,0.4)]'
-                                    : 'bg-black/55 border-stone-800 text-stone-400 shadow-[0_2px_8px_rgba(0,0,0,0.45)] hover:border-amber-700/60 hover:text-amber-200/80'
-                            }`}
+                            className={`relative border-2 transition-all duration-150 pointer-events-auto cursor-pointer backdrop-blur-sm h-[64px] overflow-hidden ${isActive
+                                ? 'bg-amber-950/85 border-amber-400 shadow-[0_4px_12px_rgba(0,0,0,0.45),inset_0_0_8px_rgba(245,158,11,0.4)]'
+                                : 'bg-black/55 border-stone-800 text-stone-400 shadow-[0_2px_8px_rgba(0,0,0,0.45)] hover:border-amber-700/60 hover:text-amber-200/80'
+                                }`}
                         >
                             {/* 4 Retro Corner Pixels — this card IS the box. */}
                             <span className="absolute -top-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
@@ -157,11 +153,10 @@ export const WeaponHUDOverlay: React.FC = () => {
 
                             {/* Hotkey badge — top-left of card */}
                             <span
-                                className={`absolute top-0 left-0 px-1 text-[9px] font-bold leading-none z-10 ${
-                                    isActive
-                                        ? 'bg-amber-400 text-black'
-                                        : 'bg-stone-800 text-stone-400'
-                                }`}
+                                className={`absolute top-0 left-0 px-1 text-[9px] font-bold leading-none z-10 ${isActive
+                                    ? 'bg-amber-400 text-black'
+                                    : 'bg-stone-800 text-stone-400'
+                                    }`}
                             >
                                 {index + 1}
                             </span>
@@ -173,17 +168,12 @@ export const WeaponHUDOverlay: React.FC = () => {
                              *  Stats text above (z-10) sits on top and stays
                              *  readable regardless of weapon image. */}
                             {slot.texture ? (
-                                <span
-                                    aria-hidden
-                                    className="absolute right-2 bottom-1 w-[68px] h-[68px] pointer-events-none"
-                                    style={{
-                                        backgroundImage: `url(${slot.texture})`,
-                                        backgroundSize: 'contain',
-                                        backgroundPosition: 'right bottom',
-                                        backgroundRepeat: 'no-repeat',
-                                        imageRendering: 'pixelated',
-                                        opacity: isActive ? 1 : 0.7,
-                                    }}
+                                <img
+                                    src={slot.texture}
+                                    alt={slot.name}
+                                    draggable={false}
+                                    className="absolute right-2 bottom-1 w-[68px] h-[68px] object-contain pointer-events-none"
+                                    style={{ imageRendering: 'pixelated' }}
                                 />
                             ) : (
                                 // Melee weapons (e.g. drone-claws) may not
@@ -200,17 +190,15 @@ export const WeaponHUDOverlay: React.FC = () => {
                             <div className="absolute inset-0 flex flex-col justify-center pl-3.5 pr-[80px] py-2 gap-1.5 pointer-events-none">
                                 <div className="flex items-baseline gap-2 min-w-0">
                                     <span
-                                        className={`text-[11px] font-bold tracking-wide uppercase truncate ${
-                                            isActive ? 'text-amber-200' : 'text-stone-500'
-                                        }`}
+                                        className={`text-[11px] font-bold tracking-wide uppercase truncate ${isActive ? 'text-amber-200' : 'text-stone-500'
+                                            }`}
                                         title={slot.name}
                                     >
                                         {slot.name}
                                     </span>
                                     <span
-                                        className={`text-[12px] font-mono leading-none tabular-nums whitespace-nowrap shrink-0 ${
-                                            isActive ? 'text-amber-300' : 'text-stone-400'
-                                        }`}
+                                        className={`text-[12px] font-mono leading-none tabular-nums whitespace-nowrap shrink-0 ${isActive ? 'text-amber-300' : 'text-stone-400'
+                                            }`}
                                     >
                                         {String(slot.ammo).padStart(2, '0')}
                                         <span className="text-stone-500"> / </span>
@@ -219,9 +207,8 @@ export const WeaponHUDOverlay: React.FC = () => {
                                 </div>
                                 <div className="h-1 w-full bg-stone-900/80 border border-stone-700">
                                     <div
-                                        className={`h-full ${
-                                            isActive ? 'bg-amber-400' : 'bg-stone-600'
-                                        }`}
+                                        className={`h-full ${isActive ? 'bg-amber-400' : 'bg-stone-600'
+                                            }`}
                                         style={{ width: `${ammoFrac}%` }}
                                     />
                                 </div>

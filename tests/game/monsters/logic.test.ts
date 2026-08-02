@@ -5,6 +5,7 @@ import {
     decideAIState,
     dirTo,
     distBetween,
+    isWaypointReached,
     pickClosestMonster,
     PathfindingService,
     calcSeparationForce,
@@ -136,6 +137,127 @@ describe('monsters/logic — PathfindingService', () => {
         // Clear path on same side of wall
         expect(pathfinder.hasLineOfSight({ x: 10, y: 10 }, { x: 20, y: 20 }, 0)).toBe(true);
     });
+
+    it('routes around the 1-cell buffer so the path never enters buffer cells', () => {
+        // Wall on the right at x=70..90, open field on the left.
+        // The buffer cell (5, 2) sits at x=50..60 (cellSize=10). Any
+        // cell whose neighbour is buffer or wall must NOT appear in
+        // the returned path.
+        const levelSize = { width: 100, height: 100 };
+        const airWalls = [
+            {
+                points: [
+                    [70, 0],
+                    [90, 0],
+                    [90, 40],
+                    [70, 40],
+                ] as [number, number][],
+            },
+        ];
+        const pathfinder = new PathfindingService(levelSize, airWalls, 10);
+        // Target sits inside the buffer cell — the path should still
+        // succeed via snapToWalkable and the buffer-aware A*.
+        const path = pathfinder.findPath(
+            { x: 10, y: 20 },
+            { x: 60, y: 20 },
+            10,
+            10,
+        );
+        expect(path).not.toBeNull();
+        // Path waypoints must never land on buffer or wall cells.
+        for (const wp of path!) {
+            const gx = Math.floor(wp.x / 10);
+            const gy = Math.floor(wp.y / 10);
+            expect(gx).toBeGreaterThanOrEqual(0);
+            expect(gx).toBeLessThan(10);
+            const cell = (pathfinder as unknown as { grid: number[][] }).grid[gy]?.[gx];
+            // 0 = walkable, 1 = wall, 2 = buffer
+            expect(cell).toBe(0);
+        }
+    });
+
+    it('advances past waypoints that sit inside the body box', () => {
+        // Open level, start near the monster so the first A* waypoint
+        // would land within halfH of the start point. The path should
+        // either skip past it or report it ≥ halfH away from the start.
+        const pathfinder = new PathfindingService(
+            { width: 100, height: 100 },
+            [],
+            10,
+        );
+        const path = pathfinder.findPath(
+            { x: 50, y: 50 },
+            { x: 90, y: 50 },
+            10,
+            10,
+        );
+        expect(path).not.toBeNull();
+        // First waypoint after start should be at least halfH away
+        // (the filter drops anything sitting inside the body box).
+        if (path!.length > 1) {
+            const first = path![1];
+            const d = Math.hypot(first.x - 50, first.y - 50);
+            expect(d).toBeGreaterThanOrEqual(10 - 1);
+        }
+    });
+});
+
+describe('monsters/logic — isWaypointReached', () => {
+    it('returns true when distance is within bodyHalf + breathing-room', () => {
+        // 10 ≤ 10 + 1 → reached
+        expect(isWaypointReached(10, 10, 1)).toBe(true);
+        // 12 > 10 + 1 → not reached
+        expect(isWaypointReached(12, 10, 1)).toBe(false);
+    });
+
+    it('returns false for far waypoints', () => {
+        expect(isWaypointReached(80, 10, 1)).toBe(false);
+    });
+
+    it('treats flushOffset as additive padding', () => {
+        // dist 12, half 10, offset 1 → 12 ≤ 11 = false
+        expect(isWaypointReached(12, 10, 1)).toBe(false);
+        // dist 12, half 10, offset 2 → 12 ≤ 12 = true
+        expect(isWaypointReached(12, 10, 2)).toBe(true);
+    });
+});
+
+describe('PathfindingService — isPositionInCorner', () => {
+    it('returns false on a fully open grid', () => {
+        const pf = new PathfindingService({ width: 64, height: 64 }, []);
+        expect(pf.isPositionInCorner({ x: 32, y: 32 })).toBe(false);
+    });
+
+    it('returns true when the cell has a wall neighbour', () => {
+        // 32x32 grid, cellSize=16 → 2x2 grid. Mark cell (1, 0) as
+        // wall — position (24, 8) sits in cell (1, 1) which is next
+        // to the wall, so the function reports corner.
+        const pf = new PathfindingService({ width: 32, height: 32 }, []);
+        for (let gy = 0; gy < pf['gridHeight']; gy++) {
+            for (let gx = 0; gx < pf['gridWidth']; gx++) {
+                if (gx === 1 && gy === 0) pf['grid'][gy][gx] = 1;
+            }
+        }
+        expect(pf.isPositionInCorner({ x: 24, y: 24 })).toBe(true);
+    });
+
+    it('returns true when the cell has a buffer neighbour', () => {
+        const pf = new PathfindingService({ width: 32, height: 32 }, []);
+        // Mark cell (0, 0) as wall — cell (1, 1) gets buffer in
+        // rasterization, but here we just stamp the buffer directly.
+        for (let gy = 0; gy < pf['gridHeight']; gy++) {
+            for (let gx = 0; gx < pf['gridWidth']; gx++) {
+                if (gx === 0 && gy === 0) pf['grid'][gy][gx] = 1;
+            }
+        }
+        // Manually mark cell (1, 1) as buffer to simulate the post-
+        // rasterize state.
+        pf['grid'][1][1] = 2;
+        // Position (24, 24) sits in cell (1, 1) — neighbour (0, 1)
+        // is 0 but neighbour (0, 0) is wall via Chebyshev. Even if we
+        // cleared that, a 2-neighbour should still trigger.
+        expect(pf.isPositionInCorner({ x: 24, y: 24 })).toBe(true);
+    });
 });
 
 describe('monsters/logic — Crowd AI & Flocking', () => {
@@ -263,55 +385,14 @@ describe('PathfindingService — pickEscapeDirection', () => {
     });
 });
 
-describe('PathfindingService — skipBufferZoneWaypoints', () => {
-    function mkGrid(budget: (gx: number, gy: number) => number): PathfindingService {
-        // Build a fresh PathfindingService whose grid we can mutate
-        // before exercising the pure skip function.
-        const pf = new PathfindingService({ width: 64, height: 64 }, []);
-        for (let gy = 0; gy < pf['gridHeight']; gy++) {
-            for (let gx = 0; gx < pf['gridWidth']; gx++) {
-                pf['grid'][gy][gx] = budget(gx, gy);
-            }
-        }
-        return pf;
-    }
+// skipBufferZoneWaypoints was collapsed to a clamp in the pathfinding
+// simplification pass — the buffer zone no longer drives waypoint
+// skipping because flush alignment handles it directly. The clamp
+// behaviour is exercised by every findPath test that consumes the
+// return value.
 
-    it('returns the first waypoint outside the buffer zone', () => {
-        // path = world points; the underlying grid marks cells (0,0)
-        // and (1,0) as buffer zone (2). The third waypoint's cell is
-        // walkable (0) — the function should return 2.
-        const pf = mkGrid((gx, gy) => (gy === 0 && gx <= 1 ? 2 : 0));
-        const path = [
-            { x: 8, y: 8 }, // cell (0,0) — buffer
-            { x: 24, y: 8 }, // cell (1,0) — buffer
-            { x: 40, y: 8 }, // cell (2,0) — walkable
-            { x: 56, y: 8 }, // cell (3,0) — walkable
-        ];
-        expect(pf.skipBufferZoneWaypoints(path, 0)).toBe(2);
-    });
-
-    it('returns startIdx when the leading waypoint is already walkable', () => {
-        const pf = mkGrid(() => 0);
-        const path = [
-            { x: 8, y: 8 },
-            { x: 24, y: 8 },
-            { x: 40, y: 8 },
-        ];
-        expect(pf.skipBufferZoneWaypoints(path, 0)).toBe(0);
-    });
-
-    it('clamps to last waypoint when the entire tail is buffer', () => {
-        const pf = mkGrid(() => 2);
-        const path = [
-            { x: 8, y: 8 },
-            { x: 24, y: 8 },
-            { x: 40, y: 8 },
-        ];
-        expect(pf.skipBufferZoneWaypoints(path, 0)).toBe(2);
-    });
-
-    it('handles empty / null-ish path', () => {
-        const pf = mkGrid(() => 0);
-        expect(pf.skipBufferZoneWaypoints([], 0)).toBe(0);
-    });
+describe('PathfindingService — steerAroundWall', () => {
+    // ponytail: removed — per-frame wall steering broke melee
+    // monsters that intentionally hug walls. Kept the describe block
+    // as a placeholder so future helpers can land here.
 });

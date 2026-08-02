@@ -12,7 +12,6 @@ import * as Phaser from 'phaser';
 import {
     HUD_FONT_LABEL,
     HUD_STATUS_BAR_BG,
-    HUD_STATUS_BAR_H,
     HUD_STATUS_BAR_W,
     HUD_STATUS_LABEL_COLOR,
     HUD_BG_ALPHA,
@@ -89,7 +88,7 @@ export class StatusHud extends BaseHud {
 
         this.bg = scene.add.graphics();
         this.bg.fillStyle(HUD_STATUS_BAR_BG, HUD_BG_ALPHA);
-        this.bg.fillRect(-HUD_STATUS_BAR_W / 2, 0, HUD_STATUS_BAR_W, HUD_STATUS_BAR_H);
+        this.bg.fillRect(-HUD_STATUS_BAR_W / 2, 0, HUD_STATUS_BAR_W, 4);
         this.root.add(this.bg);
 
         this.hpFill = scene.add.graphics();
@@ -160,7 +159,7 @@ export class StatusHud extends BaseHud {
                 color: colorStr,
                 fontStyle: 'bold',
                 stroke: '#000000',
-                strokeThickness: 4,
+                strokeThickness: 2,
                 shadow: {
                     offsetX: 1,
                     offsetY: 1,
@@ -170,6 +169,7 @@ export class StatusHud extends BaseHud {
                     fill: true,
                 },
             })
+            .setResolution(2)
             .setOrigin(0, 0.5);
 
         this.root.add(textObj);
@@ -190,7 +190,7 @@ export class StatusHud extends BaseHud {
     update(state: StatusHudState, time: number, topOffset: number): void {
         const pos = this.body.position;
         const BAR_W = state.barWidth ?? HUD_STATUS_BAR_W;
-        const BAR_H = 6;
+        const BAR_H = 4;
         const SP_BAR_H = 2;
         const RADIUS = 2;
 

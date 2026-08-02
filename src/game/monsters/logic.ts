@@ -65,6 +65,51 @@ export function decideAIState(dist: number, attackRange: number): MonsterAIState
     return dist <= attackRange ? 'attack' : 'chase';
 }
 
+/**
+ * Runtime check: has the monster reached the current waypoint? Pure
+ * helper so the controller and any future caller share the same
+ * threshold. `flushOffset` is the breathing room left between a
+ * flush waypoint and the wall (see gridToWorldSafe) — bumping the
+ * threshold by this amount prevents the monster from "arriving"
+ * at a waypoint that still sits inside its own body box.
+ */
+export function isWaypointReached(
+    distance: number,
+    bodyHalf: number,
+    flushOffset = 1,
+): boolean {
+    return distance <= bodyHalf + flushOffset;
+}
+
+/** Detect whether a world position sits in a tight corner — its grid
+ *  cell has a wall (1) or buffer (2) within 1 Chebyshev step in any
+ *  direction. Used by the wall-escape direction picker: in a corner
+ *  the next waypoint also hugs the wall, so aiming at it just drives
+ *  the monster deeper into the wall. Sliding perpendicular to the
+ *  wall normal is the right move instead. */
+export function isPositionInCorner(
+    worldPos: { x: number; y: number },
+    cellSize: number,
+    gridWidth: number,
+    gridHeight: number,
+    grid: readonly (readonly number[])[],
+): boolean {
+    const gx = Math.max(0, Math.min(gridWidth - 1, Math.floor(worldPos.x / cellSize)));
+    const gy = Math.max(0, Math.min(gridHeight - 1, Math.floor(worldPos.y / cellSize)));
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const ny = gy + dy;
+            const nx = gx + dx;
+            if (ny < 0 || ny >= gridHeight || nx < 0 || nx >= gridWidth) {
+                return true; // out-of-bounds counts as a wall
+            }
+            if (grid[ny][nx] !== 0) return true;
+        }
+    }
+    return false;
+}
+
 /** Velocity for chasing the player at a given move speed. */
 export function chaseVelocity(
     dirToPlayer: { x: number; y: number },
@@ -89,13 +134,12 @@ export class PathfindingService {
     private readonly gridWidth: number;
     private readonly gridHeight: number;
     private readonly cellSize: number;
-    /** Wall-only grid (1 = wall, 0 = walkable). The 1-cell safety buffer
-     *  used to live here as value 2; it has been removed in favour of
-     *  per-monster inflation in findPath() — a buffer zone that's
-     *  merely "expensive" is still passable, which is exactly why
-     *  monster bodies clipped walls. Inflation makes the buffer
-     *  outright blocked for monsters whose body half-extent doesn't
-     *  fit. */
+    /** Wall + buffer grid (1 = wall, 2 = 1-cell buffer, 0 = walkable).
+     *  Buffer cells are stored separately so debug overlay can render
+     *  them in amber, but A* and LoS treat them as blocked — the
+     *  combined effect routes paths around the wall AND keeps the
+     *  monster's body 1 cell clear of the actual wall when the flush
+     *  pull snaps the waypoint to the cell centre. */
     private readonly grid: number[][];
     /** Cached inflated easystar instances, keyed by inflation cell count.
      *  Same inflation → same derived grid → reuse. Each entry already
@@ -133,7 +177,7 @@ export class PathfindingService {
     private getEasystarForInflation(inflation: number): EasyStarInstance {
         const cached = this.inflatedEasystars.get(inflation);
         if (cached) return cached;
-        const derived = this.inflateGrid(Math.max(1, inflation));
+        const derived = this.inflateGrid(inflation);
         const es = new EasyStarCtor();
         es.enableSync();
         es.enableDiagonals();
@@ -144,11 +188,16 @@ export class PathfindingService {
         return es;
     }
 
-    /** Return grid where wall cells and body-inflation margin are marked as wall (1). */
+    /** Return grid where wall cells (1) and 1-cell buffer cells (2) are
+     *  marked as blocked. Caller passes the result to an easystar
+     *  instance (or caches it). The buffer is treated as blocked so
+     *  A* routes around the wall with 1 cell of clearance — combined
+     *  with the cellSize + flushGap on the waypoint itself, the
+     *  monster's body lands ≥ 1 cell + flushGap clear of any wall. */
     private inflateGrid(radius: number): number[][] {
         const out: number[][] = Array.from({ length: this.gridHeight }, (_, gy) =>
             Array.from({ length: this.gridWidth }, (_, gx) => {
-                if (this.grid[gy][gx] === 1) return 1;
+                if (this.grid[gy][gx] !== 0) return 1;
                 for (let dy = -radius; dy <= radius; dy++) {
                     for (let dx = -radius; dx <= radius; dx++) {
                         if (dx === 0 && dy === 0) continue;
@@ -161,7 +210,7 @@ export class PathfindingService {
                             nx >= this.gridWidth
                         )
                             continue;
-                        if (this.grid[ny][nx] === 1) return 1;
+                        if (this.grid[ny][nx] !== 0) return 1;
                     }
                 }
                 return 0;
@@ -184,6 +233,20 @@ export class PathfindingService {
             x: gridPos.x * this.cellSize + this.cellSize / 2,
             y: gridPos.y * this.cellSize + this.cellSize / 2,
         };
+    }
+
+    /** Cheap "is the grid cell at worldPos in a tight corner" detector
+     *  exposed on PathfindingService so the monster controller can
+     *  decide the wall-escape direction without reaching into the
+     *  private grid. */
+    isPositionInCorner(worldPos: { x: number; y: number }): boolean {
+        return isPositionInCorner(
+            worldPos,
+            this.cellSize,
+            this.gridWidth,
+            this.gridHeight,
+            this.grid,
+        );
     }
 
     /** Helper for single raycast check on grid. */
@@ -385,8 +448,7 @@ export class PathfindingService {
     /**
      * A* pathfinding with body-aware inflation. Returns world positions or null.
      *
-     * @param start       World position. Use the monster foot (body centre +
-     *                    halfH) so waypoints clear walls.
+     * @param start       World position (body center).
      * @param end         World position.
      * @param bodyHalfW   Monster body half-width in world units.
      * @param bodyHalfH   Monster body half-height in world units.
@@ -445,33 +507,50 @@ export class PathfindingService {
         return found ? result : null;
     }
 
-    /** Convert grid cell to world coordinate adjusted flush to adjacent wall edges (zero gap, zero overlap). */
+    /** Convert grid cell to world coordinate adjusted flush to adjacent
+     *  wall + buffer edges, with a flushGap (default 4px) breathing-
+     *  room gap so the monster never parks inside its own body box
+     *  at the wall edge. The 1-cell buffer cells (value 2) trigger
+     *  the pull too, so the waypoint lands at the cell centre 1 cell
+     *  + flushGap away from the actual wall — combined with A*
+     *  routing through non-buffer cells, the body always travels
+     *  with at least one full cell of clearance. */
     private gridToWorldFlush(
         gridPos: PathGridPoint,
         bodyHalfW: number,
         bodyHalfH: number,
+        flushGap = 4,
     ): { x: number; y: number } {
         let x = gridPos.x * this.cellSize + this.cellSize / 2;
         let y = gridPos.y * this.cellSize + this.cellSize / 2;
 
         if (bodyHalfW <= 0 && bodyHalfH <= 0) return { x, y };
 
-        // Align X flush with right wall
-        if (this.grid[gridPos.y]?.[gridPos.x + 1] === 1) {
-            x = (gridPos.x + 1) * this.cellSize - bodyHalfW;
+        // Treat wall (1) and buffer (2) as solid for the flush pull —
+        // any neighbour that touches either one pulls the waypoint
+        // away from it.
+        const rightBlocked = this.grid[gridPos.y]?.[gridPos.x + 1];
+        const leftBlocked = this.grid[gridPos.y]?.[gridPos.x - 1];
+        const bottomBlocked = this.grid[gridPos.y + 1]?.[gridPos.x];
+        const topBlocked = this.grid[gridPos.y - 1]?.[gridPos.x];
+
+        // Wall/buffer on the right — pull x left so the body's right
+        // edge sits flushGap clear.
+        if (rightBlocked === 1 || rightBlocked === 2) {
+            x = (gridPos.x + 1) * this.cellSize - bodyHalfW - flushGap;
         }
-        // Align X flush with left wall
-        else if (this.grid[gridPos.y]?.[gridPos.x - 1] === 1) {
-            x = gridPos.x * this.cellSize + bodyHalfW;
+        // Wall/buffer on the left — push x right.
+        else if (leftBlocked === 1 || leftBlocked === 2) {
+            x = gridPos.x * this.cellSize + bodyHalfW + flushGap;
         }
 
-        // Align Y flush with bottom wall
-        if (this.grid[gridPos.y + 1]?.[gridPos.x] === 1) {
-            y = (gridPos.y + 1) * this.cellSize - bodyHalfH;
+        // Wall/buffer below — pull y up.
+        if (bottomBlocked === 1 || bottomBlocked === 2) {
+            y = (gridPos.y + 1) * this.cellSize - bodyHalfH - flushGap;
         }
-        // Align Y flush with top wall
-        else if (this.grid[gridPos.y - 1]?.[gridPos.x] === 1) {
-            y = gridPos.y * this.cellSize + bodyHalfH;
+        // Wall/buffer above — push y down.
+        else if (topBlocked === 1 || topBlocked === 2) {
+            y = gridPos.y * this.cellSize + bodyHalfH + flushGap;
         }
 
         return { x, y };

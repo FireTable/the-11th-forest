@@ -45,6 +45,7 @@ import {
     decideAIState,
     dirTo,
     distBetween,
+    isWaypointReached,
     pickClosestMonster,
     PathfindingService,
     calcSeparationForce,
@@ -194,10 +195,10 @@ export class Monster {
         this.hitboxWidth = hw;
         this.hitboxHeight = hh;
 
-        // Bodybox (Green Box): spec.body dimensions for physics wall collision & pathfinding
+        // Bodybox (Green Box): in the footer
         const bw = spec.body.halfW * 2;
         const bh = spec.body.halfH * 2;
-        const centerY = y - spec.body.halfH;
+        const centerY = y;
 
         this.body = scene.matter.add.rectangle(x, centerY, bw, bh, {
             label: 'monster',
@@ -477,7 +478,7 @@ export class MonsterController {
             const footY = Math.round(
                 mp.y + (m.sprite ? m.sprite.displayHeight / 2 - monsterBodyHalfH : 0),
             );
-            const footPos = { x: mp.x, y: mp.y };
+            const footPos = { x: footX, y: footY - monsterBodyHalfH / 2 };
 
             // Per-monster Active Stuck Detector — 60ms window so escape fires
             // before the player sees a single bounce. Measures
@@ -616,14 +617,21 @@ export class MonsterController {
                 const canUseLoS = time >= m.noLoSUntil;
                 const hasLoS =
                     canUseLoS &&
-                    (this.pathfinder?.hasLineOfSight(mp, targetPos, monsterBodyRadius) ?? false);
+                    (this.pathfinder?.hasLineOfSight(footPos, targetPos, monsterBodyRadius) ?? false);
 
                 if (m.path && m.currentWaypointIdx < m.path.length) {
-                    // Smooth waypoint advancement (贴着碰撞物走)
+                    // Smooth waypoint advancement. Reached distance is
+                    // bodyHalf + a small breathing-room offset so a
+                    // flush waypoint parked against a wall doesn't
+                    // perpetually count as "arrived" while the monster
+                    // still has the body box clipping the corner.
                     const currWp = m.path[m.currentWaypointIdx];
                     if (currWp) {
                         const distToWp = Math.hypot(footPos.x - currWp.x, footPos.y - currWp.y);
-                        if (distToWp < 14 && m.currentWaypointIdx < m.path.length - 1) {
+                        if (
+                            isWaypointReached(distToWp, monsterBodyHalfH) &&
+                            m.currentWaypointIdx < m.path.length - 1
+                        ) {
                             m.currentWaypointIdx++;
                         }
                     }
@@ -643,9 +651,20 @@ export class MonsterController {
                 desiredVx = cv.vx;
                 desiredVy = cv.vy;
 
+                // Separation is intentionally OFF while following a
+                // path — when two monsters route through the same
+                // corner cell, an extra repulsion push makes them
+                // jitter across each other and never reach the
+                // waypoint. The path itself keeps them spread across
+                // cells; off-path straight-line chases get a small
+                // separation force to stop identical-position overlap.
                 if (!isFollowingPath) {
-                    // Only apply separation forces when NOT navigating around wall corners
-                    const sep = calcSeparationForce(m, this.monsters, 42, m.spec.moveSpeed * 0.7);
+                    const sep = calcSeparationForce(
+                        m,
+                        this.monsters,
+                        32,
+                        m.spec.moveSpeed * 0.4,
+                    );
                     desiredVx += sep.x;
                     desiredVy += sep.y;
                 }
@@ -1138,9 +1157,24 @@ export class MonsterController {
         const nlen = Math.hypot(nx, ny);
         let escapeX: number;
         let escapeY: number;
-        if (monster.path && monster.currentWaypointIdx + 1 < monster.path.length) {
-            // Aim at the next path waypoint.
-            const nextWp = monster.path[monster.currentWaypointIdx + 1];
+
+        // Decide whether to slide ALONG the wall (perpendicular to
+        // the normal) or aim at the next waypoint. In a tight corner
+        // the next waypoint also sits against the same wall family —
+        // aiming at it just drives the monster deeper into the wall.
+        // isPositionInCorner reads the grid (cellSize + buffer) so the
+        // detection matches the pathfinder's notion of "tight".
+        const nextWp =
+            monster.path && monster.currentWaypointIdx + 1 < monster.path.length
+                ? monster.path[monster.currentWaypointIdx + 1]
+                : null;
+        const waypointAlsoInCorner = nextWp
+            ? this.pathfinder?.isPositionInCorner(nextWp) ?? false
+            : true;
+
+        if (nextWp && !waypointAlsoInCorner) {
+            // Open path ahead — aim at the next waypoint so the
+            // monster resumes chasing along the path.
             escapeX = nextWp.x - mp.x;
             escapeY = nextWp.y - mp.y;
             const len = Math.hypot(escapeX, escapeY);
@@ -1152,7 +1186,8 @@ export class MonsterController {
                 escapeY /= len;
             }
         } else if (nlen > 0) {
-            // No path: slide perpendicular to the wall normal.
+            // Cornered: slide perpendicular to the wall normal so the
+            // body peels off the wall and curves around the corner.
             escapeX = -ny / nlen;
             escapeY = nx / nlen;
             // Pick the perpendicular that points away from the wall
