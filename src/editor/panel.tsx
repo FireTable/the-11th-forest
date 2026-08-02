@@ -84,6 +84,16 @@ export function EditorPanel() {
         setError(null);
     }, [topTab]);
 
+    // Tell the Phaser scene which editor sub-tab is active so the
+    // material sprites only become draggable while the user is on
+    // the Materials tab — picking Walls or Monsters must not let the
+    // user accidentally move material art around the canvas.
+    useEffect(() => {
+        const isMaterialTab =
+            open && topTab === 'scenes' && sceneSubTab === 'materials';
+        EventBus.emit('editor-material-tab-active', isMaterialTab);
+    }, [open, topTab, sceneSubTab]);
+
     // Aggregate dirty / saving across all entities the panel can save.
     // Only one source is ever active at a time, so OR is correct.
     const isAnyDirty = dirty || characterSaveState?.dirty || moduleSaveState?.dirty;

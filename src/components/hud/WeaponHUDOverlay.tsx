@@ -83,7 +83,7 @@ export const WeaponHUDOverlay: React.FC = () => {
                             >
                                 {index + 1}
                             </span>
-                            {/* Ammo badge — bottom-right corner */}
+                            {/* Ammo badge — bottom-right corner (current / total) */}
                             {slot.clipSize > 1 && (
                                 <span
                                     className={`absolute bottom-0 right-0 px-1 text-[9px] font-bold font-mono leading-none border ${isActive
@@ -91,7 +91,7 @@ export const WeaponHUDOverlay: React.FC = () => {
                                         : 'bg-black/70 text-stone-400 border-stone-700'
                                         }`}
                                 >
-                                    {String(slot.ammo).padStart(2, '0')}
+                                    {String(slot.ammo).padStart(2, '0')}/{String(slot.clipSize).padStart(2, '0')}
                                 </span>
                             )}
                             {/* Reload progress overlay (active slot only) */}
@@ -114,13 +114,20 @@ export const WeaponHUDOverlay: React.FC = () => {
     }
 
     return (
-        <div className="absolute bottom-6 right-6 z-20 pointer-events-none select-none font-['Silkscreen',monospace] w-[280px]">
-            {/* Vertical stack of per-weapon cards. Each card owns its own
-             *  retro pixel frame (background, dark border, 4 amber corner
-             *  pixels, inset glow). The weapon's own texture floats in
-             *  the lower-right corner as a decorative background — stats
-             *  text sits to its left so the visual reads like a poster. */}
-            <div className="flex flex-col gap-1.5">
+        <div className="absolute bottom-6 right-6 z-20 pointer-events-none select-none font-['Silkscreen',monospace] w-[300px]">
+            {/* Pure-rotation poker fan: every card pivots around its
+             *  bottom-centre and fans out by `offset * 12°` of
+             *  rotation, with no manual xShift. The pivot at the
+             *  bottom edge + the card's own height naturally creates
+             *  the spread — the top corners swing outward as the card
+             *  tilts, while the bottom corners stay anchored. This
+             *  matches a real card hand where cards overlap at the
+             *  pivot and fan open at the top. The active card is the
+             *  centre (rotate 0°) and lifted 20px so it visually
+             *  pops in front of the others. z-index decreases with
+             *  |offset| so closer cards overlap farther ones, the
+             *  same way a hand stacks. */}
+            <div className="relative h-[200px]">
                 {slots.map((slot, index) => {
                     const isActive = index === activeWeaponIndex;
                     const showReloading = isActive && isReloading;
@@ -128,96 +135,141 @@ export const WeaponHUDOverlay: React.FC = () => {
                         slot.clipSize > 0
                             ? Math.max(0, Math.min(100, (slot.ammo / slot.clipSize) * 100))
                             : 100;
+                    const offset = index - activeWeaponIndex;
+                    const angle = offset * 12;
+                    const yShift = isActive ? -20 : Math.abs(offset) * 3;
+                    const z = isActive ? 50 : 40 - Math.abs(offset);
                     return (
                         <button
                             key={slot.id || index}
                             type="button"
                             onPointerDown={(e) => {
-                                // Stop the click from falling through to
-                                // the Phaser canvas underneath.
                                 e.preventDefault();
                                 EventBus.emit('mobile:weapon:switch', { index });
                             }}
                             aria-label={`Switch to ${slot.name}`}
                             data-testid={`desktop-weapon-slot-${index}`}
-                            className={`relative border-2 transition-all duration-150 pointer-events-auto cursor-pointer backdrop-blur-sm h-[64px] overflow-hidden ${isActive
+                            style={{
+                                zIndex: z,
+                                transformOrigin: '50% 100%',
+                                transform: `translateY(${yShift}px) rotate(${angle}deg)`,
+                                bottom: 0,
+                                left: '50%',
+                                marginLeft: -45,
+                            }}
+                            className={`absolute w-[90px] h-[150px] border-2 transition-all duration-200 ease-out pointer-events-auto cursor-pointer backdrop-blur-sm overflow-hidden ${isActive
                                 ? 'bg-amber-950/85 border-amber-400 shadow-[0_4px_12px_rgba(0,0,0,0.45),inset_0_0_8px_rgba(245,158,11,0.4)]'
-                                : 'bg-black/55 border-stone-800 text-stone-400 shadow-[0_2px_8px_rgba(0,0,0,0.45)] hover:border-amber-700/60 hover:text-amber-200/80'
+                                : 'bg-black/70 border-stone-800 text-stone-400 shadow-[0_2px_8px_rgba(0,0,0,0.45)] hover:border-amber-400 hover:text-amber-200'
                                 }`}
                         >
-                            {/* 4 Retro Corner Pixels — this card IS the box. */}
+                            {/* 4 Retro Corner Pixels */}
                             <span className="absolute -top-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
                             <span className="absolute -top-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
                             <span className="absolute -bottom-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
                             <span className="absolute -bottom-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
 
-                            {/* Hotkey badge — top-left of card */}
+                            {/* Hotkey rank — uniform size across active
+                             *  and inactive so cards look identical. */}
                             <span
-                                className={`absolute top-0 left-0 px-1 text-[9px] font-bold leading-none z-10 ${isActive
-                                    ? 'bg-amber-400 text-black'
-                                    : 'bg-stone-800 text-stone-400'
+                                className={`absolute top-0.5 left-1 text-[12px] font-bold leading-none z-10 ${isActive
+                                    ? 'text-amber-300 drop-shadow-[1px_1px_0px_#000]'
+                                    : 'text-stone-400'
                                     }`}
                             >
                                 {index + 1}
                             </span>
 
-                            {/* Weapon texture — lower-right background
-                             *  decoration. Rendered as a CSS background-image
-                             *  (not an <img>) so it doesn't participate in the
-                             *  layout flow and can be sized/positioned freely.
-                             *  Stats text above (z-10) sits on top and stays
-                             *  readable regardless of weapon image. */}
-                            {slot.texture ? (
+                            {/* Vertical poster body — texture on top,
+                             *  name + ammo in the middle, vertical
+                             *  reload bar on the bottom. Identical
+                             *  layout for every card. */}
+                            {/* Ammo battery fill — rises from the bottom of the card and
+                             *  drains downward as ammo depletes. Layered
+                             *  behind the texture so the weapon image
+                             *  stays visible; the fill colour (amber for
+                             *  active, stone for inactive) reads through
+                             *  the translucent texture. Replaces the old
+                             *  horizontal progress strip with a battery-
+                             *  style indicator. */}
+                            <div
+                                className={`absolute inset-x-0 bottom-0 pointer-events-none transition-[height] duration-500 ease-out ${isActive ? 'bg-amber-400/40' : 'bg-stone-500/25'}`}
+                                style={{ height: `${ammoFrac}%` }}
+                            />
+                            {/* Weapon texture — fills the card as a translucent
+                             *  background element (cover-fit, ~30%
+                             *  opacity). Sits behind the stats text
+                             *  via z-0; cards without a texture fall
+                             *  back to a tiny name placeholder. */}
+                            {slot.texture && (
+                                /* Rendered as a sideways (90° rotated)
+                                 *  translucent background — like a gun
+                                 *  laid on its side filling the card.
+                                 *  Width is sized to the card's WIDTH
+                                 *  (70px) so the rotated texture fits
+                                 *  inside the 80px card without being
+                                 *  clipped. After -90° rotation the
+                                 *  texture's horizontal axis becomes
+                                 *  the card's vertical axis, so the
+                                 *  image fills the long dimension
+                                 *  (height) while staying within the
+                                 *  card's narrow width. object-contain
+                                 *  + max-height cap keeps the full
+                                 *  texture visible without overflow. */
                                 <img
                                     src={slot.texture}
                                     alt={slot.name}
                                     draggable={false}
-                                    className="absolute right-2 bottom-1 w-[68px] h-[68px] object-contain pointer-events-none"
-                                    style={{ imageRendering: 'pixelated' }}
+                                    className={`absolute pointer-events-none object-contain ${isActive ? 'opacity-80' : 'opacity-50'}`}
+                                    style={{
+                                        imageRendering: 'pixelated',
+                                        top: '50%',
+                                        left: '50%',
+                                        // Width 75px (after rotate this
+                                        // becomes the card's vertical
+                                        // axis) gives a 5px padding on
+                                        // each side of the 80px card
+                                        // width. No height cap so the
+                                        // texture fills the full 150px
+                                        // card length when its aspect
+                                        // allows.
+                                        width: '90px',
+                                        height: 'auto',
+                                        maxHeight: '150px',
+                                        transform: 'translate(-50%, -50%) rotate(-90deg)',
+                                    }}
                                 />
-                            ) : (
-                                // Melee weapons (e.g. drone-claws) may not
-                                // have a `visual.texture` — fall back to a
-                                // small name label tucked into the lower
-                                // right of the card.
-                                <span className="absolute right-2 bottom-2 text-[9px] font-bold text-amber-200/60 text-center leading-tight px-1 pointer-events-none">
-                                    {slot.name}
-                                </span>
                             )}
-
-                            {/* Stats overlay — sits in the upper-left, with
-                             *  right-padding to clear the weapon visual. */}
-                            <div className="absolute inset-0 flex flex-col justify-center pl-3.5 pr-[80px] py-2 gap-1.5 pointer-events-none">
-                                <div className="flex items-baseline gap-2 min-w-0">
+                            {/* Foreground stats column — sits on top of
+                             *  the translucent texture. Vertically
+                             *  distributed: hotkey rank, then name +
+                             *  ammo stacked in the middle, then the
+                             *  horizontal ammo bar pinned at the bottom. */}
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-2 pb-2 px-1.5 gap-1 pointer-events-none">
+                                {!slot.texture && (
+                                    <span className={`w-14 h-14 flex items-center justify-center text-[8px] font-bold text-center leading-tight px-1 ${isActive ? 'text-amber-200/70' : 'text-stone-400/70'}`}>
+                                        {slot.name}
+                                    </span>
+                                )}
+                                <div className="flex-1" />
+                                <div className="flex flex-col items-center gap-1 w-full">
                                     <span
-                                        className={`text-[11px] font-bold tracking-wide uppercase truncate ${isActive ? 'text-amber-200' : 'text-stone-500'
-                                            }`}
+                                        className={`text-[9px] font-bold tracking-wide uppercase text-center leading-tight drop-shadow-[1px_1px_0px_#000] ${isActive ? 'text-amber-200' : 'text-stone-400'}`}
                                         title={slot.name}
                                     >
                                         {slot.name}
                                     </span>
-                                    <span
-                                        className={`text-[12px] font-mono leading-none tabular-nums whitespace-nowrap shrink-0 ${isActive ? 'text-amber-300' : 'text-stone-400'
-                                            }`}
-                                    >
+                                    <span className={`text-[10px] font-mono leading-none tabular-nums drop-shadow-[1px_1px_0px_#000] ${isActive ? 'text-amber-300' : 'text-stone-500'}`}>
                                         {String(slot.ammo).padStart(2, '0')}
                                         <span className="text-stone-500"> / </span>
                                         {String(slot.clipSize).padStart(2, '0')}
                                     </span>
-                                </div>
-                                <div className="h-1 w-full bg-stone-900/80 border border-stone-700">
-                                    <div
-                                        className={`h-full ${isActive ? 'bg-amber-400' : 'bg-stone-600'
-                                            }`}
-                                        style={{ width: `${ammoFrac}%` }}
-                                    />
                                 </div>
                             </div>
 
                             {/* Reload progress overlay (active slot only). */}
                             {showReloading && (
                                 <div
-                                    className="absolute inset-x-0 bottom-0 h-1 bg-amber-400/80 pointer-events-none z-10"
+                                    className="absolute bottom-0 left-0 right-0 h-1 bg-amber-400/80 pointer-events-none z-10"
                                     style={{
                                         width: `${Math.max(
                                             0,

@@ -13,40 +13,40 @@ export const CharacterHUDOverlay: React.FC = () => {
     const spPercent = Math.max(0, Math.min(100, (sp / (maxSp || 1)) * 100));
 
     if (mobile) {
-        // Compact top-left strip — keeps HP/SP visible without colliding
-        // with the bottom-left joystick thumb zone.
+        // Vertical stack: character name on top, then HP + SP bars.
+        // The bar fills the available row width and the current /
+        // max value sits right-aligned at the bar's end with a black
+        // stroke so it's legible against the fill colour.
         return (
-            <div className="absolute top-4 left-4 z-20 pointer-events-none select-none font-['Silkscreen',monospace]">
-                <div className="flex items-center gap-2 bg-stone-950/55 px-2.5 py-1.5 border border-amber-900/60 backdrop-blur-sm">
-                    <div className="flex flex-col gap-1 w-[180px]">
-                        <div className="flex items-center gap-1">
-                            <Heart className="w-3 h-3 fill-red-500 text-red-400 shrink-0" />
-                            <span className="text-[10px] font-bold text-red-300 leading-none">
-                                {Math.ceil(hp)}
-                            </span>
-                            <div className="flex-1 h-2 bg-black border border-red-950">
-                                <div
-                                    className="h-full bg-red-600 transition-all duration-150"
-                                    style={{ width: `${hpPercent}%` }}
-                                />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <Zap className="w-3 h-3 fill-sky-400 text-sky-300 shrink-0" />
-                            <span className="text-[10px] font-bold text-sky-300 leading-none">
-                                {Math.ceil(sp)}
-                            </span>
-                            <div className="flex-1 h-2 bg-black border border-sky-950">
-                                <div
-                                    className="h-full bg-sky-500 transition-all duration-150"
-                                    style={{ width: `${spPercent}%` }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <span className="text-[9px] font-bold tracking-wider text-amber-200 uppercase ml-1">
+            <div className="absolute top-4 left-4 z-20 pointer-events-none select-none font-['Silkscreen',monospace] w-[220px]">
+                <div className="flex flex-col gap-1.5 bg-stone-950/55 px-2.5 py-1.5 border border-amber-900/60 backdrop-blur-sm">
+                    <span className="text-[10px] font-bold tracking-wider text-amber-200 uppercase drop-shadow-[1px_1px_0px_#000]">
                         {characterName}
                     </span>
+                    <div className="flex items-center gap-1.5">
+                        <Heart className="w-3 h-3 fill-red-500 text-red-400 shrink-0" />
+                        <div className="flex-1 h-2 bg-black border border-red-950 relative">
+                            <div
+                                className="h-full bg-red-600 transition-all duration-150"
+                                style={{ width: `${hpPercent}%` }}
+                            />
+                            <span className="absolute inset-0 flex items-center justify-end pr-1 text-[9px] font-bold text-white leading-none drop-shadow-[1px_1px_0px_#000]">
+                                {Math.ceil(hp)}/{maxHp}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <Zap className="w-3 h-3 fill-sky-400 text-sky-300 shrink-0" />
+                        <div className="flex-1 h-2 bg-black border border-sky-950 relative">
+                            <div
+                                className="h-full bg-sky-500 transition-all duration-150"
+                                style={{ width: `${spPercent}%` }}
+                            />
+                            <span className="absolute inset-0 flex items-center justify-end pr-1 text-[9px] font-bold text-white leading-none drop-shadow-[1px_1px_0px_#000]">
+                                {Math.ceil(sp)}/{maxSp}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
