@@ -75,8 +75,6 @@ import * as iq from 'image-q';
 
 extend([lchPlugin, labPlugin]);
 
-
-
 /**
  * 4-connected flood-fill from a seed. Iterative (stack, not recursion)
  * so a 2048×2048 background field never blows the call stack.
@@ -168,7 +166,8 @@ function stripEdgeHalo(png: PNG, keyColor: AnyColor): void {
     for (let i = 0; i < data.length; i += 4) {
         const a = data[i + 3];
         if (a === 0 || a === 255) continue;
-        if (isBgColorLeaning(data[i], data[i + 1], data[i + 2], keyColor, { relaxed: true })) data[i + 3] = 0;
+        if (isBgColorLeaning(data[i], data[i + 1], data[i + 2], keyColor, { relaxed: true }))
+            data[i + 3] = 0;
     }
 }
 
@@ -307,14 +306,22 @@ function pureBgFloodFill(png: PNG, keyColor: AnyColor): void {
             const idx = y * w + x;
             if (visited[idx]) continue;
             const di = idx << 2;
-            if (data[di + 3] === 0 || !isBgColorLeaning(data[di], data[di + 1], data[di + 2], keyColor)) continue;
+            if (
+                data[di + 3] === 0 ||
+                !isBgColorLeaning(data[di], data[di + 1], data[di + 2], keyColor)
+            )
+                continue;
             stack.push(idx);
             while (stack.length) {
                 const i = stack.pop()!;
                 if (visited[i]) continue;
                 visited[i] = 1;
                 const ddi = i << 2;
-                if (data[ddi + 3] === 0 || !isBgColorLeaning(data[ddi], data[ddi + 1], data[ddi + 2], keyColor)) continue;
+                if (
+                    data[ddi + 3] === 0 ||
+                    !isBgColorLeaning(data[ddi], data[ddi + 1], data[ddi + 2], keyColor)
+                )
+                    continue;
                 data[ddi + 3] = 0;
                 const ix = i % w;
                 const iy = (i - ix) / w;
@@ -392,7 +399,10 @@ function applyPixelOutline(
     }
 }
 
-export function keyOut(png: PNG, opts: { outlineWidth?: number; outlineColor?: [number, number, number] | 'transparent' } = {}): void {
+export function keyOut(
+    png: PNG,
+    opts: { outlineWidth?: number; outlineColor?: [number, number, number] | 'transparent' } = {},
+): void {
     const { data, width: w, height: h } = png;
     const keyColor = detectKeyColor(png);
     const seed = findKeySeed(png, keyColor);
@@ -589,9 +599,6 @@ export function findFrames(png: PNG, _minRun = 8, _minArea = 500): Box[] {
     return boxes;
 }
 
-
-
-
 /**
  * Clean Pixel-Art Downsampler.
  * Uses center-pixel nearest neighbor sampling for 100% accurate colors (protecting skin tones)
@@ -717,7 +724,8 @@ function main(): void {
     }
     const pad = Number(flags.find((f) => f.startsWith('--pad='))?.slice(6) ?? 2);
     const outlineWidth = Number(flags.find((f) => f.startsWith('--outline='))?.slice(10) ?? 2);
-    const outlineColorArg = flags.find((f) => f.startsWith('--outline-color='))?.slice(16) ?? 'transparent';
+    const outlineColorArg =
+        flags.find((f) => f.startsWith('--outline-color='))?.slice(16) ?? 'transparent';
 
     let outlineColor: [number, number, number] | 'transparent' = 'transparent';
     if (outlineColorArg !== 'transparent') {
@@ -730,21 +738,17 @@ function main(): void {
 
     // `--downsample[=N]` reduces sheet physical resolution by N (default 4).
     // `--colors[=N]` performs image-q NeuQuant palette quantization (default 32 colors).
-    const downsampleArg = flags.find(
-        (f) => f === '--downsample' || f.startsWith('--downsample='),
-    );
+    const downsampleArg = flags.find((f) => f === '--downsample' || f.startsWith('--downsample='));
     const doDownsample = !!downsampleArg;
-    const downsampleScale = downsampleArg && downsampleArg.includes('=')
-        ? Number(downsampleArg.slice('--downsample='.length))
-        : 4;
+    const downsampleScale =
+        downsampleArg && downsampleArg.includes('=')
+            ? Number(downsampleArg.slice('--downsample='.length))
+            : 4;
 
-    const colorsArg = flags.find(
-        (f) => f === '--colors' || f.startsWith('--colors='),
-    );
+    const colorsArg = flags.find((f) => f === '--colors' || f.startsWith('--colors='));
     const doQuantize = !!colorsArg;
-    const colors = colorsArg && colorsArg.includes('=')
-        ? Number(colorsArg.slice('--colors='.length))
-        : 32;
+    const colors =
+        colorsArg && colorsArg.includes('=') ? Number(colorsArg.slice('--colors='.length)) : 32;
 
     const dither = flags.includes('--dither');
     const inPlace = flags.includes('--in-place');
@@ -814,10 +818,14 @@ function main(): void {
     });
     console.log(`\n${frames.length} frames → ${outDir}`);
     if (doDownsample) {
-        console.log(`  downsample: sheet → ${workPng.width}x${workPng.height} (scale ${downsampleScale})`);
+        console.log(
+            `  downsample: sheet → ${workPng.width}x${workPng.height} (scale ${downsampleScale})`,
+        );
     }
     if (doQuantize) {
-        console.log(`  quantize: palette reduced to ${colors} colors (image-q NeuQuant${dither ? ' + dither' : ''})`);
+        console.log(
+            `  quantize: palette reduced to ${colors} colors (image-q NeuQuant${dither ? ' + dither' : ''})`,
+        );
     }
 
     // Auto-recompose using the source grid. The grid is detected from
@@ -843,16 +851,8 @@ function main(): void {
                 throw new Error('--in-place requires --id=<character_id>');
             }
             const projectRoot = resolve(__dirname, '..');
-            const processedPath = join(
-                projectRoot,
-                'public/assets/image/characters',
-                `${id}.png`,
-            );
-            const rawsPath = join(
-                projectRoot,
-                'public/assets/image/characters/raws',
-                `${id}.png`,
-            );
+            const processedPath = join(projectRoot, 'public/assets/image/characters', `${id}.png`);
+            const rawsPath = join(projectRoot, 'public/assets/image/characters/raws', `${id}.png`);
             mkdirSync(dirname(rawsPath), { recursive: true });
             copyFileSync(src, rawsPath);
             copyFileSync(outFile, processedPath);

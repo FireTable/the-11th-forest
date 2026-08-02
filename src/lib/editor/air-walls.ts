@@ -64,11 +64,7 @@ export function setWallKind(level: Level, id: string, kind: AirWallKind): Level 
  * Append a vertex to the named wall. Skips duplicates of the last point
  * (clicks often produce two identical consecutive coords).
  */
-export function addPoint(
-    level: Level,
-    id: string,
-    vertex: AirWallVertex,
-): Level {
+export function addPoint(level: Level, id: string, vertex: AirWallVertex): Level {
     return {
         ...level,
         airWalls: level.airWalls.map((w) => {
@@ -93,13 +89,7 @@ export function removePoint(level: Level, id: string, index: number): Level {
 }
 
 /** Move the vertex at `index` to (x, y). Coerces to integers. */
-export function movePoint(
-    level: Level,
-    id: string,
-    index: number,
-    x: number,
-    y: number,
-): Level {
+export function movePoint(level: Level, id: string, index: number, x: number, y: number): Level {
     return {
         ...level,
         airWalls: level.airWalls.map((w) => {
@@ -108,7 +98,7 @@ export function movePoint(
             return {
                 ...w,
                 points: w.points.map((p, i) =>
-                    i === index ? [Math.round(x), Math.round(y)] as AirWallVertex : p,
+                    i === index ? ([Math.round(x), Math.round(y)] as AirWallVertex) : p,
                 ),
             };
         }),
@@ -116,19 +106,16 @@ export function movePoint(
 }
 
 /** Move all vertices of the named wall by delta (dx, dy). */
-export function moveWallPolygon(
-    level: Level,
-    id: string,
-    dx: number,
-    dy: number,
-): Level {
+export function moveWallPolygon(level: Level, id: string, dx: number, dy: number): Level {
     return {
         ...level,
         airWalls: level.airWalls.map((w) => {
             if (w.id !== id) return w;
             return {
                 ...w,
-                points: w.points.map(([x, y]) => [Math.round(x + dx), Math.round(y + dy)] as AirWallVertex),
+                points: w.points.map(
+                    ([x, y]) => [Math.round(x + dx), Math.round(y + dy)] as AirWallVertex,
+                ),
             };
         }),
     };

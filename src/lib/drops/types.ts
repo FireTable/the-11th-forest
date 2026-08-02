@@ -16,12 +16,7 @@
 
 import type { z } from 'zod';
 
-import type {
-    DropEffectSchema,
-    DropIndexSchema,
-    DropSpecSchema,
-    DropVisualSchema,
-} from './schema';
+import type { DropEffectSchema, DropIndexSchema, DropSpecSchema, DropVisualSchema } from './schema';
 
 export type DropType = 'instant' | 'refill-ammo' | 'weapon';
 

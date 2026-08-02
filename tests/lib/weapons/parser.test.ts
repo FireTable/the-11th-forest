@@ -190,7 +190,9 @@ damage: 1
 cooldownMs: 100
 range: 100
 `;
-        expect(() => parseWeaponYaml(yamlText, 'bad')).toThrow(/ranged.*projectile.*melee.*hitWidth|projectile.*hitWidth/);
+        expect(() => parseWeaponYaml(yamlText, 'bad')).toThrow(
+            /ranged.*projectile.*melee.*hitWidth|projectile.*hitWidth/,
+        );
     });
 
     it('rejects weapon with both ranged and melee fields', () => {

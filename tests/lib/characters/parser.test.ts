@@ -76,10 +76,7 @@ hotbar:
     it('rejects empty hotbar', () => {
         expect(() =>
             parseCharacterYaml(
-                validYaml.replace(
-                    'hotbar:\n  - pistol\n  - shotgun\n  - smg\n',
-                    'hotbar: []',
-                ),
+                validYaml.replace('hotbar:\n  - pistol\n  - shotgun\n  - smg\n', 'hotbar: []'),
                 'wanderer',
             ),
         ).toThrow(/hotbar/);
@@ -87,19 +84,13 @@ hotbar:
 
     it('rejects hotbar with non-string entry', () => {
         expect(() =>
-            parseCharacterYaml(
-                validYaml.replace('  - pistol', '  - 42'),
-                'wanderer',
-            ),
+            parseCharacterYaml(validYaml.replace('  - pistol', '  - 42'), 'wanderer'),
         ).toThrow(/hotbar/);
     });
 
     it('rejects hotbar with empty-string entry', () => {
         expect(() =>
-            parseCharacterYaml(
-                validYaml.replace('  - pistol', '  - ""'),
-                'wanderer',
-            ),
+            parseCharacterYaml(validYaml.replace('  - pistol', '  - ""'), 'wanderer'),
         ).toThrow(/hotbar/);
     });
 
@@ -137,8 +128,7 @@ sprite:
 
     it('rejects sprite with non-positive scale', () => {
         const yamlText =
-            validYaml +
-            'sprite:\n  texture: a.png\n  grid: { rows: 4, cols: 4 }\n  scale: 0\n';
+            validYaml + 'sprite:\n  texture: a.png\n  grid: { rows: 4, cols: 4 }\n  scale: 0\n';
         expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/sprite\.scale/);
     });
 
@@ -181,7 +171,9 @@ anims:
     it('rejects anims with reversed frame range', () => {
         const yamlText =
             validYaml + 'anims:\n  idle:\n    frames: [5, 1]\n    frameRate: 6\n    repeat: -1\n';
-        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/frames\[1\].*>=.*frames\[0\]/);
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(
+            /frames\[1\].*>=.*frames\[0\]/,
+        );
     });
 
     it('rejects anims with non-positive frameRate', () => {

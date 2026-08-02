@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-    CAT,
-    PROJECTILE_MONSTER_MASK,
-    PROJECTILE_PLAYER_MASK,
-} from '@/lib/constants';
+import { CAT, PROJECTILE_MONSTER_MASK, PROJECTILE_PLAYER_MASK } from '@/lib/constants';
 
-import { isPlayerBullet, isWall } from '@/game/weapons/logic';
+import { isPlayerBullet, isWall, nextSlotIndex } from '@/game/weapons/logic';
 
 describe('weapons/logic — masks', () => {
     it('PROJECTILE_PLAYER_MASK hits tall walls + monsters, ignores short walls (cover)', () => {
@@ -48,5 +44,38 @@ describe('weapons/logic — body label helpers', () => {
         expect((tallWallCat & CAT.WALL_TALL) !== 0).toBe(true);
         expect((shortWallCat & CAT.WALL_TALL) !== 0).toBe(false);
         expect((charCat & CAT.WALL_TALL) !== 0).toBe(false);
+    });
+});
+
+describe('weapons/logic — nextSlotIndex (mobile ◀/▶ cycle math)', () => {
+    it('advances forward within the slot list', () => {
+        expect(nextSlotIndex(0, 1, 3)).toBe(1);
+        expect(nextSlotIndex(1, 1, 3)).toBe(2);
+    });
+
+    it('wraps forward from the last slot back to the first', () => {
+        expect(nextSlotIndex(2, 1, 3)).toBe(0);
+    });
+
+    it('wraps backward from the first slot to the last', () => {
+        expect(nextSlotIndex(0, -1, 3)).toBe(2);
+    });
+
+    it('steps backward within the list', () => {
+        expect(nextSlotIndex(2, -1, 3)).toBe(1);
+        expect(nextSlotIndex(1, -1, 3)).toBe(0);
+    });
+
+    it('returns 0 for a single-slot hotbar regardless of direction', () => {
+        expect(nextSlotIndex(0, 1, 1)).toBe(0);
+        expect(nextSlotIndex(0, -1, 1)).toBe(0);
+    });
+
+    it('returns 0 for an empty hotbar as a no-op safety', () => {
+        expect(nextSlotIndex(0, 1, 0)).toBe(0);
+    });
+
+    it('coerces non-integer currentIndex via floor', () => {
+        expect(nextSlotIndex(0.7, 1, 3)).toBe(1);
     });
 });

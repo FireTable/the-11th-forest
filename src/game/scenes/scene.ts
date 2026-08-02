@@ -22,24 +22,23 @@ async function getMonsterSpriteCellDims(
     const sprite = spec.sprite;
     const grid = sprite?.grid;
     if (!sprite || !grid) return { width: 0, height: 0 };
-    const url = sprite.texture.startsWith('/')
-        ? sprite.texture
-        : `/${sprite.texture}`;
-    const natural = await new Promise<{ width: number; height: number }>(
-        (resolve, reject) => {
-            const img = new Image();
-            img.onload = () =>
-                resolve({ width: img.naturalWidth, height: img.naturalHeight });
-            img.onerror = () => reject(new Error(`Failed to load ${url}`));
-            img.src = url;
-        },
-    );
+    const url = sprite.texture.startsWith('/') ? sprite.texture : `/${sprite.texture}`;
+    const natural = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error(`Failed to load ${url}`));
+        img.src = url;
+    });
     return {
         width: Math.floor(natural.width / grid.cols),
         height: Math.floor(natural.height / grid.rows),
     };
 }
 import { PathfindingService } from '@/game/monsters/logic';
+import {
+    createPathDebugOverlay,
+    type PathDebugOverlayHandles,
+} from '@/game/monsters/path-debug-overlay';
 import { DEPTH, MUSIC_EVENT, PIXEL_LIGHTING_CONFIG } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
@@ -97,6 +96,7 @@ export class LoadScene extends Phaser.Scene {
     private dropSystem!: DropController;
     private materialManager!: MaterialManager;
     private audio!: AudioController;
+    private pathDebugOverlay!: PathDebugOverlayHandles;
     /** `this.time.now` value at the moment create() finished wiring the
      *  level. Subtracted from current `this.time.now` to get elapsed. */
     private levelStartAt = 0;
@@ -123,23 +123,16 @@ export class LoadScene extends Phaser.Scene {
             this.assets.spriteCell.height,
         );
         // Load monster spritesheet assets (if spec contains sprite config)
-        loadMonsterAssets(
-            this,
-            this.assets.monsterSpecs.values(),
-            getMonsterSpriteCellDims,
-        );
+        loadMonsterAssets(this, this.assets.monsterSpecs.values(), getMonsterSpriteCellDims);
         // Load drop spritesheet assets
         loadDropAssets(this, this.assets.dropSpecs.values());
         // Load weapon & bullet visual assets
         loadWeaponAssets(this, this.assets.weaponsById.values());
         // Audio assets — every SFX + music track gets queued here.
-        loadAudioAssets(
-            this,
-            [
-                ...this.assets.sfxSpecs.values(),
-                ...this.assets.musicSpecs.values(),
-            ] as Iterable<SoundSpec>,
-        );
+        loadAudioAssets(this, [
+            ...this.assets.sfxSpecs.values(),
+            ...this.assets.musicSpecs.values(),
+        ] as Iterable<SoundSpec>);
         MaterialManager.preloadMaterials(this, this.level.materials);
     }
 
@@ -147,8 +140,7 @@ export class LoadScene extends Phaser.Scene {
         // World size === image size, so the background displays at native
         // dimensions and air-wall coords align 1:1 with image pixel space.
         const bg = this.add.image(0, 0, 'background').setOrigin(0, 0);
-        const isPixelLightingEnabled =
-            this.level.pixelLighting ?? PIXEL_LIGHTING_CONFIG.ENABLE;
+        const isPixelLightingEnabled = this.level.pixelLighting ?? PIXEL_LIGHTING_CONFIG.ENABLE;
         if (isPixelLightingEnabled) {
             bg.setTint(PIXEL_LIGHTING_CONFIG.BACKGROUND_TINT);
         }
@@ -175,7 +167,12 @@ export class LoadScene extends Phaser.Scene {
         createDropAnims(this, this.assets.dropSpecs.values());
 
         // Spawn the player character (WASD + Shift dodge + hotbar).
-        this.character = loadCharacter(this, this.level, this.assets.character, this.assets.weapons);
+        this.character = loadCharacter(
+            this,
+            this.level,
+            this.assets.character,
+            this.assets.weapons,
+        );
 
         // Editor panel hides the on-canvas HUDs so the level / walls are
         // unencumbered for editing. EditorPanel emits via EventBus since
@@ -191,17 +188,17 @@ export class LoadScene extends Phaser.Scene {
             this.character.debugBodyRect.setVisible(isEditor);
             this.character.debugHitboxRect.setVisible(isEditor);
             this.monsterSystem.setDebugVisible(isEditor);
+            this.pathDebugOverlay.setVisible(isEditor);
         };
         EventBus.on('editor-open', onEditorOpen);
-        this.events.once('shutdown', () =>
-            EventBus.removeListener('editor-open', onEditorOpen),
-        );
+        this.events.once('shutdown', () => EventBus.removeListener('editor-open', onEditorOpen));
 
         // Initialize A* Pathfinding service with level air walls
-        const pathfinder = new PathfindingService(
-            this.level.imageSize,
-            this.level.airWalls,
-        );
+        const pathfinder = new PathfindingService(this.level.imageSize, this.level.airWalls);
+
+        // Editor-only visualisation of the grid + per-monster paths.
+        // Stays hidden in production; toggled by the editor-open event.
+        this.pathDebugOverlay = createPathDebugOverlay(this, pathfinder);
 
         // Wire monster controller — self-spawns from level.monsters.
         this.monsterSystem = new MonsterController(
@@ -270,7 +267,7 @@ export class LoadScene extends Phaser.Scene {
                     a.label === 'player-bullet' ? a : b.label === 'player-bullet' ? b : null;
                 if (!bullet) continue;
                 const other = bullet === a ? b : a;
-                if (other.label !== 'monster') continue;
+                if (other.label !== 'monster' && other.label !== 'monster-hitbox') continue;
                 this.monsterSystem.applyBulletDamage(
                     this.character.weapons.getActive().damage,
                     other,
@@ -291,10 +288,7 @@ export class LoadScene extends Phaser.Scene {
 
         // Center camera on world so the viewport shows the middle of the
         // level when the browser window is smaller than the image.
-        this.cameras.main.centerOn(
-            this.level.imageSize.width / 2,
-            this.level.imageSize.height / 2,
-        );
+        this.cameras.main.centerOn(this.level.imageSize.width / 2, this.level.imageSize.height / 2);
 
         // Per-frame monster tick & material Y-sorting & drop update.
         this.materialManager = new MaterialManager(this, this.level);
@@ -335,14 +329,9 @@ export class LoadScene extends Phaser.Scene {
                     PIXEL_LIGHTING_CONFIG.PIXELATE_AMOUNT > 0 &&
                     cameraAny.filters.internal.addPixelate
                 ) {
-                    cameraAny.filters.internal.addPixelate(
-                        PIXEL_LIGHTING_CONFIG.PIXELATE_AMOUNT,
-                    );
+                    cameraAny.filters.internal.addPixelate(PIXEL_LIGHTING_CONFIG.PIXELATE_AMOUNT);
                 }
-                if (
-                    PIXEL_LIGHTING_CONFIG.USE_QUANTIZE &&
-                    cameraAny.filters.internal.addQuantize
-                ) {
+                if (PIXEL_LIGHTING_CONFIG.USE_QUANTIZE && cameraAny.filters.internal.addQuantize) {
                     cameraAny.filters.internal.addQuantize({
                         steps: [...PIXEL_LIGHTING_CONFIG.QUANTIZE_STEPS],
                         dither: PIXEL_LIGHTING_CONFIG.QUANTIZE_DITHER,
@@ -363,6 +352,7 @@ export class LoadScene extends Phaser.Scene {
 
         this.events.on('update', () => {
             this.monsterSystem.update(this.time.now);
+            this.pathDebugOverlay.refresh(this.monsterSystem.getDebugMonsters(), this.character.body);
             this.dropSystem.update();
             this.materialManager.update();
             // Push elapsed time to the UI store. Throttled to ~5Hz so we
@@ -387,6 +377,7 @@ export class LoadScene extends Phaser.Scene {
 
     shutdown(): void {
         this.audio?.destroy();
+        this.pathDebugOverlay?.destroy();
     }
 
     /**

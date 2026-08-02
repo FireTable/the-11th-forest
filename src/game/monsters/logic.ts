@@ -5,13 +5,39 @@
  * effects — monster.ts wires these into its per-frame tick.
  */
 
+// easystarjs is a CommonJS module; vitest's ESM loader doesn't always
+// expose named exports for CJS packages, so default-import and pull
+// off the .js class. Vite handles the same shape via its own CJS
+// interop at build time.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import EasyStarPkg from 'easystarjs';
+const EasyStarCtor = (EasyStarPkg as unknown as { js: new () => EasyStarInstance }).js;
+
 export type MonsterAIState = 'chase' | 'attack';
 
+/** Subset of easystar.js API we use. Kept local to avoid leaking the
+ *  CommonJS interop type into module consumers. */
+interface EasyStarInstance {
+    enableSync(): void;
+    enableDiagonals(): void;
+    disableCornerCutting(): void;
+    setGrid(grid: number[][]): void;
+    setAcceptableTiles(tiles: number[] | number): void;
+    setTileCost(tileType: number, cost: number): void;
+    findPath(
+        sx: number,
+        sy: number,
+        ex: number,
+        ey: number,
+        cb: (path: { x: number; y: number }[]) => void,
+    ): number;
+    /** Drive the queued path calculation forward. Required even in
+     *  sync mode — findPath alone queues but never iterates. */
+    calculate(): void;
+}
+
 /** Euclidean distance between two points. */
-export function distBetween(
-    a: { x: number; y: number },
-    b: { x: number; y: number },
-): number {
+export function distBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
     return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
@@ -39,6 +65,51 @@ export function decideAIState(dist: number, attackRange: number): MonsterAIState
     return dist <= attackRange ? 'attack' : 'chase';
 }
 
+/**
+ * Runtime check: has the monster reached the current waypoint? Pure
+ * helper so the controller and any future caller share the same
+ * threshold. `flushOffset` is the breathing room left between a
+ * flush waypoint and the wall (see gridToWorldSafe) — bumping the
+ * threshold by this amount prevents the monster from "arriving"
+ * at a waypoint that still sits inside its own body box.
+ */
+export function isWaypointReached(
+    distance: number,
+    bodyHalf: number,
+    flushOffset = 1,
+): boolean {
+    return distance <= bodyHalf + flushOffset;
+}
+
+/** Detect whether a world position sits in a tight corner — its grid
+ *  cell has a wall (1) or buffer (2) within 1 Chebyshev step in any
+ *  direction. Used by the wall-escape direction picker: in a corner
+ *  the next waypoint also hugs the wall, so aiming at it just drives
+ *  the monster deeper into the wall. Sliding perpendicular to the
+ *  wall normal is the right move instead. */
+export function isPositionInCorner(
+    worldPos: { x: number; y: number },
+    cellSize: number,
+    gridWidth: number,
+    gridHeight: number,
+    grid: readonly (readonly number[])[],
+): boolean {
+    const gx = Math.max(0, Math.min(gridWidth - 1, Math.floor(worldPos.x / cellSize)));
+    const gy = Math.max(0, Math.min(gridHeight - 1, Math.floor(worldPos.y / cellSize)));
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const ny = gy + dy;
+            const nx = gx + dx;
+            if (ny < 0 || ny >= gridHeight || nx < 0 || nx >= gridWidth) {
+                return true; // out-of-bounds counts as a wall
+            }
+            if (grid[ny][nx] !== 0) return true;
+        }
+    }
+    return false;
+}
+
 /** Velocity for chasing the player at a given move speed. */
 export function chaseVelocity(
     dirToPlayer: { x: number; y: number },
@@ -59,20 +130,21 @@ export interface PathGridPoint {
     y: number;
 }
 
-interface AStarNode {
-    x: number;
-    y: number;
-    g: number;
-    h: number;
-    f: number;
-    parent: AStarNode | null;
-}
-
 export class PathfindingService {
     private readonly gridWidth: number;
     private readonly gridHeight: number;
     private readonly cellSize: number;
-    private readonly grid: number[][]; // 0: walkable, 1: blocked
+    /** Wall + buffer grid (1 = wall, 2 = 1-cell buffer, 0 = walkable).
+     *  Buffer cells are stored separately so debug overlay can render
+     *  them in amber, but A* and LoS treat them as blocked — the
+     *  combined effect routes paths around the wall AND keeps the
+     *  monster's body 1 cell clear of the actual wall when the flush
+     *  pull snaps the waypoint to the cell centre. */
+    private readonly grid: number[][];
+    /** Cached inflated easystar instances, keyed by inflation cell count.
+     *  Same inflation → same derived grid → reuse. Each entry already
+     *  has its grid + acceptableTiles + tileCost configured. */
+    private readonly inflatedEasystars: Map<number, EasyStarInstance> = new Map();
 
     constructor(
         levelSize: { width: number; height: number },
@@ -84,12 +156,67 @@ export class PathfindingService {
         this.gridHeight = Math.ceil(levelSize.height / cellSize);
 
         // Initialize empty walkable grid
-        this.grid = Array.from({ length: this.gridHeight }, () =>
-            Array(this.gridWidth).fill(0),
-        );
+        this.grid = Array.from({ length: this.gridHeight }, () => Array(this.gridWidth).fill(0));
 
-        // Rasterize air-wall polygons onto grid with boundary padding
+        // Rasterize air-wall polygons onto grid. Only walls (1) are
+        // marked — body-aware inflation is applied per-monster at
+        // findPath() time.
         this.rasterizeAirWalls(airWalls);
+    }
+
+    /**
+     * Build (or fetch from cache) an easystar instance whose grid has
+     * every wall cell expanded outward by `inflation` cells in all 8
+     * directions. A cell inside that expanded zone is treated as a
+     * wall — so the resulting path can only traverse cells where the
+     * monster's body rectangle actually fits.
+     *
+     * `inflation` is in cells; the caller converts from world units.
+     * Cached so we don't re-derive the grid every frame.
+     */
+    private getEasystarForInflation(inflation: number): EasyStarInstance {
+        const cached = this.inflatedEasystars.get(inflation);
+        if (cached) return cached;
+        const derived = this.inflateGrid(inflation);
+        const es = new EasyStarCtor();
+        es.enableSync();
+        es.enableDiagonals();
+        es.disableCornerCutting();
+        es.setGrid(derived);
+        es.setAcceptableTiles([0]);
+        this.inflatedEasystars.set(inflation, es);
+        return es;
+    }
+
+    /** Return grid where wall cells (1) and 1-cell buffer cells (2) are
+     *  marked as blocked. Caller passes the result to an easystar
+     *  instance (or caches it). The buffer is treated as blocked so
+     *  A* routes around the wall with 1 cell of clearance — combined
+     *  with the cellSize + flushGap on the waypoint itself, the
+     *  monster's body lands ≥ 1 cell + flushGap clear of any wall. */
+    private inflateGrid(radius: number): number[][] {
+        const out: number[][] = Array.from({ length: this.gridHeight }, (_, gy) =>
+            Array.from({ length: this.gridWidth }, (_, gx) => {
+                if (this.grid[gy][gx] !== 0) return 1;
+                for (let dy = -radius; dy <= radius; dy++) {
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const ny = gy + dy;
+                        const nx = gx + dx;
+                        if (
+                            ny < 0 ||
+                            ny >= this.gridHeight ||
+                            nx < 0 ||
+                            nx >= this.gridWidth
+                        )
+                            continue;
+                        if (this.grid[ny][nx] !== 0) return 1;
+                    }
+                }
+                return 0;
+            }),
+        );
+        return out;
     }
 
     /** Convert world coordinates (pixels) to grid coordinates. */
@@ -108,8 +235,25 @@ export class PathfindingService {
         };
     }
 
+    /** Cheap "is the grid cell at worldPos in a tight corner" detector
+     *  exposed on PathfindingService so the monster controller can
+     *  decide the wall-escape direction without reaching into the
+     *  private grid. */
+    isPositionInCorner(worldPos: { x: number; y: number }): boolean {
+        return isPositionInCorner(
+            worldPos,
+            this.cellSize,
+            this.gridWidth,
+            this.gridHeight,
+            this.grid,
+        );
+    }
+
     /** Helper for single raycast check on grid. */
-    private checkSingleRay(start: { x: number; y: number }, end: { x: number; y: number }): boolean {
+    private checkSingleRay(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+    ): boolean {
         const p1 = this.worldToGrid(start);
         const p2 = this.worldToGrid(end);
 
@@ -145,7 +289,11 @@ export class PathfindingService {
     }
 
     /** Check line-of-sight raycast between two world positions with body corridor clearance. */
-    hasLineOfSight(start: { x: number; y: number }, end: { x: number; y: number }, bodyRadius = 10): boolean {
+    hasLineOfSight(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+        bodyRadius = 10,
+    ): boolean {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const len = Math.hypot(dx, dy);
@@ -173,7 +321,10 @@ export class PathfindingService {
     }
 
     /** Smooths raw A* path by skipping intermediate waypoints using line-of-sight raycasts. */
-    private smoothPath(rawPath: { x: number; y: number }[]): { x: number; y: number }[] {
+    private smoothPath(
+        rawPath: { x: number; y: number }[],
+        bodyRadius = 18,
+    ): { x: number; y: number }[] {
         if (rawPath.length <= 2) return rawPath;
 
         const smoothed: { x: number; y: number }[] = [rawPath[0]];
@@ -181,9 +332,8 @@ export class PathfindingService {
 
         while (curr < rawPath.length - 1) {
             let next = rawPath.length - 1;
-            // Look ahead for the farthest reachable waypoint with clear line of sight
             while (next > curr + 1) {
-                if (this.hasLineOfSight(rawPath[curr], rawPath[next])) {
+                if (this.hasLineOfSight(rawPath[curr], rawPath[next], bodyRadius)) {
                     break;
                 }
                 next--;
@@ -195,139 +345,267 @@ export class PathfindingService {
         return smoothed;
     }
 
-    /** Synchronous pure A* pathfinding with string-pulling smoothing. Returns world positions or null. */
+    /**
+     * Pick a unit-vector direction that the monster can actually travel
+     * along without immediately running into a wall. Used by the
+     * stuck-recovery escape impulse.
+     *
+     * Strategy: probe 8 directions in order — first opposite to the
+     * nearest cardinal of `targetAway` (so the monster steps AWAY from
+     * the target on the assumption it overshot into a corner), then
+     * sweep clockwise from there. Return the first candidate whose
+     * 32-px probe point has a clear LoS from `from`.
+     *
+     * Pure: no side effects. Returns null if every direction is
+     * blocked (deep dead-end — caller should fall back to a different
+     * recovery path).
+     */
+    pickEscapeDirection(
+        from: { x: number; y: number },
+        targetAway?: { x: number; y: number },
+    ): { x: number; y: number } | null {
+        // Previous version raycast-probed 32 px in 8 directions. That
+        // failed on tight corners: cellSize is 16 px, monsters are
+        // 32-40 px wide, and the ray would land inside the monster's
+        // own body or in the next cell which is often a wall. Result:
+        // every direction rejected → null → fallback to the old
+        // constant angle → still ramming the wall.
+        //
+        // New approach: ask the GRID which of the 8 neighbours of the
+        // monster's current cell are walkable (grid !== 1). Pick the
+        // walkable neighbour that points MOST away from targetAway.
+        // This is a purely grid-level query — no raycast, no probe
+        // distance — so it succeeds as long as the monster has any
+        // open neighbour at all (which is always true outside a
+        // physical dead-end).
+        const g = this.worldToGrid(from);
+        const myCell = this.grid[g.y]?.[g.x];
+        // If the monster's own cell is solid (shouldn't happen but
+        // defends against a future refactor that lets A* spawn inside
+        // walls), bail out — caller falls back to the constant angle.
+        if (myCell === undefined || myCell === 1) return null;
+
+        // Bias order: start at the direction opposite targetAway,
+        // sweep clockwise. Same idea as before — pick the neighbour
+        // that heads "out of the corner" first.
+        const baseAngle = targetAway
+            ? Math.atan2(targetAway.y - from.y, targetAway.x - from.x) + Math.PI
+            : 0;
+
+        let best: { x: number; y: number } | null = null;
+        let bestScore = -Infinity;
+
+        for (let k = 0; k < 8; k++) {
+            const ang = baseAngle + (k / 8) * Math.PI * 2;
+            // Round to nearest of {-1, 0, 1} — explicit so the round
+            // never lands on ±2 when cos/sin drift past 0.5 in the
+            // wrong direction.
+            const stepX = Math.max(-1, Math.min(1, Math.round(Math.cos(ang))));
+            const stepY = Math.max(-1, Math.min(1, Math.round(Math.sin(ang))));
+            const nx = g.x + stepX;
+            const ny = g.y + stepY;
+            if (nx < 0 || nx >= this.gridWidth) continue;
+            if (ny < 0 || ny >= this.gridHeight) continue;
+            const cell = this.grid[ny][nx];
+            if (cell === 1) continue; // solid wall
+
+            // Score: how much this direction points away from
+            // targetAway. Higher = better. Using (1 - alignment)
+            // means cells directly opposite the target score ~2,
+            // perpendicular score ~1, toward-target score ~0.
+            const dirX = Math.cos(ang);
+            const dirY = Math.sin(ang);
+            let score = 1;
+            if (targetAway) {
+                const tx = targetAway.x - from.x;
+                const ty = targetAway.y - from.y;
+                const tlen = Math.hypot(tx, ty);
+                if (tlen > 0) {
+                    const alignment = (dirX * tx + dirY * ty) / tlen;
+                    score = 1 - alignment; // [-1..2]
+                }
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                best = { x: dirX, y: dirY };
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Skip leading waypoints that sit in the 1-cell buffer zone
+     * (grid === 2). The first chase step heading along the A* path
+     * shouldn't be a buffer-zone waypoint hugging the wall — that's
+     * exactly what makes a monster grind along a wall edge. Pure:
+     * returns the new index, clamped to the last waypoint.
+     */
+    skipBufferZoneWaypoints(path: readonly { x: number; y: number }[], startIdx: number): number {
+        if (!path || path.length === 0) return 0;
+        return Math.max(0, Math.min(path.length - 1, startIdx));
+    }
+
+    /**
+     * A* pathfinding with body-aware inflation. Returns world positions or null.
+     *
+     * @param start       World position (body center).
+     * @param end         World position.
+     * @param bodyHalfW   Monster body half-width in world units.
+     * @param bodyHalfH   Monster body half-height in world units.
+     * @param safety      Multiplier on body extents (1.3 = 30% padding).
+     */
     findPath(
         start: { x: number; y: number },
         end: { x: number; y: number },
+        bodyHalfW = 0,
+        bodyHalfH = 0,
+        _safety = 1.0,
     ): { x: number; y: number }[] | null {
-        const startG = this.worldToGrid(start);
-        const endG = this.worldToGrid(end);
+        // Set inflation = 0 for 100% flush wall alignment (green body box touches wall edge)
+        const result = this.findPathWithInflation(start, end, bodyHalfW, bodyHalfH, 0);
+        if (result !== null) return result;
+        return [start, end];
+    }
+
+    /** Inner findPath with a fixed inflation. Returns null when A*
+     *  can't reach — caller decides whether to retry with smaller
+     *  inflation. */
+    private findPathWithInflation(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+        bodyHalfW: number,
+        bodyHalfH: number,
+        inflation: number,
+    ): { x: number; y: number }[] | null {
+        // Snap start/end onto the inflated grid so a monster spawned
+        // flush against a wall still gets a valid path.
+        const startG = this.snapToWalkable(this.worldToGrid(start), inflation);
+        const endG = this.snapToWalkable(this.worldToGrid(end), inflation);
 
         if (startG.x === endG.x && startG.y === endG.y) {
             return [end];
         }
 
-        // Fast path: direct line of sight bypasses grid search completely
-        if (this.hasLineOfSight(start, end)) {
-            return [start, end];
-        }
-
-        const openList: AStarNode[] = [];
-        const closedSet = new Set<string>();
-
-        const getKey = (x: number, y: number) => `${x},${y}`;
-        const heuristic = (x1: number, y1: number, x2: number, y2: number) =>
-            Math.hypot(x2 - x1, y2 - y1);
-
-        const startNode: AStarNode = {
-            x: startG.x,
-            y: startG.y,
-            g: 0,
-            h: heuristic(startG.x, startG.y, endG.x, endG.y),
-            f: 0,
-            parent: null,
-        };
-        startNode.f = startNode.g + startNode.h;
-        openList.push(startNode);
-
-        // Directions: 8-way movement (orthogonals + diagonals)
-        const neighbors = [
-            { x: 0, y: -1, cost: 1 },
-            { x: 1, y: 0, cost: 1 },
-            { x: 0, y: 1, cost: 1 },
-            { x: -1, y: 0, cost: 1 },
-            { x: 1, y: -1, cost: 1.414 },
-            { x: 1, y: 1, cost: 1.414 },
-            { x: -1, y: 1, cost: 1.414 },
-            { x: -1, y: -1, cost: 1.414 },
-        ];
-
-        let maxSteps = 1500;
-
-        while (openList.length > 0 && maxSteps-- > 0) {
-            // Pick lowest f node
-            let currentIdx = 0;
-            for (let i = 1; i < openList.length; i++) {
-                if (openList[i].f < openList[currentIdx].f) {
-                    currentIdx = i;
-                }
-            }
-
-            const current = openList[currentIdx];
-
-            if (current.x === endG.x && current.y === endG.y) {
-                // Reconstruct path
-                const rawPath: PathGridPoint[] = [];
-                let curr: AStarNode | null = current;
-                while (curr) {
-                    rawPath.unshift({ x: curr.x, y: curr.y });
-                    curr = curr.parent;
-                }
-                const worldPoints = rawPath.map((p) => this.gridToWorld(p));
-                return this.smoothPath(worldPoints);
-            }
-
-            openList.splice(currentIdx, 1);
-            closedSet.add(getKey(current.x, current.y));
-
-            for (const n of neighbors) {
-                const nx = current.x + n.x;
-                const ny = current.y + n.y;
-
-                if (
-                    nx < 0 ||
-                    nx >= this.gridWidth ||
-                    ny < 0 ||
-                    ny >= this.gridHeight ||
-                    this.grid[ny][nx] === 1
-                ) {
-                    continue;
-                }
-
-                // Prevent diagonal corner cutting into walls
-                if (n.x !== 0 && n.y !== 0) {
-                    if (this.grid[current.y][nx] === 1 || this.grid[ny][current.x] === 1) {
-                        continue;
-                    }
-                }
-
-                if (closedSet.has(getKey(nx, ny))) continue;
-
-                const stepCost = this.grid[ny][nx] === 2 ? n.cost * 2.5 : n.cost;
-                const gScore = current.g + stepCost;
-                let neighborNode = openList.find((node) => node.x === nx && node.y === ny);
-
-                if (!neighborNode) {
-                    neighborNode = {
-                        x: nx,
-                        y: ny,
-                        g: gScore,
-                        h: heuristic(nx, ny, endG.x, endG.y),
-                        f: 0,
-                        parent: current,
-                    };
-                    neighborNode.f = neighborNode.g + neighborNode.h;
-                    openList.push(neighborNode);
-                } else if (gScore < neighborNode.g) {
-                    neighborNode.g = gScore;
-                    neighborNode.f = neighborNode.g + neighborNode.h;
-                    neighborNode.parent = current;
-                }
-            }
-        }
-
-        return null;
+        const es = this.getEasystarForInflation(inflation);
+        let result: { x: number; y: number }[] | null = null;
+        let found = false;
+        es.findPath(
+            startG.x,
+            startG.y,
+            endG.x,
+            endG.y,
+            (path: { x: number; y: number }[]) => {
+                if (!path || path.length === 0) return;
+                const worldPoints = path.map((p) => this.gridToWorldFlush(p, bodyHalfW, bodyHalfH));
+                worldPoints[0] = start;
+                const bodyRadius = Math.max(bodyHalfW, bodyHalfH);
+                result = this.smoothPath(worldPoints, bodyRadius);
+                found = true;
+            },
+        );
+        es.calculate();
+        return found ? result : null;
     }
+
+    /** Convert grid cell to world coordinate adjusted flush to adjacent
+     *  wall + buffer edges, with a flushGap (default 4px) breathing-
+     *  room gap so the monster never parks inside its own body box
+     *  at the wall edge. The 1-cell buffer cells (value 2) trigger
+     *  the pull too, so the waypoint lands at the cell centre 1 cell
+     *  + flushGap away from the actual wall — combined with A*
+     *  routing through non-buffer cells, the body always travels
+     *  with at least one full cell of clearance. */
+    private gridToWorldFlush(
+        gridPos: PathGridPoint,
+        bodyHalfW: number,
+        bodyHalfH: number,
+        flushGap = 4,
+    ): { x: number; y: number } {
+        let x = gridPos.x * this.cellSize + this.cellSize / 2;
+        let y = gridPos.y * this.cellSize + this.cellSize / 2;
+
+        if (bodyHalfW <= 0 && bodyHalfH <= 0) return { x, y };
+
+        // Treat wall (1) and buffer (2) as solid for the flush pull —
+        // any neighbour that touches either one pulls the waypoint
+        // away from it.
+        const rightBlocked = this.grid[gridPos.y]?.[gridPos.x + 1];
+        const leftBlocked = this.grid[gridPos.y]?.[gridPos.x - 1];
+        const bottomBlocked = this.grid[gridPos.y + 1]?.[gridPos.x];
+        const topBlocked = this.grid[gridPos.y - 1]?.[gridPos.x];
+
+        // Wall/buffer on the right — pull x left so the body's right
+        // edge sits flushGap clear.
+        if (rightBlocked === 1 || rightBlocked === 2) {
+            x = (gridPos.x + 1) * this.cellSize - bodyHalfW - flushGap;
+        }
+        // Wall/buffer on the left — push x right.
+        else if (leftBlocked === 1 || leftBlocked === 2) {
+            x = gridPos.x * this.cellSize + bodyHalfW + flushGap;
+        }
+
+        // Wall/buffer below — pull y up.
+        if (bottomBlocked === 1 || bottomBlocked === 2) {
+            y = (gridPos.y + 1) * this.cellSize - bodyHalfH - flushGap;
+        }
+        // Wall/buffer above — push y down.
+        else if (topBlocked === 1 || topBlocked === 2) {
+            y = gridPos.y * this.cellSize + bodyHalfH + flushGap;
+        }
+
+        return { x, y };
+    }
+
+
+
+    /** If a grid cell sits on an inflated wall, walk outward to the nearest
+     *  non-wall cell in the same inflation's grid. Prevents null results
+     *  when the endpoint or start is on a wall. */
+    private snapToWalkable(
+        start: PathGridPoint,
+        inflation: number,
+        maxRadius = 2,
+    ): PathGridPoint {
+        const inflated = this.inflateGrid(inflation);
+        const w = inflated[0]?.length ?? 0;
+        const h = inflated.length;
+        if (start.x >= 0 && start.x < w && start.y >= 0 && start.y < h) {
+            if (inflated[start.y][start.x] === 0) return start;
+        }
+        // Spiral outward up to maxRadius cells to find a walkable cell.
+        // Capped so a monster spawned flush against a wall doesn't get
+        // its A* start teleported across the map — the first waypoint
+        // would then be several cells away from the actual body and
+        // the gap looks like a glitch.
+        const cap = Math.min(maxRadius, Math.max(w, h));
+        for (let r = 1; r <= cap; r++) {
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+                    const nx = start.x + dx;
+                    const ny = start.y + dy;
+                    if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                    if (inflated[ny][nx] === 0) return { x: nx, y: ny };
+                }
+            }
+        }
+        // No walkable cell within maxRadius — return the original
+        // start (may be on a wall). A* will likely fail, then the
+        // outer fallback retries with smaller inflation.
+        return start;
+    }
+
+
 
     /** Simple Point-in-Polygon check (Ray casting). */
     private pointInPolygon(px: number, py: number, poly: readonly [number, number][]): boolean {
         let inside = false;
         for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-            const xi = poly[i][0], yi = poly[i][1];
-            const xj = poly[j][0], yj = poly[j][1];
-            const intersect =
-                yi > py !== yj > py &&
-                px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+            const xi = poly[i][0],
+                yi = poly[i][1];
+            const xj = poly[j][0],
+                yj = poly[j][1];
+            const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
             if (intersect) inside = !inside;
         }
         return inside;
@@ -399,11 +677,9 @@ export class PathfindingService {
  * Caller pre-filters by kind if needed (e.g. melee-only for contact damage).
  * Pure: returns null if nothing matches.
  */
-export function pickClosestMonster<M extends { dead: boolean; body: { position: { x: number; y: number } } }>(
-    point: { x: number; y: number },
-    monsters: readonly M[],
-    maxDist: number,
-): M | null {
+export function pickClosestMonster<
+    M extends { dead: boolean; body: { position: { x: number; y: number } } },
+>(point: { x: number; y: number }, monsters: readonly M[], maxDist: number): M | null {
     let best: M | null = null;
     let bestDistSq = maxDist * maxDist;
     for (const m of monsters) {
@@ -423,12 +699,9 @@ export function pickClosestMonster<M extends { dead: boolean; body: { position: 
 /**
  * Calculate separation (repulsion) vector to prevent monsters from stacking or blocking each other.
  */
-export function calcSeparationForce<M extends { dead: boolean; body: { position: { x: number; y: number } } }>(
-    current: M,
-    allMonsters: readonly M[],
-    radius = 32,
-    maxForce = 1.0,
-): { x: number; y: number } {
+export function calcSeparationForce<
+    M extends { dead: boolean; body: { position: { x: number; y: number } } },
+>(current: M, allMonsters: readonly M[], radius = 32, maxForce = 1.0): { x: number; y: number } {
     if (current.dead) return { x: 0, y: 0 };
     const myPos = current.body.position;
     let pushX = 0;
@@ -465,7 +738,11 @@ export function calcSeparationForce<M extends { dead: boolean; body: { position:
 /**
  * Calculate surround slot position around player for a monster index to avoid single-file bottlenecks.
  */
-export function getSurroundOffset(monsterIndex: number, totalMonsters: number, radius = 28): { x: number; y: number } {
+export function getSurroundOffset(
+    monsterIndex: number,
+    totalMonsters: number,
+    radius = 28,
+): { x: number; y: number } {
     if (totalMonsters <= 1) return { x: 0, y: 0 };
     const angle = (monsterIndex / totalMonsters) * Math.PI * 2;
     return {
@@ -485,7 +762,8 @@ export function getPathLookAheadPoint(
     checkLoS?: (p1: { x: number; y: number }, p2: { x: number; y: number }) => boolean,
 ): { target: { x: number; y: number }; nextIdx: number } {
     if (!path || path.length === 0) return { target: currentPos, nextIdx: currentIdx };
-    if (currentIdx >= path.length) return { target: path[path.length - 1], nextIdx: path.length - 1 };
+    if (currentIdx >= path.length)
+        return { target: path[path.length - 1], nextIdx: path.length - 1 };
 
     let idx = currentIdx;
     while (idx < path.length - 1 && distBetween(currentPos, path[idx]) < 12) {

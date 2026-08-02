@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import {
-    formatImageSize,
-    parseImageSize,
-} from '@/lib/levels/types';
+import { formatImageSize, parseImageSize } from '@/lib/levels/types';
 import { parseLevelYaml, parseLevelIndex } from '@/lib/levels/parser';
 
 describe('parseImageSize / formatImageSize', () => {
@@ -282,6 +279,8 @@ levels:
     });
 
     it('rejects non-string entries', () => {
-        expect(() => parseLevelIndex('levels:\n  - 42\n')).toThrow(/expected string|non-empty string/);
+        expect(() => parseLevelIndex('levels:\n  - 42\n')).toThrow(
+            /expected string|non-empty string/,
+        );
     });
 });

@@ -10,4 +10,4 @@ bullet:
     scale: 0.25
     anchor: [0.5, 0.5]
 sfx:
-  bulletWall: bullet-wall
+    bulletWall: bullet-wall

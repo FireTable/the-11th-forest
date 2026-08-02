@@ -2,7 +2,7 @@ name: Shotgun
 damage: 5
 cooldownMs: 800
 range: 400
-clipSize: 2
+clipSize: 4
 reloadTimeMs: 2400
 bulletsPerShot: 5
 visual:

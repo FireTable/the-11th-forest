@@ -45,11 +45,11 @@ import {
     decideAIState,
     dirTo,
     distBetween,
+    isWaypointReached,
     pickClosestMonster,
     PathfindingService,
     calcSeparationForce,
     getSurroundOffset,
-    getPathLookAheadPoint,
 } from './logic';
 
 // ─── Entity ──────────────────────────────────────────────────────────────
@@ -139,16 +139,24 @@ export class Monster {
     lastHitAt = 0;
     /** Set by MonsterController when killed — used to suppress further collisions. */
     dead = false;
+    hitboxBody?: MatterJS.BodyType;
     /** One-shot guard so the aggro growl only fires once per monster. */
     hasAggroed = false;
     /** Waypoints for pathfinding navigation. */
     path: { x: number; y: number }[] | null = null;
     currentWaypointIdx = 0;
+    lastPathRecalcAt = 0;
+    lastRecalcTargetPos = { x: 0, y: 0 };
     /** Stuck detection and emergency pathing recovery fields. */
     stuckCheckPos = { x: 0, y: 0 };
     stuckTicks = 0;
     lastStuckCheckAt = 0;
     noLoSUntil = 0;
+    /** When > now (ms), the collision handler is driving this monster's
+     *  velocity directly (Matter collisionstart fired). The per-frame
+     *  velocity loop skips its LERP / targetDir work for the duration
+     *  so the escape direction isn't immediately overwritten. */
+    wallEscapeUntil = 0;
     /** Wave identifier from the level spawn entry — used by `clear`
      *  triggers that wait on a specific wave. Undefined for spawns that
      *  aren't part of a named wave. */
@@ -171,45 +179,65 @@ export class Monster {
         this.stuckCheckPos = { x, y };
         this.waveId = waveId;
 
-        let w = spec.body.halfW * 2;
-        let h = spec.body.halfH * 2;
-        let centerY = y - spec.body.halfH;
+        // Hitbox (Red Box): full sprite frame size for bullet & attack collisions
+        let hw = spec.body.halfW * 2;
+        let hh = spec.body.halfH * 2;
 
         if (spec.sprite && scene.textures.exists(textureKey(spec))) {
             const frame = scene.textures.getFrame(textureKey(spec), 0);
             const scale = spec.sprite.scale ?? 1.0;
             if (frame) {
-                w = frame.width * scale * 0.8;
-                h = frame.height * scale;
-                centerY = y - h / 2;
+                hw = frame.width * scale * 0.8;
+                hh = frame.height * scale;
             }
         }
 
-        this.hitboxWidth = w;
-        this.hitboxHeight = h;
+        this.hitboxWidth = hw;
+        this.hitboxHeight = hh;
 
-        this.body = scene.matter.add.rectangle(x, centerY, w, h, {
+        // Bodybox (Green Box): in the footer
+        const bw = spec.body.halfW * 2;
+        const bh = spec.body.halfH * 2;
+        const centerY = y;
+
+        this.body = scene.matter.add.rectangle(x, centerY, bw, bh, {
             label: 'monster',
             friction: 0,
             frictionStatic: 0,
             frictionAir: 0.02,
             restitution: 0,
-            chamfer: { radius: Math.min(8, Math.min(w, h) / 4) },
+            chamfer: { radius: Math.min(8, Math.min(bw, bh) / 4) },
             collisionFilter: {
                 category: CAT.MONSTER_MELEE,
                 mask: CAT.CHARACTER | CAT.BULLET | (CAT.WALL_TALL | CAT.WALL_SHORT),
             },
         });
 
+        // Hitbox Sensor (Red Box): full sprite dimensions for bullet hits & attacks
+        const hitCenterY = y - hh / 2;
+        this.hitboxBody = scene.matter.add.rectangle(x, hitCenterY, hw, hh, {
+            label: 'monster-hitbox',
+            isSensor: true,
+            collisionFilter: {
+                category: CAT.MONSTER_MELEE,
+                mask: CAT.BULLET,
+            },
+        });
+        (this.body as any).monsterRef = this;
+        (this.hitboxBody as any).monsterRef = this;
+
         const matter = (Phaser as any).Physics.Matter.Matter;
         matter.Body.setInertia(this.body, Infinity);
 
-        const tint = weapon.projectile !== undefined
-            ? Monster.TINT_RANGED
-            : Monster.TINT_MELEE;
-        
         // Foot shadow based on hit box size
-        this.shadow = scene.add.ellipse(x, y, spec.body.halfW * 2, spec.body.halfH * 0.8, 0x000000, 0.3);
+        this.shadow = scene.add.ellipse(
+            x,
+            y,
+            spec.body.halfW * 2,
+            spec.body.halfH * 0.8,
+            0x000000,
+            0.3,
+        );
 
         // Status HUD above monster hitbox
         this.statusHud = new StatusHud(scene, this.body);
@@ -227,9 +255,10 @@ export class Monster {
         this.debugBodyRect.setDepth(9999);
         this.debugBodyRect.setVisible(false);
 
-        // Full Hitbox Debug Rect (Purple / Red outline matching full Body)
-        this.debugHitboxRect = scene.add.rectangle(x, centerY, w, h, tint, 0.25);
-        this.debugHitboxRect.setStrokeStyle(2, tint, 1);
+        // Full Hitbox Debug Rect (Red outline for all Hitboxes)
+        const hitboxTint = 0xef4444;
+        this.debugHitboxRect = scene.add.rectangle(x, centerY, hw, hh, hitboxTint, 0.25);
+        this.debugHitboxRect.setStrokeStyle(2, hitboxTint, 1);
         this.debugHitboxRect.setDepth(10000);
         this.debugHitboxRect.setVisible(false);
 
@@ -260,6 +289,9 @@ export class Monster {
 
     destroy(scene: Phaser.Scene): void {
         scene.matter.world.remove(this.body);
+        if (this.hitboxBody) {
+            scene.matter.world.remove(this.hitboxBody);
+        }
         this.debugBodyRect?.destroy();
         this.debugHitboxRect?.destroy();
         this.sprite?.destroy();
@@ -278,10 +310,7 @@ export interface RolledDrop {
 }
 
 /** Roll each entry independently; return all that succeed. */
-export function rollDrops(
-    table: DropRef[],
-    byId: (id: string) => unknown,
-): RolledDrop[] {
+export function rollDrops(table: DropRef[], byId: (id: string) => unknown): RolledDrop[] {
     const out: RolledDrop[] = [];
     for (const entry of table) {
         if (Math.random() < entry.chance) {
@@ -335,13 +364,13 @@ export class MonsterController {
         scene: Phaser.Scene,
         spawns:
             | {
-                  spec: MonsterSpec;
-                  weapon: WeaponSpec;
-                  x: number;
-                  y: number;
-                  trigger?: MonsterTrigger;
-                  waveId?: string;
-              }[]
+                spec: MonsterSpec;
+                weapon: WeaponSpec;
+                x: number;
+                y: number;
+                trigger?: MonsterTrigger;
+                waveId?: string;
+            }[]
             | undefined,
         playerBody: MatterJS.BodyType,
         cb: MonsterControllerCallbacks,
@@ -393,14 +422,20 @@ export class MonsterController {
             .map((m, idx) => ({ id: idx, x: m.body.position.x, y: m.body.position.y }));
     }
 
+    /** Editor-only: expose raw Monster handles so the path debug
+     *  overlay can read `m.path` / `m.currentWaypointIdx`. Production
+     *  code uses the lightweight getActiveMonsters() above. */
+    public getDebugMonsters(): readonly Monster[] {
+        return this.monsters.filter((m) => !m.dead && m.state !== 'dying');
+    }
+
     /** Per-frame: AI tick + projectile sync + cleanup. */
     update(time: number): void {
         this.advancePendingSpawns(time);
         const pp = this.playerBody.position;
         const playerMovedDist = distBetween(this.lastPlayerPos, pp);
         const shouldRecalcPaths =
-            this.pathfinder &&
-            (playerMovedDist > 16 || time - this.lastPathCalcAt > 150);
+            this.pathfinder && (playerMovedDist > 16 || time - this.lastPathCalcAt > 150);
 
         if (shouldRecalcPaths) {
             this.lastPathCalcAt = time;
@@ -420,27 +455,74 @@ export class MonsterController {
             const dirToPlayer = dirTo(mp, pp);
 
             // Compute surround target offset around player to prevent crowding single-file
-            const surroundOffset = getSurroundOffset(i, totalMonsters, Math.min(28, m.weapon.range * 0.45));
+            const surroundOffset = getSurroundOffset(
+                i,
+                totalMonsters,
+                Math.min(28, m.weapon.range * 0.45),
+            );
             const targetPos = { x: pp.x + surroundOffset.x, y: pp.y + surroundOffset.y };
 
             // Dynamic clearance radius based on exact physical Hitbox dimensions
             const monsterBodyRadius = m.getHitboxRadius();
+            // Foot position — the A* waypoints correspond to where the
+            // monster's FEET stand, not where its body centre sits.
+            // The body rectangle extends halfH below mp (the spec
+            // positions the rectangle with its top edge at the sprite
+            // head and its bottom edge at the feet). Driving the path
+            // from the foot position means a waypoint "passes" the
+            // wall if the feet fit there — the body clears the wall
+            // automatically. Otherwise the path grazes the wall top
+            // and the body bottom collides.
+            const monsterBodyHalfH = m.spec.body.halfH;
+            const footX = mp.x;
+            const footY = Math.round(
+                mp.y + (m.sprite ? m.sprite.displayHeight / 2 - monsterBodyHalfH : 0),
+            );
+            const footPos = { x: footX, y: footY - monsterBodyHalfH / 2 };
 
-            // Per-monster Active Stuck Detector (checks every 120ms)
+            // Per-monster Active Stuck Detector — 60ms window so escape fires
+            // before the player sees a single bounce. Measures
+            // PROGRESS TOWARD THE TARGET rather than raw movedDist:
+            // when Matter bounces the body off a wall, raw movedDist
+            // stays large (the body reflected, often perpendicular to
+            // the wall) so the original < 1.5 px heuristic never
+            // trips. A monster bouncing against a wall is making zero
+            // progress toward its target, which is exactly what we
+            // need to detect.
             let isStuckEmergency = false;
-            if (time - m.lastStuckCheckAt >= 120) {
+            if (time - m.lastStuckCheckAt >= 60) {
                 m.lastStuckCheckAt = time;
-                const movedDist = distBetween(mp, m.stuckCheckPos);
-                if (m.state === 'chase' && movedDist < 3.0) {
+                // Progress = how much the monster closed the gap to
+                // targetPos in this window. Negative = moving away.
+                const fromOld = {
+                    x: m.stuckCheckPos.x - targetPos.x,
+                    y: m.stuckCheckPos.y - targetPos.y,
+                };
+                const fromNow = { x: mp.x - targetPos.x, y: mp.y - targetPos.y };
+                const oldDist = Math.hypot(fromOld.x, fromOld.y);
+                const nowDist = Math.hypot(fromNow.x, fromNow.y);
+                const progress = oldDist - nowDist; // > 0 = closing in
+                // Threshold: less than 1 px of closing over 60ms
+                // (~16.6 px/s) while in chase = stuck. Generous so
+                // curving pursuit doesn't false-positive.
+                if (m.state === 'chase' && progress < 1.0) {
                     m.stuckTicks++;
                     if (m.stuckTicks >= 1) {
                         isStuckEmergency = true;
                         m.noLoSUntil = time + 2000; // Disable direct LoS shortcut for 2s
                         if (this.pathfinder) {
-                            const newPath = this.pathfinder.findPath(mp, targetPos);
+                            const newPath = this.pathfinder.findPath(
+                                footPos,
+                                targetPos,
+                                m.spec.body.halfW,
+                                monsterBodyHalfH,
+                            );
                             if (newPath && newPath.length > 1) {
                                 m.path = newPath;
-                                m.currentWaypointIdx = 1;
+                                m.currentWaypointIdx = this.pathfinder.skipBufferZoneWaypoints(
+                                    newPath,
+                                    1,
+                                );
                             }
                         }
                     }
@@ -450,33 +532,12 @@ export class MonsterController {
                 m.stuckCheckPos = { x: mp.x, y: mp.y };
             }
 
-            // Recalculate A* path if needed globally
-            if (shouldRecalcPaths && dist > m.weapon.range && this.pathfinder) {
-                const canUseLoS = time >= m.noLoSUntil;
-                if (canUseLoS && this.pathfinder.hasLineOfSight(mp, targetPos, monsterBodyRadius)) {
-                    m.path = [mp, targetPos];
-                    m.currentWaypointIdx = 1;
-                } else {
-                    const path = this.pathfinder.findPath(mp, targetPos);
-                    if (path && path.length > 1) {
-                        m.path = path;
-                        m.currentWaypointIdx = 1; // 0 is start cell
-                    } else {
-                        m.path = null;
-                    }
-                }
-            }
-
             if (m.state === 'dying') {
                 // Freeze physics body during death animation
                 this.matter.Body.setVelocity(m.body, { x: 0, y: 0 });
                 if (m.statusHud) {
                     const halfH = m.sprite ? m.sprite.displayHeight / 2 : m.spec.body.halfH;
-                    m.statusHud.update(
-                        { hp: 0, maxHp: m.spec.hp, showHpBar: false },
-                        time,
-                        halfH,
-                    );
+                    m.statusHud.update({ hp: 0, maxHp: m.spec.hp, showHpBar: false }, time, halfH);
                 }
                 continue;
             }
@@ -494,29 +555,119 @@ export class MonsterController {
             let desiredVx = 0;
             let desiredVy = 0;
             if (m.state === 'chase') {
-                let targetDir = dirTo(mp, targetPos);
+                // Per-frame A* path recalc — every chase frame, not
+                // every 150 ms. The previous "recalc only when player
+                // moved > 16 px OR 150 ms passed" left the monster
+                // with a stale (or null) path for most of its life,
+                // which is exactly why it kept ramming walls. A* on a
+                // 16-px grid is microseconds per monster — the per-
+                // frame cost is fine for a handful of monsters.
+                // `shouldRecalcPaths` was a perf shortcut that turned
+                // out to be a correctness bug.
+                if (this.pathfinder) {
+                    const distTargetMoved = Math.hypot(
+                        targetPos.x - m.lastRecalcTargetPos.x,
+                        targetPos.y - m.lastRecalcTargetPos.y,
+                    );
+                    // Hysteresis Guard: do not replace active path mid-way unless target moved > 48px or stuck
+                    const hasFinishedPath = !m.path || m.currentWaypointIdx >= m.path.length;
+                    const shouldRecalc =
+                        hasFinishedPath ||
+                        distTargetMoved > 48 ||
+                        isStuckEmergency;
 
-                // Direct Line of Sight shortcut check (guarded by stuck timer & monster body size x 2)
-                const canUseLoS = time >= m.noLoSUntil;
-                const hasLoS = canUseLoS && (this.pathfinder?.hasLineOfSight(mp, targetPos, monsterBodyRadius) ?? false);
-
-                if (!hasLoS && m.path && m.currentWaypointIdx < m.path.length) {
-                    const checkLoS = (p1: { x: number; y: number }, p2: { x: number; y: number }) =>
-                        this.pathfinder?.hasLineOfSight(p1, p2, monsterBodyRadius * 0.7) ?? false;
-                    const lookAhead = getPathLookAheadPoint(mp, m.path, m.currentWaypointIdx, 12, checkLoS);
-                    m.currentWaypointIdx = lookAhead.nextIdx;
-                    targetDir = dirTo(mp, lookAhead.target);
+                    if (shouldRecalc) {
+                        m.lastPathRecalcAt = time;
+                        m.lastRecalcTargetPos = { x: targetPos.x, y: targetPos.y };
+                        const canUseLoS = time >= m.noLoSUntil;
+                        if (
+                            canUseLoS &&
+                            this.pathfinder.hasLineOfSight(footPos, targetPos, monsterBodyRadius)
+                        ) {
+                            m.path = [footPos, targetPos];
+                            m.currentWaypointIdx = 1;
+                        } else {
+                            const path = this.pathfinder.findPath(
+                                footPos,
+                                targetPos,
+                                m.spec.body.halfW,
+                                monsterBodyHalfH,
+                            );
+                            if (path && path.length > 1) {
+                                m.path = path;
+                                m.currentWaypointIdx = 1;
+                            }
+                        }
+                    }
                 }
+
+                // Resolve targetDir in priority order:
+                //   1. Direct line-of-sight to targetPos → straight line
+                //      (cheapest, smoothest, no need for waypoints).
+                //   2. Otherwise → next waypoint along the A* path. The
+                //      path is the source of truth for "how do I get
+                //      around the wall", not a fallback when LoS fails.
+                // The previous version used dirTo(mp, targetPos) as the
+                // DEFAULT, then only overrode with the path when LoS was
+                // blocked AND a path existed AND the monster hadn't run
+                // off the end. That meant in any other case — no path,
+                // path complete, LoS clear — the monster reverted to
+                // straight-line chase and rammed the wall.
+                let targetDir: { x: number; y: number };
+                const canUseLoS = time >= m.noLoSUntil;
+                const hasLoS =
+                    canUseLoS &&
+                    (this.pathfinder?.hasLineOfSight(footPos, targetPos, monsterBodyRadius) ?? false);
+
+                if (m.path && m.currentWaypointIdx < m.path.length) {
+                    // Smooth waypoint advancement. Reached distance is
+                    // bodyHalf + a small breathing-room offset so a
+                    // flush waypoint parked against a wall doesn't
+                    // perpetually count as "arrived" while the monster
+                    // still has the body box clipping the corner.
+                    const currWp = m.path[m.currentWaypointIdx];
+                    if (currWp) {
+                        const distToWp = Math.hypot(footPos.x - currWp.x, footPos.y - currWp.y);
+                        if (
+                            isWaypointReached(distToWp, monsterBodyHalfH) &&
+                            m.currentWaypointIdx < m.path.length - 1
+                        ) {
+                            m.currentWaypointIdx++;
+                        }
+                    }
+                    const targetWp = m.path[m.currentWaypointIdx] ?? targetPos;
+                    targetDir = dirTo(footPos, targetWp);
+                } else if (hasLoS) {
+                    // Clear sight and no remaining path waypoints → direct straight line
+                    targetDir = dirTo(footPos, targetPos);
+                } else {
+                    targetDir = dirTo(footPos, targetPos);
+                }
+
+                const isFollowingPath = !!m.path && m.currentWaypointIdx < m.path.length;
 
                 // Base chase vector
                 const cv = chaseVelocity(targetDir, m.spec.moveSpeed);
                 desiredVx = cv.vx;
                 desiredVy = cv.vy;
 
-                // Soft Separation vector from other monsters (anti-clumping & anti-stacking)
-                const sep = calcSeparationForce(m, this.monsters, 42, m.spec.moveSpeed * 0.7);
-                desiredVx += sep.x;
-                desiredVy += sep.y;
+                // Separation is intentionally OFF while following a
+                // path — when two monsters route through the same
+                // corner cell, an extra repulsion push makes them
+                // jitter across each other and never reach the
+                // waypoint. The path itself keeps them spread across
+                // cells; off-path straight-line chases get a small
+                // separation force to stop identical-position overlap.
+                if (!isFollowingPath) {
+                    const sep = calcSeparationForce(
+                        m,
+                        this.monsters,
+                        32,
+                        m.spec.moveSpeed * 0.4,
+                    );
+                    desiredVx += sep.x;
+                    desiredVy += sep.y;
+                }
 
                 // Anti-blocking Detour: check if an ally directly ahead is stationary / attacking
                 for (const ally of this.monsters) {
@@ -529,7 +680,7 @@ export class MonsterController {
                         // Ally is directly in front (dot > 0.6) and is attacking or stopped
                         if (dot > 0.6 && (ally.state === 'attack' || ally.state === 'idle')) {
                             // Tangential detour vector perpendicular to targetDir
-                            const sign = (i % 2 === 0) ? 1 : -1;
+                            const sign = i % 2 === 0 ? 1 : -1;
                             const detourX = -targetDir.y * sign * m.spec.moveSpeed * 0.6;
                             const detourY = targetDir.x * sign * m.spec.moveSpeed * 0.6;
                             desiredVx += detourX;
@@ -539,11 +690,11 @@ export class MonsterController {
                     }
                 }
 
-                // Emergency Escape Impulse if monster is stuck against wall corner
+                // Emergency Escape: if stuck, disable direct LoS shortcut and force fresh A* path
                 if (isStuckEmergency || m.stuckTicks >= 2) {
-                    const escapeAngle = (i * 1.57 + time * 0.005) % (Math.PI * 2);
-                    desiredVx += Math.cos(escapeAngle) * m.spec.moveSpeed * 1.2;
-                    desiredVy += Math.sin(escapeAngle) * m.spec.moveSpeed * 1.2;
+                    m.noLoSUntil = time + 2000;
+                    m.path = null;
+                    m.stuckTicks = 0;
                 }
 
                 // Cap total desired velocity to preserve move speed limit
@@ -553,30 +704,31 @@ export class MonsterController {
                     desiredVx = (desiredVx / speed) * maxAllowedSpeed;
                     desiredVy = (desiredVy / speed) * maxAllowedSpeed;
                 }
+            } else {
+                m.path = null;
+                m.currentWaypointIdx = 0;
             }
 
-            // Smooth Inertial Velocity Steering (LERP) for organic curved turns
-            const currVx = m.body.velocity.x;
-            const currVy = m.body.velocity.y;
-            const lerpFactor = 0.22; // Smooth curve interpolation factor
-            const finalVx = currVx + (desiredVx - currVx) * lerpFactor;
-            const finalVy = currVy + (desiredVy - currVy) * lerpFactor;
-
-            this.matter.Body.setVelocity(m.body, { x: finalVx, y: finalVy });
+            // Direct Velocity Execution when following A* path (100% path commitment, no wall friction)
+            const isFollowingPath = !!m.path && m.currentWaypointIdx < m.path.length;
+            if (isFollowingPath && time >= m.wallEscapeUntil) {
+                this.matter.Body.setVelocity(m.body, { x: desiredVx, y: desiredVy });
+            } else if (time >= m.wallEscapeUntil) {
+                const currVx = m.body.velocity.x;
+                const currVy = m.body.velocity.y;
+                const lerpFactor = 0.22;
+                const finalVx = currVx + (desiredVx - currVx) * lerpFactor;
+                const finalVy = currVy + (desiredVy - currVy) * lerpFactor;
+                this.matter.Body.setVelocity(m.body, { x: finalVx, y: finalVy });
+            }
 
             // ── Attack tick ──────────────────────────────────────────
-            if (
-                m.state === 'attack' &&
-                time - m.lastAttackAt >= m.weapon.cooldownMs
-            ) {
+            if (m.state === 'attack' && time - m.lastAttackAt >= m.weapon.cooldownMs) {
                 this.performAttack(m, dirToPlayer);
                 m.lastAttackAt = time;
             }
 
             // ── Visual sync & animation ───────────────────────────────
-            const footY = Math.round(mp.y + (m.sprite ? m.sprite.displayHeight / 2 - m.spec.body.halfH : 0));
-            const footX = mp.x;
-            
             // Align feet shadow and green debug rect with actual feet position
             m.shadow.setPosition(footX, footY);
             m.shadow.setDepth(footY - 1);
@@ -585,9 +737,10 @@ export class MonsterController {
             if (m.sprite) {
                 // Calculate visual offset. `left` shifts right (+) / left (-), `bottom` shifts up (-) / down (+)
                 const rawX = m.spec.sprite?.offset?.left ?? m.spec.sprite?.offset?.x ?? 0;
-                const rawY = m.spec.sprite?.offset?.bottom !== undefined 
-                    ? -m.spec.sprite.offset.bottom 
-                    : (m.spec.sprite?.offset?.y ?? 0);
+                const rawY =
+                    m.spec.sprite?.offset?.bottom !== undefined
+                        ? -m.spec.sprite.offset.bottom
+                        : (m.spec.sprite?.offset?.y ?? 0);
                 const offX = rawX * (m.sprite.flipX ? -1 : 1);
                 const offY = rawY;
 
@@ -595,17 +748,18 @@ export class MonsterController {
                 m.sprite.setPosition(mp.x + offX, mp.y + offY);
                 m.sprite.setDepth(footY);
 
-                // Align Editor debug rect with physics body center
-                m.debugHitboxRect.setPosition(mp.x, mp.y);
+                // Align Editor debug rect & sensor hitbox directly with sprite position
+                m.debugHitboxRect.setPosition(mp.x + offX, mp.y + offY);
+                if (m.hitboxBody) {
+                    this.matter.Body.setPosition(m.hitboxBody, { x: mp.x + offX, y: mp.y + offY });
+                }
 
-                // Update status HUD above monster hitbox/sprite top
-                const halfH = (m.body as any).bounds
-                    ? ((m.body as any).bounds.max.y - (m.body as any).bounds.min.y) / 2
-                    : m.sprite.displayHeight / 2;
+                // Update status HUD above monster Red Hitbox top edge
+                const topOffset = m.hitboxHeight / 2;
                 m.statusHud.update(
                     { name: m.spec.name, hp: m.hp, maxHp: m.spec.hp, showHpBar: true },
                     time,
-                    halfH,
+                    topOffset,
                 );
 
                 // Play corresponding animation track (idle / move / hit)
@@ -626,11 +780,7 @@ export class MonsterController {
             } else {
                 m.debugHitboxRect.setPosition(mp.x, mp.y);
                 const halfH = m.spec.body.halfH;
-                m.statusHud.update(
-                    { hp: m.hp, maxHp: m.spec.hp, showHpBar: true },
-                    time,
-                    halfH,
-                );
+                m.statusHud.update({ hp: m.hp, maxHp: m.spec.hp, showHpBar: true }, time, halfH);
                 if (dist > 1) {
                     m.debugHitboxRect.setRotation(Math.atan2(dirToPlayer.y, dirToPlayer.x));
                 }
@@ -661,16 +811,17 @@ export class MonsterController {
     /** Apply damage from a player bullet to a specific monster (or AoE later). */
     applyBulletDamage(bulletDamage: number, hitBody: MatterJS.BodyType): void {
         // Find monster whose main body or compound parts match hitBody
-        const target = this.monsters.find((m) => {
-            if (m.dead || m.state === 'dying') return false;
-            if (m.body === hitBody) return true;
-            // Check compound parts if any (includes spriteHitbox sensor)
-            const parts = (m.body as any).parts;
-            if (Array.isArray(parts) && parts.includes(hitBody)) return true;
-            // Fallback: check parent
-            if ((hitBody as any).parent === m.body) return true;
-            return false;
-        }) ?? pickClosestMonster(hitBody.position, this.monsters, 200);
+        const target =
+            this.monsters.find((m) => {
+                if (m.dead || m.state === 'dying') return false;
+                if (m.body === hitBody) return true;
+                // Check compound parts if any (includes spriteHitbox sensor)
+                const parts = (m.body as any).parts;
+                if (Array.isArray(parts) && parts.includes(hitBody)) return true;
+                // Fallback: check parent
+                if ((hitBody as any).parent === m.body) return true;
+                return false;
+            }) ?? pickClosestMonster(hitBody.position, this.monsters, 200);
 
         if (target && target.state !== 'dying') {
             target.hp -= bulletDamage;
@@ -751,10 +902,7 @@ export class MonsterController {
         const len = Math.hypot(dirToPlayer.x, dirToPlayer.y);
         if (len === 0) return;
         const { speed, visual: size } = projectile;
-        const muzzlePos = m.weaponVisual.getMuzzlePosition(
-            m.body.position.x,
-            m.body.position.y,
-        );
+        const muzzlePos = m.weaponVisual.getMuzzlePosition(m.body.position.x, m.body.position.y);
         m.weaponVisual.triggerRecoil();
         EventBus.emit(SFX_EVENT(weapon.sfx?.shoot ?? 'monster-shoot'));
         const bullet = spawnProjectile(
@@ -800,9 +948,7 @@ export class MonsterController {
         if (hasDeathAnim && m.sprite) {
             m.sprite.play(deathTrackKey);
         }
-        const animMs = hasDeathAnim
-            ? (this.scene.anims.get(deathTrackKey)?.duration ?? 0)
-            : 0;
+        const animMs = hasDeathAnim ? (this.scene.anims.get(deathTrackKey)?.duration ?? 0) : 0;
         this.startDeathFade(m, animMs);
     }
 
@@ -882,7 +1028,14 @@ export class MonsterController {
             const isFired = fired.some((p) => p.index === q.pending.index);
             if (isFired) {
                 this.monsters.push(
-                    new Monster(this.scene, q.spec, q.weapon, q.pending.x, q.pending.y, q.pending.waveId),
+                    new Monster(
+                        this.scene,
+                        q.spec,
+                        q.weapon,
+                        q.pending.x,
+                        q.pending.y,
+                        q.pending.waveId,
+                    ),
                 );
                 return false;
             }
@@ -905,8 +1058,8 @@ export class MonsterController {
                     a.label === 'monster-projectile'
                         ? a
                         : b.label === 'monster-projectile'
-                          ? b
-                          : null;
+                            ? b
+                            : null;
                 if (projBody) {
                     const other = projBody === a ? b : a;
                     if (other === this.playerBody) {
@@ -923,11 +1076,7 @@ export class MonsterController {
                 // Mirrors player plasma-sword: a sensor body fires briefly
                 // in front of the monster; on overlap it damages the player.
                 const meleeBody =
-                    a.label === 'monster-melee'
-                        ? a
-                        : b.label === 'monster-melee'
-                          ? b
-                          : null;
+                    a.label === 'monster-melee' ? a : b.label === 'monster-melee' ? b : null;
                 if (meleeBody) {
                     const other = meleeBody === a ? b : a;
                     if (other === this.playerBody) {
@@ -944,6 +1093,39 @@ export class MonsterController {
                     this.damagePlayerFromContact();
                     continue;
                 }
+
+                // ── monster ↔ wall (instant escape) ────────────────────
+                // The 60 ms stuck detector is too slow to react to a wall
+                // bounce — by the time it fires, the LERP has already
+                // blended the bounce-back into the velocity vector and
+                // the monster keeps oscillating against the wall. Matter
+                // tells us the collision happened THIS frame, so we
+                // override the velocity here: aim along the path's next
+                // segment, or perpendicular to the wall normal if no
+                // path is available. The wallEscapeUntil window
+                // prevents the per-frame loop from undoing the
+                // override before the monster clears the wall cell.
+                const monsterBody =
+                    a.label === 'monster' ? a : b.label === 'monster' ? b : null;
+                const wallBody =
+                    monsterBody && typeof a.label === 'string' && a.label.startsWith('wall:')
+                        ? a
+                        : monsterBody && typeof b.label === 'string' && b.label.startsWith('wall:')
+                            ? b
+                            : null;
+                if (monsterBody && wallBody) {
+                    const monster = this.monsters.find(
+                        (mm) => mm.body === monsterBody && !mm.dead,
+                    );
+                    if (monster && this.scene.time.now >= monster.wallEscapeUntil) {
+                        this.applyWallEscape(monster, wallBody);
+                        // Suppress further wall escapes for 150 ms —
+                        // gives the monster a chance to actually move
+                        // away from the wall before re-evaluating.
+                        monster.wallEscapeUntil = this.scene.time.now + 150;
+                    }
+                    continue;
+                }
             }
         });
     }
@@ -952,6 +1134,78 @@ export class MonsterController {
         const proj = this.projectiles.find((p) => p.body === body);
         if (!proj) return;
         this.destroyProjectile(proj);
+    }
+
+    /**
+     * Matter collisionstart fired: the monster just bumped a wall.
+     * Override its velocity along the path's next segment so it
+     * actually slides past the wall instead of bouncing back into
+     * it. Per-frame loop respects wallEscapeUntil so this direction
+     * sticks for a few frames.
+     *
+     * Wall normal is the unit vector pointing FROM the wall body TO
+     * the monster (Matter convention). The escape direction is the
+     * tangent along the path; if the path is unavailable, we push
+     * perpendicular to the wall normal as a safe default.
+     */
+    private applyWallEscape(monster: Monster, wallBody: MatterJS.BodyType): void {
+        const mp = monster.body.position;
+        const wp = wallBody.position;
+        // Wall normal: from wall to monster.
+        const nx = mp.x - wp.x;
+        const ny = mp.y - wp.y;
+        const nlen = Math.hypot(nx, ny);
+        let escapeX: number;
+        let escapeY: number;
+
+        // Decide whether to slide ALONG the wall (perpendicular to
+        // the normal) or aim at the next waypoint. In a tight corner
+        // the next waypoint also sits against the same wall family —
+        // aiming at it just drives the monster deeper into the wall.
+        // isPositionInCorner reads the grid (cellSize + buffer) so the
+        // detection matches the pathfinder's notion of "tight".
+        const nextWp =
+            monster.path && monster.currentWaypointIdx + 1 < monster.path.length
+                ? monster.path[monster.currentWaypointIdx + 1]
+                : null;
+        const waypointAlsoInCorner = nextWp
+            ? this.pathfinder?.isPositionInCorner(nextWp) ?? false
+            : true;
+
+        if (nextWp && !waypointAlsoInCorner) {
+            // Open path ahead — aim at the next waypoint so the
+            // monster resumes chasing along the path.
+            escapeX = nextWp.x - mp.x;
+            escapeY = nextWp.y - mp.y;
+            const len = Math.hypot(escapeX, escapeY);
+            if (len === 0) {
+                escapeX = 0;
+                escapeY = 0;
+            } else {
+                escapeX /= len;
+                escapeY /= len;
+            }
+        } else if (nlen > 0) {
+            // Cornered: slide perpendicular to the wall normal so the
+            // body peels off the wall and curves around the corner.
+            escapeX = -ny / nlen;
+            escapeY = nx / nlen;
+            // Pick the perpendicular that points away from the wall
+            // (i.e. has a positive component along the wall normal).
+            const dot = escapeX * (nx / nlen) + escapeY * (ny / nlen);
+            if (dot < 0) {
+                escapeX = -escapeX;
+                escapeY = -escapeY;
+            }
+        } else {
+            escapeX = 0;
+            escapeY = 0;
+        }
+        const escapeSpeed = monster.spec.moveSpeed * 1.5;
+        this.matter.Body.setVelocity(monster.body, {
+            x: escapeX * escapeSpeed,
+            y: escapeY * escapeSpeed,
+        });
     }
 
     private damagePlayerFromProjectile(projBody: MatterJS.BodyType): void {
@@ -985,11 +1239,7 @@ export class MonsterController {
         const meleeMonsters = this.monsters.filter(
             (m) => !m.dead && m.weapon.projectile === undefined,
         );
-        const best = pickClosestMonster(
-            meleeBody.position,
-            meleeMonsters,
-            Infinity,
-        );
+        const best = pickClosestMonster(meleeBody.position, meleeMonsters, Infinity);
         if (!best) return;
         EventBus.emit(SFX_EVENT('player-hit'));
         this.cb.onPlayerHit(best.weapon.damage);

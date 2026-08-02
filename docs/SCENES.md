@@ -6,10 +6,10 @@ How a "scene" is loaded — the data flow, file layout, and runtime contract.
 
 Every scene is **one YAML** plus a background image:
 
-| File | Purpose | Read by |
-|---|---|---|
-| `public/assets/image/scenes/<id>.png` | Background image | Phaser |
-| `public/data/levels/<id>.yaml` | Runtime level data (everything) | Game + Editor |
+| File                                  | Purpose                         | Read by       |
+| ------------------------------------- | ------------------------------- | ------------- |
+| `public/assets/image/scenes/<id>.png` | Background image                | Phaser        |
+| `public/data/levels/<id>.yaml`        | Runtime level data (everything) | Game + Editor |
 
 `<id>` is the kebab-case basename. There is **no per-level code** — a single generic `LoadScene` reads any of them. The filename is the canonical id; no `id` field in the YAML.
 
@@ -119,56 +119,61 @@ URL override is for testing without editing the index. Default game launch picks
 The runtime level is **one self-contained file**: walls, every spawn, the music, the lighting, the decorative materials. Field-by-field reference:
 
 ```yaml
-title: string                       # shown in the HUD; default = filename if absent
-background: string                  # path under public/, e.g. assets/image/scenes/X.png
-imageSize: "WxH"                    # native image size — world bounds match this exactly
-prompt: string                      # optional inline AI regen prompt (rarely used now;
-                                    # generation historically lived in prompts/scenes/<id>.yaml)
-music: string                       # optional — id from public/data/audios/index.yaml →
-                                    #   emitted as MUSIC_EVENT(level.music) on create()
-pixelLighting: boolean              # optional — override PIXEL_LIGHTING_CONFIG.ENABLE
+title: string # shown in the HUD; default = filename if absent
+background: string # path under public/, e.g. assets/image/scenes/X.png
+imageSize: 'WxH' # native image size — world bounds match this exactly
+prompt:
+    string # optional inline AI regen prompt (rarely used now;
+    # generation historically lived in prompts/scenes/<id>.yaml)
+music:
+    string # optional — id from public/data/audios/index.yaml →
+    #   emitted as MUSIC_EVENT(level.music) on create()
+pixelLighting: boolean # optional — override PIXEL_LIGHTING_CONFIG.ENABLE
 
-character: string                   # optional id from public/data/characters/index.yaml
-                                    #   (defaults to the first index entry)
-characterSpawn:                     # optional — where + which way the player starts
+character:
+    string # optional id from public/data/characters/index.yaml
+    #   (defaults to the first index entry)
+characterSpawn: # optional — where + which way the player starts
     facing: left | right
     x: number
     y: number
 
-airWalls:                           # polygon obstacles in image pixel space
-    - id: string                    # unique within the level
-      kind: tall | short            # tall: blocks character + bullets
-                                    # short: blocks character only (bullets pass over)
-      points:                       # polygon, implicitly closed; ≥3 vertices
-          - [number, number]        # rectangle = 4 vertices
+airWalls: # polygon obstacles in image pixel space
+    - id: string # unique within the level
+      kind:
+          tall | short # tall: blocks character + bullets
+          # short: blocks character only (bullets pass over)
+      points: # polygon, implicitly closed; ≥3 vertices
+          - [number, number] # rectangle = 4 vertices
 
-monsters:                           # optional — list of monster spawns
-    - type: string                  # id from public/data/monsters/index.yaml
+monsters: # optional — list of monster spawns
+    - type: string # id from public/data/monsters/index.yaml
       x: number
       y: number
-      waveId: string                # optional — tag for clear-trigger grouping
-      trigger:                      # optional — gate the spawn (see Spawn triggers)
+      waveId: string # optional — tag for clear-trigger grouping
+      trigger: # optional — gate the spawn (see Spawn triggers)
           kind: time | clear
-          delayMs: number           # ≥0, default 0
-          waveId: string            # for kind:clear — which wave must be cleared first
-                                    # for kind:time  — which wave this spawn belongs to
+          delayMs: number # ≥0, default 0
+          waveId:
+              string # for kind:clear — which wave must be cleared first
+              # for kind:time  — which wave this spawn belongs to
 
-dropSpawns:                         # optional — static drops placed in the level
-    - type: string                  # id from public/data/drops/index.yaml
+dropSpawns: # optional — static drops placed in the level
+    - type: string # id from public/data/drops/index.yaml
       x: number
       y: number
 
-materials:                          # optional — decorative props (trees, rocks, …)
-    - id: string                    # unique within the level
-      texture: string               # path under public/
+materials: # optional — decorative props (trees, rocks, …)
+    - id: string # unique within the level
+      texture: string # path under public/
       x: number
       y: number
-      scale: number                 # >0, optional
-      rotation: number              # optional
-      flipX: boolean                # optional
-      flipY: boolean                # optional
-      mode: background | y-sort | foreground  # optional
-      depthOffset: number           # optional
+      scale: number # >0, optional
+      rotation: number # optional
+      flipX: boolean # optional
+      flipY: boolean # optional
+      mode: background | y-sort | foreground # optional
+      depthOffset: number # optional
 ```
 
 The parser strictly validates (Zod) and transforms:
@@ -180,10 +185,10 @@ The parser strictly validates (Zod) and transforms:
 
 Triggers let you gate monster spawns by time or by clear. Pure data — runtime evaluation lives in `src/game/monsters/monster.ts` (`advanceSpawnQueue` reducer in `spawn-queue.ts`).
 
-| `trigger.kind` | Fires when |
-|---|---|
-| `time` | `levelStartElapsedMs + trigger.delayMs` — based on Phaser's `this.time.now` |
-| `clear` | No monster with `waveId === trigger.waveId` is alive **plus** `trigger.delayMs` after that moment. If a new spawn tags itself with the same `waveId` before the timer fires, the timer resets. |
+| `trigger.kind` | Fires when                                                                                                                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `time`         | `levelStartElapsedMs + trigger.delayMs` — based on Phaser's `this.time.now`                                                                                                                    |
+| `clear`        | No monster with `waveId === trigger.waveId` is alive **plus** `trigger.delayMs` after that moment. If a new spawn tags itself with the same `waveId` before the timer fires, the timer resets. |
 
 When the trigger is absent, the spawn fires **immediately** at scene start.
 
@@ -193,12 +198,12 @@ Example — three waves from `sacred-forest-sanctuary.yaml`:
 
 ```yaml
 monsters:
-    - type: drone       # wave-1 fires at scene start
+    - type: drone # wave-1 fires at scene start
       x: 800
       y: 800
       waveId: wave-1
 
-    - type: drone       # wave-2 fires 3s after wave-1 is cleared
+    - type: drone # wave-2 fires 3s after wave-1 is cleared
       x: 1200
       y: 1000
       waveId: wave-2
@@ -207,7 +212,7 @@ monsters:
           waveId: wave-1
           delayMs: 3000
 
-    - type: gunner      # boss fires 5s after wave-2 is cleared
+    - type: gunner # boss fires 5s after wave-2 is cleared
       x: 2000
       y: 600
       waveId: boss
@@ -221,41 +226,46 @@ monsters:
 
 ```yaml
 levels:
-    - <id>                          # ordered; first entry is the default scene
+    - <id> # ordered; first entry is the default scene
 ```
 
 ## Adding a new scene
 
 1. **Generate the background** (image stays where you generate it; copy into the assets folder):
-   ```bash
-   pnpm tsx scripts/generate-image.ts <id>
-   # → outputs to ./tmp/image/<model>-<timestamp>.png
-   ```
-   Copy the result to `public/assets/image/scenes/<id>.png`.
+
+    ```bash
+    pnpm tsx scripts/generate-image.ts <id>
+    # → outputs to ./tmp/image/<model>-<timestamp>.png
+    ```
+
+    Copy the result to `public/assets/image/scenes/<id>.png`.
 
 2. **Write the level YAML** at `public/data/levels/<id>.yaml`:
-   ```yaml
-   title: The 11th Forest — <Name>
-   background: assets/image/scenes/<id>.png
-   imageSize: 2752x1536
-   airWalls: []
-   monsters: []
-   dropSpawns: []
-   materials: []
-   ```
-   All sections except `title` / `background` / `imageSize` are optional. `imageSize` MUST equal the image's native pixel size — Matter world bounds + air-wall coords are interpreted in this pixel space.
+
+    ```yaml
+    title: The 11th Forest — <Name>
+    background: assets/image/scenes/<id>.png
+    imageSize: 2752x1536
+    airWalls: []
+    monsters: []
+    dropSpawns: []
+    materials: []
+    ```
+
+    All sections except `title` / `background` / `imageSize` are optional. `imageSize` MUST equal the image's native pixel size — Matter world bounds + air-wall coords are interpreted in this pixel space.
 
 3. **Register the id** in `public/data/levels/index.yaml`:
-   ```yaml
-   levels:
-       - sacred-forest-sanctuary
-       - <id>                  # append at the end (order = render order)
-   ```
+
+    ```yaml
+    levels:
+        - sacred-forest-sanctuary
+        - <id> # append at the end (order = render order)
+    ```
 
 4. **(Optional) override** for testing without touching the index:
-   ```
-   http://localhost:8080/?scene=<id>
-   ```
+    ```
+    http://localhost:8080/?scene=<id>
+    ```
 
 That's it — no TS code changes. The same `LoadScene` class loads it.
 
@@ -263,21 +273,21 @@ That's it — no TS code changes. The same `LoadScene` class loads it.
 
 Two pieces of scene state are pushed into the React HUD via `useGameStore`:
 
-| Field | When pushed | Consumer |
-|---|---|---|
-| `levelTitle` | `setLevelTitle(level.title \|\| id)` once in `create()` | `SceneHubOverlay` (top-center amber) |
+| Field            | When pushed                                                                      | Consumer                                     |
+| ---------------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
+| `levelTitle`     | `setLevelTitle(level.title \|\| id)` once in `create()`                          | `SceneHubOverlay` (top-center amber)         |
 | `levelElapsedMs` | `setLevelElapsedMs(now - levelStartAt)`, throttled to 5 Hz in `tickLevelClock()` | `SceneHubOverlay` (under title, white MM:SS) |
 
 Both reset on shutdown via `setLevelElapsedMs(0)` when the next scene boots.
 
 ## Events emitted by `LoadScene`
 
-| Event | Payload | When |
-|---|---|---|
-| `level-loaded` | `{ id, level }` | end of `create()` |
-| `current-scene-ready` | `this` (the scene) | end of `create()` |
-| `music:<id>` | — | if `level.music` set |
-| `editor-open` | listened by the scene (not emitted by it) | toggles HUD + debug rectangles |
+| Event                 | Payload                                   | When                           |
+| --------------------- | ----------------------------------------- | ------------------------------ |
+| `level-loaded`        | `{ id, level }`                           | end of `create()`              |
+| `current-scene-ready` | `this` (the scene)                        | end of `create()`              |
+| `music:<id>`          | —                                         | if `level.music` set           |
+| `editor-open`         | listened by the scene (not emitted by it) | toggles HUD + debug rectangles |
 
 ## Validation
 

@@ -31,17 +31,26 @@ import {
 } from './weapon';
 import { WeaponVisualController } from './visual';
 
-import {
-    CAT,
-    DEPTH,
-    PROJECTILE_PLAYER_MASK,
-} from '@/lib/constants';
+import { CAT, DEPTH, PROJECTILE_PLAYER_MASK } from '@/lib/constants';
 
 // ─── Pure helpers ────────────────────────────────────────────────────────
 
 /** Whether a body label identifies a player-fired bullet. */
 export function isPlayerBullet(body: { label?: string }): boolean {
     return body.label === 'player-bullet';
+}
+
+/**
+ * Wrap-around slot index. `direction` is `+1` (next) or `-1` (previous);
+ * any integer is accepted since the wrap formula only depends on sign.
+ * Single-slot hotbar returns 0. Pure so controllers / TouchControls can
+ * share the same cycle math.
+ */
+export function nextSlotIndex(currentIndex: number, direction: 1 | -1, slotCount: number): number {
+    if (slotCount <= 0) return 0;
+    const len = Math.floor(slotCount);
+    const idx = (((Math.floor(currentIndex) + direction) % len) + len) % len;
+    return idx;
 }
 
 /** Whether a body label identifies a wall (any kind). */
@@ -70,12 +79,7 @@ export class WeaponController {
     private readonly trailGraphics: Phaser.GameObjects.Graphics;
     private readonly visualController: WeaponVisualController;
 
-    constructor(
-        scene: Phaser.Scene,
-        matter: any,
-        body: MatterJS.BodyType,
-        weapons: WeaponSpec[],
-    ) {
+    constructor(scene: Phaser.Scene, matter: any, body: MatterJS.BodyType, weapons: WeaponSpec[]) {
         if (weapons.length === 0) throw new Error('WeaponController: at least one weapon required');
         this.scene = scene;
         this.matter = matter;
@@ -119,7 +123,8 @@ export class WeaponController {
                     // Find the slot whose bullet hit, so the per-weapon
                     // sfx.bulletWall override applies.
                     const ownerIndex = this.bullets.findIndex((b) => b.body === bulletBody);
-                    const ownerSpec = ownerIndex >= 0 ? this.slots[this.currentIndex].spec : undefined;
+                    const ownerSpec =
+                        ownerIndex >= 0 ? this.slots[this.currentIndex].spec : undefined;
                     for (let i = this.bullets.length - 1; i >= 0; i--) {
                         if (this.bullets[i].body === bulletBody) {
                             this.destroyBullet(i);
@@ -153,6 +158,14 @@ export class WeaponController {
         this.currentIndex = index;
         this.visualController.setWeapon(this.slots[index].spec);
         EventBus.emit(SFX_EVENT('weapon-switch'));
+    }
+
+    /** Mobile ◀/▶ button handler — cycle to the previous or next slot,
+     *  wrapping around. Delegates to `nextSlotIndex` so the wrap math
+     *  is shared with the node-runnable tests. */
+    cycleSlot(direction: 1 | -1): void {
+        const next = nextSlotIndex(this.currentIndex, direction, this.slots.length);
+        this.switchTo(next);
     }
 
     /** R key — manual reload. Only when ammo < clipSize and not already reloading. */
@@ -277,7 +290,8 @@ export class WeaponController {
 
         // 2. Auto-reload on empty (ranged only).
         const active = this.slots[this.currentIndex];
-        const isActiveMelee = active.spec.bullet?.type === 'melee' || active.spec.hitWidth !== undefined;
+        const isActiveMelee =
+            active.spec.bullet?.type === 'melee' || active.spec.hitWidth !== undefined;
         if (isActiveMelee) {
             active.ammo = 1;
             active.reloading = false;
@@ -380,7 +394,8 @@ export class WeaponController {
                 originY += sin * offX + cos * effectiveOffY;
             }
 
-            const meleeRotationOffset = slot.spec.bullet?.rotationOffset ?? slot.spec.visual?.rotationOffset ?? 0;
+            const meleeRotationOffset =
+                slot.spec.bullet?.rotationOffset ?? slot.spec.visual?.rotationOffset ?? 0;
             const meleeBullet = spawnMeleeHitbox(this.scene, this.matter, {
                 origin: { x: originX, y: originY },
                 angle,

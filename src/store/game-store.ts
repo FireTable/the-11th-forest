@@ -5,6 +5,9 @@ export interface WeaponSlotData {
     name: string;
     ammo: number;
     clipSize: number;
+    /** Public-path URL for the weapon thumbnail (e.g. `/assets/image/weapons/arcana-staff.png`).
+     *  Undefined for melee weapons or spec.visual entries without a texture. */
+    texture?: string;
 }
 
 export interface GameUIState {
@@ -33,15 +36,16 @@ export interface GameUIState {
     // Visibility
     hubsVisible: boolean;
 
-    // Death state — set true by the character controller when HP hits 0.
-    // The HUD overlays a restart prompt; the Phaser scene pauses until
-    // the user clicks Restart.
-    isDead: boolean;
-
     // Setters
     setLevelTitle: (title: string) => void;
     setLevelElapsedMs: (ms: number) => void;
-    setCharacterStats: (stats: { name?: string; hp: number; maxHp: number; sp: number; maxSp: number }) => void;
+    setCharacterStats: (stats: {
+        name?: string;
+        hp: number;
+        maxHp: number;
+        sp: number;
+        maxSp: number;
+    }) => void;
     setWeaponStats: (stats: {
         activeIndex: number;
         name: string;
@@ -52,7 +56,6 @@ export interface GameUIState {
         slots: WeaponSlotData[];
     }) => void;
     setHubsVisible: (visible: boolean) => void;
-    setDead: (dead: boolean) => void;
 }
 
 export const useGameStore = create<GameUIState>((set) => ({
@@ -74,7 +77,6 @@ export const useGameStore = create<GameUIState>((set) => ({
     levelElapsedMs: 0,
 
     hubsVisible: true,
-    isDead: false,
 
     setLevelTitle: (title) => set({ levelTitle: title }),
     setLevelElapsedMs: (ms) => set({ levelElapsedMs: ms }),
@@ -102,6 +104,4 @@ export const useGameStore = create<GameUIState>((set) => ({
         })),
 
     setHubsVisible: (visible) => set({ hubsVisible: visible }),
-
-    setDead: (dead) => set({ isDead: dead }),
 }));

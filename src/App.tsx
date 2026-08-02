@@ -2,6 +2,9 @@ import { Suspense, lazy } from 'react';
 
 import { PhaserGame } from '@/PhaserGame';
 import { GameHUDLayer } from '@/components/hud/GameHUDLayer';
+import { PixelCrosshair } from '@/components/hud/PixelCrosshair';
+import { RotateOverlay } from '@/components/hud/RotateOverlay';
+import { TouchControls } from '@/components/hud/TouchControls';
 
 /**
  * Top-level React component.
@@ -20,9 +23,7 @@ import { GameHUDLayer } from '@/components/hud/GameHUDLayer';
  * shares the same surface — no separate floating widget at the app
  * root.
  */
-const EditorPanel = lazy(() =>
-    import('@/editor/panel').then((m) => ({ default: m.EditorPanel })),
-);
+const EditorPanel = lazy(() => import('@/editor/panel').then((m) => ({ default: m.EditorPanel })));
 
 function App() {
     return (
@@ -32,6 +33,9 @@ function App() {
             <Suspense fallback={null}>
                 <EditorPanel />
             </Suspense>
+            <PixelCrosshair />
+            <RotateOverlay />
+            <TouchControls />
         </div>
     );
 }

@@ -72,8 +72,7 @@ export function EditorPanel() {
     // The character / module shell sections report their dirty/saving
     // state here so the single outer Save button can dispatch. Null
     // when the current top-tab section has nothing pending.
-    const [characterSaveState, setCharacterSaveState] =
-        useState<CharacterSaveState | null>(null);
+    const [characterSaveState, setCharacterSaveState] = useState<CharacterSaveState | null>(null);
     const [moduleSaveState, setModuleSaveState] = useState<ModuleSaveState | null>(null);
 
     // When the top-tab changes, drop any stale save state from the
@@ -85,12 +84,20 @@ export function EditorPanel() {
         setError(null);
     }, [topTab]);
 
+    // Tell the Phaser scene which editor sub-tab is active so the
+    // material sprites only become draggable while the user is on
+    // the Materials tab — picking Walls or Monsters must not let the
+    // user accidentally move material art around the canvas.
+    useEffect(() => {
+        const isMaterialTab =
+            open && topTab === 'scenes' && sceneSubTab === 'materials';
+        EventBus.emit('editor-material-tab-active', isMaterialTab);
+    }, [open, topTab, sceneSubTab]);
+
     // Aggregate dirty / saving across all entities the panel can save.
     // Only one source is ever active at a time, so OR is correct.
-    const isAnyDirty =
-        dirty || characterSaveState?.dirty || moduleSaveState?.dirty;
-    const isAnySaving =
-        saving || characterSaveState?.saving || moduleSaveState?.saving;
+    const isAnyDirty = dirty || characterSaveState?.dirty || moduleSaveState?.dirty;
+    const isAnySaving = saving || characterSaveState?.saving || moduleSaveState?.saving;
 
     useEffect(() => {
         setOverlayTarget(document.getElementById('game-container'));
@@ -167,7 +174,9 @@ export function EditorPanel() {
             return;
         }
         if (
-            (topTab === 'drops' || topTab === 'monsters' || topTab === 'weapons' ||
+            (topTab === 'drops' ||
+                topTab === 'monsters' ||
+                topTab === 'weapons' ||
                 topTab === 'audios') &&
             moduleSaveState?.dirty
         ) {
@@ -301,9 +310,7 @@ export function EditorPanel() {
                     {topTab === 'characters' && (
                         <CharacterSection onSaveStateChange={setCharacterSaveState} />
                     )}
-                    {topTab === 'drops' && (
-                        <DropsSection onSaveStateChange={setModuleSaveState} />
-                    )}
+                    {topTab === 'drops' && <DropsSection onSaveStateChange={setModuleSaveState} />}
                     {topTab === 'monsters' && (
                         <MonstersSectionEditor onSaveStateChange={setModuleSaveState} />
                     )}
@@ -330,7 +337,10 @@ export function EditorPanel() {
                 </div>
                 <CheatPanel />
             </aside>
-            {level && overlayTarget && open && topTab === 'scenes' &&
+            {level &&
+                overlayTarget &&
+                open &&
+                topTab === 'scenes' &&
                 createPortal(
                     <WallCanvas
                         level={level}
@@ -354,10 +364,6 @@ export function handleWallKindChange(
     setLevel(setWallKind(level, id, kind));
 }
 
-export function handleWallRemove(
-    setLevel: (next: Level) => void,
-    level: Level,
-    id: string,
-): void {
+export function handleWallRemove(setLevel: (next: Level) => void, level: Level, id: string): void {
     setLevel(removeWall(level, id));
 }

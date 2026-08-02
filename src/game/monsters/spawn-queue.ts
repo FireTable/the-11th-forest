@@ -66,11 +66,7 @@ function aliveCount(alive: AliveSnapshot, waveId: string | undefined): number {
  * Decide whether a single pending spawn is ready to fire RIGHT NOW.
  * Pure — exported for testing individual rules in isolation.
  */
-export function spawnReady(
-    pending: PendingSpawn,
-    now: number,
-    alive: AliveSnapshot,
-): boolean {
+export function spawnReady(pending: PendingSpawn, now: number, alive: AliveSnapshot): boolean {
     const t = pending.trigger;
     if (t.kind === 'time') return now >= t.delayMs;
     // kind === 'clear'

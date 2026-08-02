@@ -22,9 +22,7 @@ function pathOf(issue: { path: ReadonlyArray<PropertyKey> }): string {
 
 /** Re-throw a ZodError as a plain Error prefixed with `Drop ${id}:`. */
 function rethrow(zerr: ZodError, id: string): never {
-    const summary = zerr.issues
-        .map((i) => `${pathOf(i)}: ${i.message}`)
-        .join('; ');
+    const summary = zerr.issues.map((i) => `${pathOf(i)}: ${i.message}`).join('; ');
     throw new Error(`Drop ${id}: ${summary}`);
 }
 
@@ -49,9 +47,7 @@ export function parseDropIndex(text: string): DropIndex {
     }
     const result = DropIndexSchema.safeParse(raw);
     if (!result.success) {
-        const summary = result.error.issues
-            .map((i) => `${pathOf(i)}: ${i.message}`)
-            .join('; ');
+        const summary = result.error.issues.map((i) => `${pathOf(i)}: ${i.message}`).join('; ');
         throw new Error(`Drop index: ${summary}`);
     }
     return result.data;

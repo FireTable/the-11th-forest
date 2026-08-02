@@ -12,7 +12,6 @@ import * as Phaser from 'phaser';
 import {
     HUD_FONT_LABEL,
     HUD_STATUS_BAR_BG,
-    HUD_STATUS_BAR_H,
     HUD_STATUS_BAR_W,
     HUD_STATUS_LABEL_COLOR,
     HUD_BG_ALPHA,
@@ -61,6 +60,7 @@ export interface StatusHudState {
     dodgeActive?: boolean;
     dodgeCooldownStartedAt?: number;
     dodgeCooldownTimeMs?: number;
+    barWidth?: number;
 }
 
 interface FloatingText {
@@ -83,12 +83,12 @@ export class StatusHud extends BaseHud {
     private floatingTexts: FloatingText[] = [];
 
     constructor(scene: Phaser.Scene, body: MatterJS.BodyType) {
-        super(scene, 0, 0, 1000);
+        super(scene, 0, 0, 9999);
         this.body = body;
 
         this.bg = scene.add.graphics();
         this.bg.fillStyle(HUD_STATUS_BAR_BG, HUD_BG_ALPHA);
-        this.bg.fillRect(-HUD_STATUS_BAR_W / 2, 0, HUD_STATUS_BAR_W, HUD_STATUS_BAR_H);
+        this.bg.fillRect(-HUD_STATUS_BAR_W / 2, 0, HUD_STATUS_BAR_W, 4);
         this.root.add(this.bg);
 
         this.hpFill = scene.add.graphics();
@@ -109,10 +109,10 @@ export class StatusHud extends BaseHud {
         this.nameLabel = scene.add
             .text(0, -2, '', {
                 fontFamily: 'monospace',
-                fontSize: '10px',
+                fontSize: '11px',
                 color: '#ffffff',
                 stroke: '#000000',
-                strokeThickness: 4,
+                strokeThickness: 2,
                 shadow: {
                     offsetX: 1,
                     offsetY: 1,
@@ -122,6 +122,7 @@ export class StatusHud extends BaseHud {
                     fill: true,
                 },
             })
+            .setResolution(2)
             .setOrigin(0.5, 1);
         this.root.add(this.nameLabel);
 
@@ -131,8 +132,9 @@ export class StatusHud extends BaseHud {
                 fontSize: HUD_FONT_LABEL,
                 color: HUD_STATUS_LABEL_COLOR,
                 stroke: '#000000',
-                strokeThickness: 3,
+                strokeThickness: 2,
             })
+            .setResolution(2)
             .setOrigin(0.5, 1);
         this.root.add(this.label);
     }
@@ -157,7 +159,7 @@ export class StatusHud extends BaseHud {
                 color: colorStr,
                 fontStyle: 'bold',
                 stroke: '#000000',
-                strokeThickness: 4,
+                strokeThickness: 2,
                 shadow: {
                     offsetX: 1,
                     offsetY: 1,
@@ -167,6 +169,7 @@ export class StatusHud extends BaseHud {
                     fill: true,
                 },
             })
+            .setResolution(2)
             .setOrigin(0, 0.5);
 
         this.root.add(textObj);
@@ -186,8 +189,8 @@ export class StatusHud extends BaseHud {
      */
     update(state: StatusHudState, time: number, topOffset: number): void {
         const pos = this.body.position;
-        const BAR_W = HUD_STATUS_BAR_W;
-        const BAR_H = 6;
+        const BAR_W = state.barWidth ?? HUD_STATUS_BAR_W;
+        const BAR_H = 4;
         const SP_BAR_H = 2;
         const RADIUS = 2;
 
@@ -208,15 +211,27 @@ export class StatusHud extends BaseHud {
         if (showHp) {
             // Dark border & shadow
             this.bg.fillStyle(0x0f172a, 0.95);
-            this.bg.fillRoundedRect(cx - BAR_W / 2 - 1, cy - 1, BAR_W + 2, totalHeight + 2, RADIUS + 1);
+            this.bg.fillRoundedRect(
+                cx - BAR_W / 2 - 1,
+                cy - 1,
+                BAR_W + 2,
+                totalHeight + 2,
+                RADIUS + 1,
+            );
             this.bg.lineStyle(1, 0x334155, 1);
-            this.bg.strokeRoundedRect(cx - BAR_W / 2 - 1, cy - 1, BAR_W + 2, totalHeight + 2, RADIUS + 1);
+            this.bg.strokeRoundedRect(
+                cx - BAR_W / 2 - 1,
+                cy - 1,
+                BAR_W + 2,
+                totalHeight + 2,
+                RADIUS + 1,
+            );
         }
 
-        // 2. Draw Name Label (Positioned cleanly above the status bar)
+        // 2. Draw Name Label (Positioned cleanly 2px above the HP bar top)
         if (state.name) {
             this.nameLabel.setText(state.name);
-            this.nameLabel.setPosition(cx, cy - 3);
+            this.nameLabel.setPosition(cx, cy - 2);
             this.nameLabel.setVisible(true);
         } else {
             this.nameLabel.setVisible(false);
@@ -248,7 +263,10 @@ export class StatusHud extends BaseHud {
         // 5. Draw Left Circular Progress Rings (Supports simultaneous Dodge Roll & Reloading)
         this.reloadCircle.clear();
 
-        const isDodgeCooldown = !!state.dodgeCooldownStartedAt && !!state.dodgeCooldownTimeMs && (time < state.dodgeCooldownStartedAt + state.dodgeCooldownTimeMs);
+        const isDodgeCooldown =
+            !!state.dodgeCooldownStartedAt &&
+            !!state.dodgeCooldownTimeMs &&
+            time < state.dodgeCooldownStartedAt + state.dodgeCooldownTimeMs;
         const hasDodgeRing = !!(state.dodgeActive || isDodgeCooldown);
         const hasReloadRing = !!(showReloading && state.reloadStartedAt && state.reloadTimeMs);
 

@@ -110,9 +110,9 @@ const DEFAULT_DURATION: Record<string, number> = {
     '-death': 1.5,
     '-aggro': 0.5,
     '-hurt': 1.0,
-    'heartbeat': 1.0,
-    'dodge': 0.8,
-    'footstep': 0.5,
+    heartbeat: 1.0,
+    dodge: 0.8,
+    footstep: 0.5,
     'dry-fire': 0.5,
     'bullet-wall': 0.7,
     'reload-': 0.9,
@@ -141,9 +141,7 @@ const subsetFilter = requestedIds.length > 0 ? new Set(requestedIds) : null;
 async function main(): Promise<void> {
     const index = readSfxIndex();
     const allSfxIds = index.sfx ?? [];
-    const targets = subsetFilter
-        ? allSfxIds.filter((id) => subsetFilter.has(id))
-        : allSfxIds;
+    const targets = subsetFilter ? allSfxIds.filter((id) => subsetFilter.has(id)) : allSfxIds;
 
     // Resolve specs + skip those without a prompt.
     interface Job {

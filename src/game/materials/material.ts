@@ -209,6 +209,14 @@ export class MaterialManager {
         const onEditorOpen = (open: unknown) => {
             this.setEditorActive(open === true);
         };
+        // Material drag is enabled only while the editor's Materials
+        // sub-tab is the active view — picking Walls or Monsters must
+        // not let the user accidentally move material sprites around.
+        // The panel emits a fresh boolean whenever open / topTab /
+        // sceneSubTab changes, so this listener tracks it directly.
+        const onMaterialTabActive = (active: unknown) => {
+            this.setEditorActive(active === true);
+        };
         const onAdd = (mat: unknown) => {
             if (mat) this.addMaterial(mat as PlacedMaterial);
         };
@@ -230,6 +238,7 @@ export class MaterialManager {
         };
 
         EventBus.on('editor-open', onEditorOpen);
+        EventBus.on('editor-material-tab-active', onMaterialTabActive);
         EventBus.on('material-add', onAdd);
         EventBus.on('material-select-id', onSelect);
         EventBus.on('material-update-props', onUpdate);
@@ -237,6 +246,7 @@ export class MaterialManager {
 
         this.scene.events.once('shutdown', () => {
             EventBus.removeListener('editor-open', onEditorOpen);
+            EventBus.removeListener('editor-material-tab-active', onMaterialTabActive);
             EventBus.removeListener('material-add', onAdd);
             EventBus.removeListener('material-select-id', onSelect);
             EventBus.removeListener('material-update-props', onUpdate);

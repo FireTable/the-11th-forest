@@ -23,6 +23,9 @@ importers:
       earcut:
         specifier: ^3.2.3
         version: 3.2.3
+      easystarjs:
+        specifier: ^0.4.4
+        version: 0.4.4
       konva:
         specifier: ^10.3.0
         version: 10.3.0
@@ -1996,6 +1999,9 @@ packages:
   earcut@3.2.3:
     resolution: {integrity: sha512-vnS4AVwp1KHAF13i1vp1/2D5evWy3k5u/iW/B81QVsUZtV8cv2tU0b2VNFlqvh4kYwrFMDdjPCfAmfyJW9y14Q==}
 
+  easystarjs@0.4.4:
+    resolution: {integrity: sha512-ZSt0TkB8xuIXRIrKsM3jkmk1/cZUtyvf0DqOXf6wuKq9slx9UA5kkLtiaWhtmOQFJFKdabbvXwk6RO0znghArQ==}
+
   electron-to-chromium@1.5.396:
     resolution: {integrity: sha512-yHiw2Y3C3H9U6TMbOfoWK/BPreiOPXRfTWPBwQBoZG6/8TB6eOPnsy5oaRYuatR7Fw2SJ4kKforgufeo7fq0EQ==}
 
@@ -2191,6 +2197,9 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  heap@0.2.6:
+    resolution: {integrity: sha512-MzzWcnfB1e4EG2vHi3dXHoBupmuXNZzx6pY6HldVS55JKKBoq3xOyzfSaZRkJp37HIhEYC78knabHff3zc4dQQ==}
 
   human-signals@5.0.0:
     resolution: {integrity: sha512-AXcZb6vzzrFAUE61HnN4mpLqd/cSIwNQjtNWR0euPm6y0iqx3G4gOXaIDdtdDwZmhwe82LA6+zinmW4UBWVePQ==}
@@ -4663,6 +4672,10 @@ snapshots:
 
   earcut@3.2.3: {}
 
+  easystarjs@0.4.4:
+    dependencies:
+      heap: 0.2.6
+
   electron-to-chromium@1.5.396: {}
 
   emoji-regex@10.6.0: {}
@@ -4929,6 +4942,8 @@ snapshots:
       - utf-8-validate
 
   has-flag@4.0.0: {}
+
+  heap@0.2.6: {}
 
   human-signals@5.0.0: {}
 

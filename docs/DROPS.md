@@ -28,15 +28,16 @@ public/data/drops/
 ## YAML schema — `public/data/drops/<id>.yaml`
 
 ```yaml
-id: hp-shard             # optional; loader overwrites with filename
+id: hp-shard # optional; loader overwrites with filename
 name: HP Shard
-kind: static             # 'static' | 'monster'
-                         # static: placed in level; monster: rolled on death
+kind:
+    static # 'static' | 'monster'
+    # static: placed in level; monster: rolled on death
 
-effect:                   # exactly one of the three discriminated variants
-    type: instant        # 'instant' | 'refill-ammo' | 'weapon'
-    hp: 10               # instant: amount to add (0 if absent)
-    sp: 0                # instant: amount to add (0 if absent)
+effect: # exactly one of the three discriminated variants
+    type: instant # 'instant' | 'refill-ammo' | 'weapon'
+    hp: 10 # instant: amount to add (0 if absent)
+    sp: 0 # instant: amount to add (0 if absent)
     # OR:
     # type: refill-ammo
     # ammoFraction: 0.5   # 0..1 of active weapon's clip
@@ -44,17 +45,17 @@ effect:                   # exactly one of the three discriminated variants
     # type: weapon
     # weaponId: plasma-sword
 
-sfx: pickup-hp           # override default 'pickup-generic' sfx
+sfx: pickup-hp # override default 'pickup-generic' sfx
 
-sprite:                   # optional; fallback rectangle if absent
+sprite: # optional; fallback rectangle if absent
     texture: assets/image/drops/hp-shard.png
     grid: { rows: 1, cols: 1 }
     scale: 0.4
 
 anims:
-    idle: { frames: [0, 0], frameRate: 1, repeat: -1 }   # static bob
+    idle: { frames: [0, 0], frameRate: 1, repeat: -1 } # static bob
 
-prompt: |                # AI sprite template (rarely needed; most drops reuse textures)
+prompt: | # AI sprite template (rarely needed; most drops reuse textures)
     …
 ```
 
@@ -62,9 +63,14 @@ prompt: |                # AI sprite template (rarely needed; most drops reuse t
 
 ```ts
 import {
-    parseDropIndex, parseDropYaml,
-    fetchDrop, fetchDropIndex,
-    type DropSpec, type DropIndex, type DropEffect, type DropType,
+    parseDropIndex,
+    parseDropYaml,
+    fetchDrop,
+    fetchDropIndex,
+    type DropSpec,
+    type DropIndex,
+    type DropEffect,
+    type DropType,
 } from '@/lib/drops';
 ```
 
@@ -98,16 +104,17 @@ Single pickup object. Owns: Matter body (sensor), sprite, animation state. Const
 Owns the array of active drops + collision wiring. Per-frame `update()` animates them.
 
 ```ts
-new DropController(scene, matter, characterBody, specMap, cb)
+new DropController(scene, matter, characterBody, specMap, cb);
 ```
 
-| Method | Purpose |
-|---|---|
+| Method              | Purpose                                     |
+| ------------------- | ------------------------------------------- |
 | `spawn(spec, x, y)` | create new DropInstance, add to active list |
-| `update()` | per-frame animation tick |
-| `destroy()` | teardown all drops |
+| `update()`          | per-frame animation tick                    |
+| `destroy()`         | teardown all drops                          |
 
 Collision handler listens for `collisionstart` between a drop sensor and the character body. On overlap:
+
 1. Compute effect via `planDropEffect`
 2. Fire callbacks (`cb.onHeal`, `cb.onRefillAmmo`, `cb.onGrantWeapon`)
 3. Emit `sfx:<spec.sfx>` (or `sfx:pickup-generic` fallback)
@@ -115,8 +122,8 @@ Collision handler listens for `collisionstart` between a drop sensor and the cha
 
 ## Events emitted
 
-| Event | When |
-|---|---|
+| Event                                     | When           |
+| ----------------------------------------- | -------------- |
 | `sfx:pickup-<id>` or `sfx:pickup-generic` | drop collected |
 
 ## Events subscribed

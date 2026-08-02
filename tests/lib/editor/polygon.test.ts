@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import {
-    isMeaningfulPolygon,
-    polygonBounds,
-    rectToPoints,
-} from '@/lib/editor/polygon';
+import { isMeaningfulPolygon, polygonBounds, rectToPoints } from '@/lib/editor/polygon';
 
 describe('rectToPoints', () => {
     it('returns the four corners in clockwise order starting from top-left', () => {

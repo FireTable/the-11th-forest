@@ -16,7 +16,6 @@
  * us pass a freshly-resolved scene spec bundle.
  */
 
-import { LoadingScene } from '@/game/scenes/loading-scene';
 import { resolveScene, type ResolvedScene } from '@/game/resolve-scene';
 
 let game: Phaser.Game | null = null;
@@ -30,15 +29,9 @@ export function getPhaserGame(): Phaser.Game | null {
 }
 
 /**
- * Stop the dead LoadScene and re-launch LoadingScene, which sees all
- * assets already cached and fires `complete` immediately, then adds a
- * fresh LoadScene with full HP.
- *
- * We deliberately do NOT `scene.remove()` the LoadingScene instance:
- * in production builds removing it appears to evict the texture cache
- * (texture missing → black background + invisible character), even
- * though the docs say the cache is game-scoped. Re-starting the
- * existing LoadingScene avoids touching its lifecycle state.
+ * Stop every running scene and start a fresh LoadScene for `newId`.
+ * Caller has already saved any pending edits — this is the final step
+ * after the user clicks "Jump to scene".
  *
  * @param resolved Pre-fetched scene bundle. Caller (the API endpoint)
  *                 computes this so the UI shows a loading state while
@@ -49,26 +42,30 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
         throw new Error('Phaser game not initialised — setPhaserGame never called');
     }
 
-    // Stop + remove only the dead LoadScene (paused). LoadingScene stays
-    // registered so its already-cached texture references survive.
-    const deadKey = `LoadScene:${resolved.id}`;
-    const dead = game.scene.getScene(deadKey);
-    if (dead) {
-        dead.scene.stop();
-        game.scene.remove(deadKey);
+    // Stop every active scene (calls shutdown() on each). Running scenes
+    // by themselves so paused/menu ones are left alone.
+    const active = game.scene.getScenes(true);
+    for (const s of active) {
+        s.scene.stop();
     }
 
-    // Re-launch the existing LoadingScene. Its queueAssets() re-adds
-    // already-cached assets, the loader fires 'complete' immediately,
-    // and the on-complete handler adds a fresh LoadScene with full HP.
-    const loader = game.scene.getScene('LoadingScene');
-    if (loader) {
-        loader.scene.start();
-    } else {
-        // LoadingScene was somehow never registered — bootstrap a fresh
-        // one. Shouldn't happen on a normal boot path.
-        game.scene.add('LoadingScene', new LoadingScene(), true);
-    }
+    // Dynamic import so the editor's restart path doesn't pull in Phaser
+    // scene code into its lazy chunk.
+    const { LoadScene } = await import('@/game/scenes/scene');
+    game.scene.add(
+        `LoadScene:${resolved.id}`,
+        new LoadScene(resolved.id, resolved.level, {
+            weapons: resolved.weapons,
+            weaponsById: resolved.weaponsById,
+            character: resolved.character,
+            spriteCell: resolved.spriteCell,
+            monsterSpecs: resolved.monsters,
+            dropSpecs: resolved.drops,
+            sfxSpecs: resolved.sfx,
+            musicSpecs: resolved.music,
+        }),
+        true,
+    );
 }
 
 /**

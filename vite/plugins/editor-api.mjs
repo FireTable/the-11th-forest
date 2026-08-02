@@ -58,9 +58,7 @@ const SaveLevelSchema = z
                     .object({
                         id: z.string().min(1),
                         kind: z.enum(['tall', 'short']),
-                        points: z
-                            .array(z.tuple([z.number(), z.number()]))
-                            .min(3),
+                        points: z.array(z.tuple([z.number(), z.number()])).min(3),
                     })
                     .strict(),
             )
@@ -127,9 +125,7 @@ const SaveLevelSchema = z
     .strict();
 
 function formatZodIssues(issues) {
-    return issues
-        .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
-        .join('; ');
+    return issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
 }
 
 // ─── Server-side schema mirrors ──────────────────────────────────────────
@@ -261,7 +257,10 @@ const MonsterSpecSaveSchema = z
     .object({
         id: z.string().min(1).optional(),
         name: z.string().min(1),
-        imageSize: z.string().regex(/^\d+x\d+$/).optional(),
+        imageSize: z
+            .string()
+            .regex(/^\d+x\d+$/)
+            .optional(),
         prompt: z.string().optional(),
         hp: z.number().gte(0),
         moveSpeed: z.number().gt(0),
@@ -406,7 +405,10 @@ const CharacterSpecSaveSchema = z
     .object({
         id: z.string().min(1),
         name: z.string().min(1),
-        imageSize: z.string().regex(/^\d+x\d+$/).optional(),
+        imageSize: z
+            .string()
+            .regex(/^\d+x\d+$/)
+            .optional(),
         prompt: z.string().optional(),
         hp: z.number().gte(0),
         sp: z.number().gte(0),
@@ -585,7 +587,10 @@ async function handleSaveLevel(req, res) {
     const yaml = serializeLevelYaml(result.data);
     const outPath = path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`);
     await writeFile(outPath, yaml, 'utf8');
-    return sendJson(res, 200, { ok: true, path: path.relative(path.resolve(__dirname, '../..'), outPath) });
+    return sendJson(res, 200, {
+        ok: true,
+        path: path.relative(path.resolve(__dirname, '../..'), outPath),
+    });
 }
 
 async function handleListMaterials(res) {
@@ -599,7 +604,9 @@ async function handleListMaterials(res) {
                 const folderName = entry.name;
                 const folderPath = path.join(materialsDir, folderName);
                 const files = await readdir(folderPath);
-                const images = files.filter((f) => /\.(png|jpe?g|webp)$/i.test(f) && f !== 'raw.png');
+                const images = files.filter(
+                    (f) => /\.(png|jpe?g|webp)$/i.test(f) && f !== 'raw.png',
+                );
                 folders.push({
                     name: folderName,
                     images: images.map((f) => `assets/image/materials/${folderName}/${f}`),
@@ -713,10 +720,7 @@ async function handleListScenes(res) {
     const scenes = [];
     for (const id of ids) {
         try {
-            const text = await readFile(
-                path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`),
-                'utf8',
-            );
+            const text = await readFile(path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`), 'utf8');
             const level = parseYaml(text) || {};
             scenes.push({ id, title: level.title || id });
         } catch {
@@ -740,9 +744,8 @@ async function handleCreateScene(req, res) {
     if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
         return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
     }
-    const safeTitle = typeof title === 'string' && title.length > 0
-        ? title.replace(/[\r\n]/g, ' ')
-        : id;
+    const safeTitle =
+        typeof title === 'string' && title.length > 0 ? title.replace(/[\r\n]/g, ' ') : id;
 
     // 1. Append to index.yaml (idempotent: skip if already present).
     const indexPath = path.join(PUBLIC_DIR, 'data/levels/index.yaml');
@@ -792,10 +795,7 @@ async function handleUploadSceneImage(req, res) {
     // Also report the existing level's imageSize so the caller can diff.
     let previousSize = null;
     try {
-        const text = await readFile(
-            path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`),
-            'utf8',
-        );
+        const text = await readFile(path.join(PUBLIC_DIR, 'data/levels', `${id}.yaml`), 'utf8');
         const level = parseYaml(text);
         if (typeof level?.imageSize === 'string') {
             const m = level.imageSize.match(/^(\d+)x(\d+)$/);
@@ -889,10 +889,7 @@ async function handleGetCharacter(req, res) {
         return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
     }
     try {
-        const text = await readFile(
-            path.join(PUBLIC_DIR, 'data/characters', `${id}.yaml`),
-            'utf8',
-        );
+        const text = await readFile(path.join(PUBLIC_DIR, 'data/characters', `${id}.yaml`), 'utf8');
         return sendJson(res, 200, { id, spec: parseYaml(text) });
     } catch {
         return sendJson(res, 404, { error: `character not found: ${id}` });
@@ -939,11 +936,7 @@ async function handleCreateCharacter(req, res) {
     if (!Array.isArray(idx.characters)) idx.characters = [];
     if (!idx.characters.includes(id)) {
         idx.characters.push(id);
-        await writeFile(
-            indexPath,
-            stringifyYaml(idx, { lineWidth: -1, noRefs: true }),
-            'utf8',
-        );
+        await writeFile(indexPath, stringifyYaml(idx, { lineWidth: -1, noRefs: true }), 'utf8');
     }
 
     // Minimal template — the editor will fill in the rest.
@@ -959,11 +952,7 @@ async function handleCreateCharacter(req, res) {
         hotbar: ['assault-rifle'],
     };
     const out = path.join(PUBLIC_DIR, 'data/characters', `${id}.yaml`);
-    await writeFile(
-        out,
-        stringifyYaml(template, { lineWidth: -1, noRefs: true }),
-        'utf8',
-    );
+    await writeFile(out, stringifyYaml(template, { lineWidth: -1, noRefs: true }), 'utf8');
     return sendJson(res, 200, { ok: true, id });
 }
 
@@ -1061,7 +1050,11 @@ async function handleListModule(req, res) {
     const root = MODULE_ROOTS[mod];
     if (!root) return sendJson(res, 400, { error: `unknown module: ${mod}` });
     try {
-        const idxPath = path.join(PUBLIC_DIR, root.dir.split('/').slice(0, 2).join('/'), 'index.yaml');
+        const idxPath = path.join(
+            PUBLIC_DIR,
+            root.dir.split('/').slice(0, 2).join('/'),
+            'index.yaml',
+        );
         const text = await readFile(idxPath, 'utf8');
         const idx = parseYaml(text) || {};
         const ids = Array.isArray(idx[root.indexField]) ? idx[root.indexField] : [];
@@ -1079,10 +1072,7 @@ async function handleGetModuleSpec(req, res) {
         return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
     }
     try {
-        const text = await readFile(
-            path.join(PUBLIC_DIR, root.dir, `${id}.yaml`),
-            'utf8',
-        );
+        const text = await readFile(path.join(PUBLIC_DIR, root.dir, `${id}.yaml`), 'utf8');
         return sendJson(res, 200, { id, spec: parseYaml(text) });
     } catch {
         return sendJson(res, 404, { error: `${mod}/${id} not found` });
@@ -1141,18 +1131,10 @@ async function handleCreateModuleSpec(req, res) {
     if (!Array.isArray(idx[root.indexField])) idx[root.indexField] = [];
     if (!idx[root.indexField].includes(id)) {
         idx[root.indexField].push(id);
-        await writeFile(
-            idxPath,
-            stringifyYaml(idx, { lineWidth: -1, noRefs: true }),
-            'utf8',
-        );
+        await writeFile(idxPath, stringifyYaml(idx, { lineWidth: -1, noRefs: true }), 'utf8');
     }
     const out = path.join(PUBLIC_DIR, root.dir, `${id}.yaml`);
-    await writeFile(
-        out,
-        stringifyYaml(result.data, { lineWidth: -1, noRefs: true }),
-        'utf8',
-    );
+    await writeFile(out, stringifyYaml(result.data, { lineWidth: -1, noRefs: true }), 'utf8');
     return sendJson(res, 200, { ok: true });
 }
 
@@ -1265,14 +1247,17 @@ export function editorApiPlugin() {
                     sendJson(res, 500, { error: String(e?.message ?? e) });
                 }
             });
-            server.middlewares.use('/api/editor/upload-character-sprite', async (req, res, next) => {
-                if (req.method !== 'POST') return next();
-                try {
-                    await handleUploadCharacterSprite(req, res);
-                } catch (e) {
-                    sendJson(res, 500, { error: String(e?.message ?? e) });
-                }
-            });
+            server.middlewares.use(
+                '/api/editor/upload-character-sprite',
+                async (req, res, next) => {
+                    if (req.method !== 'POST') return next();
+                    try {
+                        await handleUploadCharacterSprite(req, res);
+                    } catch (e) {
+                        sendJson(res, 500, { error: String(e?.message ?? e) });
+                    }
+                },
+            );
             server.middlewares.use('/api/editor/list-module', async (req, res, next) => {
                 if (req.method !== 'POST') return next();
                 try {

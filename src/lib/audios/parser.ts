@@ -22,9 +22,7 @@ function pathOf(issue: { path: ReadonlyArray<PropertyKey> }): string {
 }
 
 function rethrow(zerr: ZodError, id: string): never {
-    const summary = zerr.issues
-        .map((i) => `${pathOf(i)}: ${i.message}`)
-        .join('; ');
+    const summary = zerr.issues.map((i) => `${pathOf(i)}: ${i.message}`).join('; ');
     throw new Error(`Sound ${id}: ${summary}`);
 }
 
@@ -46,9 +44,7 @@ export function parseAudioIndex(text: string): AudioIndex {
     }
     const result = AudioIndexSchema.safeParse(raw);
     if (!result.success) {
-        const summary = result.error.issues
-            .map((i) => `${pathOf(i)}: ${i.message}`)
-            .join('; ');
+        const summary = result.error.issues.map((i) => `${pathOf(i)}: ${i.message}`).join('; ');
         throw new Error(`Audio index: ${summary}`);
     }
     return result.data;

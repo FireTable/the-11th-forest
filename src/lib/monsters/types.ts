@@ -16,11 +16,7 @@
 
 import type { z } from 'zod';
 
-import type {
-    DropRefSchema,
-    MonsterIndexSchema,
-    MonsterSpecSchema,
-} from './schema';
+import type { DropRefSchema, MonsterIndexSchema, MonsterSpecSchema } from './schema';
 
 export type DropRef = z.infer<typeof DropRefSchema>;
 

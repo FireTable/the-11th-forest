@@ -21,11 +21,7 @@ import { z } from 'zod';
  * (`emit` accepts any string key); the schema just documents what's
  * in flight so a typo on either side is easier to spot.
  */
-export const EventNameSchema = z.enum([
-    'editor-open',
-    'level-loaded',
-    'current-scene-ready',
-]);
+export const EventNameSchema = z.enum(['editor-open', 'level-loaded', 'current-scene-ready']);
 
 /**
  * Event payloads are deliberately unconstrained — each emit/on pair

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { clampToBounds, dodgeIntent, moveIntent, resolveHurtSfx } from '@/game/characters/logic';
+import {
+    clampToBounds,
+    dodgeIntent,
+    moveIntent,
+    pickNearestMonster,
+    resolveHurtSfx,
+} from '@/game/characters/logic';
 
 describe('characters/logic — moveIntent', () => {
     it('returns zero when no key pressed', () => {
@@ -44,35 +50,25 @@ describe('characters/logic — dodgeIntent', () => {
     const FWD = { vx: 1, vy: 0 };
 
     it('returns null when shift not pressed', () => {
-        expect(
-            dodgeIntent(false, FWD, 100, 15, 600, 0, 0, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(false, FWD, 100, 15, 600, 0, 0, 28, 1000)).toBeNull();
     });
 
     it('returns null when no movement intent', () => {
-        expect(
-            dodgeIntent(true, NO_INTENT, 100, 15, 600, 0, 0, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(true, NO_INTENT, 100, 15, 600, 0, 0, 28, 1000)).toBeNull();
     });
 
     it('returns null when SP below cost', () => {
-        expect(
-            dodgeIntent(true, FWD, 10, 15, 600, 0, 0, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(true, FWD, 10, 15, 600, 0, 0, 28, 1000)).toBeNull();
     });
 
     it('returns null when cooldown not elapsed', () => {
         // lastDodgeEndAt=900, now=1000, cooldown=600 → only 100ms passed
-        expect(
-            dodgeIntent(true, FWD, 100, 15, 600, 900, 0, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(true, FWD, 100, 15, 600, 900, 0, 28, 1000)).toBeNull();
     });
 
     it('returns null when a previous dodge is still active', () => {
         // dodgeActiveUntil=1200, now=1000 → still dodging
-        expect(
-            dodgeIntent(true, FWD, 100, 15, 600, 0, 1200, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(true, FWD, 100, 15, 600, 0, 1200, 28, 1000)).toBeNull();
     });
 
     it('returns dodge velocity when all conditions met', () => {
@@ -107,11 +103,18 @@ describe('characters/logic — clampToBounds', () => {
 });
 describe('characters/logic — resolveHurtSfx', () => {
     it('returns female variant when gender=female and hurtFemale set', () => {
-        expect(resolveHurtSfx({ gender: 'female', sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' } })).toBe('f');
+        expect(
+            resolveHurtSfx({
+                gender: 'female',
+                sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' },
+            }),
+        ).toBe('f');
     });
 
     it('returns male variant when gender=male and hurtMale set', () => {
-        expect(resolveHurtSfx({ gender: 'male', sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' } })).toBe('m');
+        expect(
+            resolveHurtSfx({ gender: 'male', sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' } }),
+        ).toBe('m');
     });
 
     it('falls back to hurt when gender set but per-gender field missing', () => {
@@ -129,5 +132,38 @@ describe('characters/logic — resolveHurtSfx', () => {
 
     it('returns hurt when no gender set (gender-neutral fallback)', () => {
         expect(resolveHurtSfx({ sfx: { hurt: 'n' } })).toBe('n');
+    });
+});
+
+describe('characters/logic — pickNearestMonster (mobile auto-aim)', () => {
+    it('returns null when the list is empty', () => {
+        expect(pickNearestMonster([], 100, 100)).toBeNull();
+    });
+
+    it('returns the only monster when the list has one', () => {
+        const m = { x: 50, y: 50 };
+        expect(pickNearestMonster([m], 100, 100)).toBe(m);
+    });
+
+    it('returns the closest monster when several are in range', () => {
+        const far = { id: 'far', x: 500, y: 500 };
+        const near = { id: 'near', x: 110, y: 100 };
+        const mid = { id: 'mid', x: 200, y: 200 };
+        const got = pickNearestMonster([far, mid, near], 100, 100);
+        expect(got).toBe(near);
+    });
+
+    it('breaks ties by picking the first occurrence (stable / predictable)', () => {
+        const a = { id: 'a', x: 110, y: 100 };
+        const b = { id: 'b', x: 100, y: 110 };
+        // Both are distance sqrt(100) — same magnitude. We pick a (first).
+        const got = pickNearestMonster([a, b], 100, 100);
+        expect(got).toBe(a);
+    });
+
+    it('handles negative coordinates', () => {
+        const m = { id: 'm', x: -50, y: -50 };
+        const got = pickNearestMonster([m], 0, 0);
+        expect(got).toBe(m);
     });
 });

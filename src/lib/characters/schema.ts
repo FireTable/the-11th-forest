@@ -111,7 +111,10 @@ export const CharacterSpecSchema = z
         name: z.string().min(1),
         // Self-contained doc fields — accepted on input for YAML
         // readability but not surfaced on the runtime spec.
-        imageSize: z.string().regex(/^\d+x\d+$/).optional(),
+        imageSize: z
+            .string()
+            .regex(/^\d+x\d+$/)
+            .optional(),
         prompt: z.string().optional(),
         hp: z.number().gte(0),
         sp: z.number().gte(0),

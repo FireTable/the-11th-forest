@@ -30,7 +30,7 @@ export const DEPTH = {
     PROJECTILE_BASE: 20, // Min base depth for bullets so they always render OVER background materials
     // Y-sorting range for characters, monsters, bullets, and y-sort materials (PROJECTILE_BASE + y-coord + offset)
     FOREGROUND_MATERIAL: 10000,
-    MELEE_SLASH: 12000,     // Slash arc always above foreground materials
+    MELEE_SLASH: 12000, // Slash arc always above foreground materials
     SELECTION_BOX: 15000,
     HUD: 20000,
 } as const;
@@ -67,6 +67,7 @@ export const KEY_A = 65;
 export const KEY_S = 83;
 export const KEY_D = 68;
 export const KEY_SHIFT = 16;
+export const KEY_SPACE = 32;
 export const KEY_ONE = 49;
 export const KEY_TWO = 50;
 export const KEY_THREE = 51;
@@ -110,8 +111,8 @@ export const HUD_WEAPON_AMMO_BAR_H = 6;
 
 // ─── HUD: status-hud (head reload indicator) ──────────────────────────
 
-export const HUD_STATUS_BAR_W = 72;
-export const HUD_STATUS_BAR_H = 8;
+export const HUD_STATUS_BAR_W = 60;
+export const HUD_STATUS_BAR_H = 4;
 /** Offset above character center for the status bar. */
 export const HUD_STATUS_OFFSET_Y = -34;
 /** Duration of the "Full" fade-out after reload completes. */

@@ -28,7 +28,7 @@ import {
     KEY_R,
     KEY_S,
     KEY_SEVEN,
-    KEY_SHIFT,
+    KEY_SPACE,
     KEY_SIX,
     KEY_THREE,
     KEY_TWO,
@@ -40,7 +40,6 @@ import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
-import { useGameStore } from '@/store/game-store';
 
 import { animKey } from './keys';
 
@@ -82,7 +81,7 @@ export interface DodgeIntent {
  * Returns null when no dodge should fire.
  */
 export function dodgeIntent(
-    shiftDown: boolean,
+    spaceDown: boolean,
     intent: MoveIntent,
     sp: number,
     spCost: number,
@@ -92,12 +91,9 @@ export function dodgeIntent(
     dodgeSpeed: number,
     now: number,
 ): DodgeIntent | null {
-    const canDodge =
-        sp >= spCost &&
-        now - lastDodgeEndAt >= cooldownMs &&
-        now >= dodgeActiveUntil;
+    const canDodge = sp >= spCost && now - lastDodgeEndAt >= cooldownMs && now >= dodgeActiveUntil;
     const hasDirection = intent.vx !== 0 || intent.vy !== 0;
-    if (!shiftDown || !hasDirection || !canDodge) return null;
+    if (!spaceDown || !hasDirection || !canDodge) return null;
     return {
         vx: intent.vx * dodgeSpeed,
         vy: intent.vy * dodgeSpeed,
@@ -149,6 +145,30 @@ export function clampToBounds(
     };
 }
 
+/**
+ * Pick the nearest monster to (originX, originY) by Euclidean distance.
+ * Pure so the controller and tests can share the auto-aim math without
+ * booting a Phaser scene. Returns null when the list is empty.
+ */
+export function pickNearestMonster<T extends { x: number; y: number }>(
+    monsters: readonly T[],
+    originX: number,
+    originY: number,
+): T | null {
+    if (monsters.length === 0) return null;
+    let nearest: T = monsters[0];
+    let minDist = Math.hypot(monsters[0].x - originX, monsters[0].y - originY);
+    for (let i = 1; i < monsters.length; i++) {
+        const m = monsters[i];
+        const d = Math.hypot(m.x - originX, m.y - originY);
+        if (d < minDist) {
+            minDist = d;
+            nearest = m;
+        }
+    }
+    return nearest;
+}
+
 // ─── Controller ──────────────────────────────────────────────────────────
 
 // Body size + dodge params come from CharacterSpec (loaded from YAML).
@@ -161,6 +181,7 @@ export function clampToBounds(
 export interface WeaponsLike {
     update(time: number, tx: number, ty: number, fire: boolean, halfH: number): void;
     switchTo(index: number): void;
+    cycleSlot(direction: 1 | -1): void;
     manualReload(): void;
     refillActiveAmmo(fraction: number): void;
     swapToWeapon(weaponId: string): boolean;
@@ -233,6 +254,12 @@ export class CharacterController {
     // instead of immediately snapping to wherever the cursor happens to be.
     private targetX: number | null = null;
     private targetY: number | null = null;
+    // Mobile touch state — written by EventBus listeners from
+    // TouchControls.tsx, merged into the keyboard intent on each tick.
+    // null pointer id == joystick not held.
+    private mobileMove: { vx: number; vy: number } | null = null;
+    private mobileFiring = false;
+    private mobileDodge = false;
     /** Last footstep SFX time — throttle to ~5 per second so the loop
      *  doesn't spam when the player holds WASD. */
     private lastFootstepAt = 0;
@@ -271,6 +298,7 @@ export class CharacterController {
 
         this.bindKeyboard();
         this.bindPointer();
+        this.bindMobile();
 
         // Chain the dodge -> idle transition. Bound once in the
         // constructor so we don't leak listeners on every stop event.
@@ -289,31 +317,27 @@ export class CharacterController {
             if (this.infiniteHp) this.hp = INFINITE_HP_VALUE;
         };
         EventBus.on('dev:cheat:infiniteHp', infiniteHpHandler);
-        this.cleanupFns.push(() => EventBus.removeListener('dev:cheat:infiniteHp', infiniteHpHandler));
+        this.cleanupFns.push(() =>
+            EventBus.removeListener('dev:cheat:infiniteHp', infiniteHpHandler),
+        );
     }
 
     // ─── Public API ──────────────────────────────────────────────────────
 
     /** Apply HP/SP healing (clamped to [0, max]). Negative values damage.
      *  Dev cheat: when `infiniteHp` is on, negative HP deltas are
-     *  silently ignored so the player can't die.
-     *
-     *  Death: when HP falls to 0 from a positive value, flip the
-     *  `isDead` flag in the UI store and pause the Phaser scene. The
-     *  React death overlay reads `isDead` and offers a Restart
-     *  button; restart triggers a fresh scene start (the constructor
-     *  reseeds HP from the spec). */
+     *  silently ignored so the player can't die. */
     heal(hpDelta: number, spDelta: number): void {
         const hpBlocked = this.infiniteHp && hpDelta < 0;
         if (hpDelta !== 0 && !hpBlocked) {
             const oldHp = this.hp;
             this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
             const actualDelta = this.hp - oldHp;
-            if (oldHp > 0 && this.hp === 0 && !hpBlocked) {
-                this.handleDeath();
-            }
             if (actualDelta !== 0 && this.parts.statusHud?.showFloatingNumber) {
-                this.parts.statusHud.showFloatingNumber(actualDelta, actualDelta > 0 ? 'heal' : 'damage');
+                this.parts.statusHud.showFloatingNumber(
+                    actualDelta,
+                    actualDelta > 0 ? 'heal' : 'damage',
+                );
             }
             if (hpDelta < 0) {
                 const sfx = resolveHurtSfx(this.spec);
@@ -349,17 +373,22 @@ export class CharacterController {
     /** Drive one tick manually — useful for tests; normally scene events do it. */
     update(now: number): void {
         const kb = this.scene.input.keyboard!;
+        const mm = this.mobileMove;
         const intent = moveIntent({
-            up: kb.addKey(KEY_W).isDown,
-            down: kb.addKey(KEY_S).isDown,
-            left: kb.addKey(KEY_A).isDown,
-            right: kb.addKey(KEY_D).isDown,
+            up: kb.addKey(KEY_W).isDown || (mm?.vy ?? 0) < -0.2,
+            down: kb.addKey(KEY_S).isDown || (mm?.vy ?? 0) > 0.2,
+            left: kb.addKey(KEY_A).isDown || (mm?.vx ?? 0) < -0.2,
+            right: kb.addKey(KEY_D).isDown || (mm?.vx ?? 0) > 0.2,
         });
 
         // ── Dodge initiation ────────────────────────────────────────
-        const shiftDown = kb.addKey(KEY_SHIFT).isDown;
+        const spaceDown = kb.addKey(KEY_SPACE).isDown || this.mobileDodge;
+        // Edge-triggered: clear the one-frame dodge flag the moment
+        // the controller consumes it, so holding the touch button
+        // doesn't queue a chain of dodges.
+        this.mobileDodge = false;
         const dodge = dodgeIntent(
-            shiftDown,
+            spaceDown,
             intent,
             this.sp,
             this.spec.dodge.spCost,
@@ -396,9 +425,10 @@ export class CharacterController {
         const pos = this.parts.body.position;
         // Calculate visual offset. `left` shifts right (+) / left (-), `bottom` shifts up (-) / down (+)
         const rawX = this.spec.sprite?.offset?.left ?? this.spec.sprite?.offset?.x ?? 0;
-        const rawY = this.spec.sprite?.offset?.bottom !== undefined 
-            ? -this.spec.sprite.offset.bottom 
-            : (this.spec.sprite?.offset?.y ?? 0);
+        const rawY =
+            this.spec.sprite?.offset?.bottom !== undefined
+                ? -this.spec.sprite.offset.bottom
+                : (this.spec.sprite?.offset?.y ?? 0);
         const offX = rawX * (sprite.flipX ? -1 : 1);
         const offY = rawY;
         sprite.setPosition(pos.x + offX, pos.y + this.spec.body.halfH + offY);
@@ -414,7 +444,10 @@ export class CharacterController {
             this.parts.debugBodyRect.setDepth(feetY + 1);
         }
         if (this.parts.debugHitboxRect) {
-            this.parts.debugHitboxRect.setPosition(pos.x, pos.y + this.spec.body.halfH - sprite.displayHeight / 2);
+            this.parts.debugHitboxRect.setPosition(
+                pos.x,
+                pos.y + this.spec.body.halfH - sprite.displayHeight / 2,
+            );
             this.parts.debugHitboxRect.setDepth(feetY + 2);
         }
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
@@ -434,10 +467,7 @@ export class CharacterController {
 
         // ── SP regen ────────────────────────────────────────────────
         if (now >= this.dodgeActiveUntil && this.sp < this.spec.sp) {
-            this.sp = Math.min(
-                this.spec.sp,
-                this.sp + (this.spec.sp * 16) / this.spec.spRegenMs,
-            );
+            this.sp = Math.min(this.spec.sp, this.sp + (this.spec.sp * 16) / this.spec.spRegenMs);
         }
 
         // ── Footstep SFX (throttled; cadence from spec) ─────────────
@@ -462,6 +492,13 @@ export class CharacterController {
             this.lastHeartbeatAt = now;
         }
 
+        // ── Mobile auto-aim (when FIRE is held on a touch device) ───
+        // While the virtual FIRE button is down, override targetX/Y with
+        // the nearest live monster every frame so bullets trail the
+        // target — independent of the desktop cursor path. When no
+        // monster exists, fall back to whatever the cursor set last.
+        this.applyMobileAutoAim(pos);
+
         // ── Weapon update ───────────────────────────────────────────
         // Default aiming target when cursor hasn't moved yet aligns with character's sprite facing (flipX)
         const defaultAimX = pos.x + (sprite.flipX ? -100 : 100);
@@ -471,7 +508,7 @@ export class CharacterController {
             now,
             this.targetX ?? defaultAimX,
             this.targetY ?? defaultAimY,
-            this.firing && now >= this.dodgeActiveUntil,
+            (this.firing || this.mobileFiring) && now >= this.dodgeActiveUntil,
             this.spec.body.halfH,
         );
 
@@ -480,7 +517,10 @@ export class CharacterController {
         this.parts.weaponHud.draw(this.parts.weapons, this.scene.time.now);
         // Character body position center is at (feetY - halfH).
         // Distance from body.position to sprite top is: displayHeight - halfH
-        const topOffset = Math.max(this.spec.body.halfH, this.parts.sprite.displayHeight - this.spec.body.halfH);
+        const topOffset = Math.max(
+            this.spec.body.halfH,
+            this.parts.sprite.displayHeight - this.spec.body.halfH,
+        );
         const slotState = this.parts.weapons.getActiveSlotState();
         this.parts.statusHud.update(
             {
@@ -583,7 +623,7 @@ export class CharacterController {
         kb.addKey(KEY_A);
         kb.addKey(KEY_S);
         kb.addKey(KEY_D);
-        kb.addKey(KEY_SHIFT);
+        kb.addKey(KEY_SPACE);
 
         kb.addKey(KEY_ONE).on('down', () => weapons.switchTo(0));
         kb.addKey(KEY_TWO).on('down', () => weapons.switchTo(1));
@@ -595,6 +635,56 @@ export class CharacterController {
         kb.addKey(KEY_R).on('down', () => weapons.manualReload());
     }
 
+    /**
+     * Subscribe to touch-control events emitted by `TouchControls.tsx`.
+     * Auto-aim lives in `update()`'s `applyMobileAutoAim` so it tracks
+     * the nearest monster every frame the FIRE button is held —
+     * independent of the desktop cursor path.
+     */
+    private bindMobile(): void {
+        const onMove = (payload?: { vx?: number; vy?: number } | null) => {
+            if (!payload || (payload.vx === 0 && payload.vy === 0)) {
+                this.mobileMove = null;
+            } else {
+                this.mobileMove = { vx: payload.vx ?? 0, vy: payload.vy ?? 0 };
+            }
+        };
+        const onFiring = (payload?: boolean) => {
+            const wasFiring = this.mobileFiring;
+            this.mobileFiring = payload === true;
+            // Mirror desktop `pointerleave`: hide the crosshair on
+            // FIRE release so the lock indicator doesn't linger on
+            // screen after the player lets go.
+            if (wasFiring && !this.mobileFiring) {
+                EventBus.emit('aim-crosshair-update', {
+                    x: -100,
+                    y: -100,
+                    isLocked: false,
+                    visible: false,
+                });
+            }
+        };
+        const onDodge = (payload?: boolean) => {
+            // Edge-trigger: only set when the touch starts; release
+            // is a no-op (the controller clears the flag on consume).
+            if (payload === true) this.mobileDodge = true;
+        };
+
+        EventBus.on('mobile:move', onMove);
+        EventBus.on('mobile:firing', onFiring);
+        EventBus.on('mobile:dodge', onDodge);
+        EventBus.on('mobile:weapon:switch', (payload?: { index?: number }) => {
+            const idx = payload?.index;
+            if (typeof idx === 'number' && idx >= 0) this.parts.weapons.switchTo(idx);
+        });
+        this.cleanupFns.push(() => {
+            EventBus.removeListener('mobile:move', onMove);
+            EventBus.removeListener('mobile:firing', onFiring);
+            EventBus.removeListener('mobile:dodge', onDodge);
+            EventBus.removeListener('mobile:weapon:switch');
+        });
+    }
+
     // Pointer tracking & magnetic aim assist state
     private rawClientX = 0;
     private rawClientY = 0;
@@ -604,6 +694,41 @@ export class CharacterController {
     private lockBreakoutUntil = 0;
     private hasPointerMoved = false;
     private currentLockedMonsterId: number | null = null;
+
+    /**
+     * While the mobile FIRE button is held, override `targetX/Y` with
+     * the live position of the nearest monster each frame so bullets
+     * chase the target even after they spawn. Re-emits the crosshair
+     * event so the on-screen reticle follows.
+     *
+     * No-op when `mobileFiring` is false (desktop path unchanged) or
+     * when no monsters are alive (targetX/Y keep their last value, then
+     * weapons.update falls through to `defaultAimX/Y` on the next frame).
+     */
+    private applyMobileAutoAim(pos: { x: number; y: number }): void {
+        if (!this.mobileFiring) return;
+        const monsters: { id: number; x: number; y: number }[] =
+            (this.scene as any).monsterSystem?.getActiveMonsters() ?? [];
+        const target = pickNearestMonster(monsters, pos.x, pos.y);
+        if (!target) return;
+
+        this.targetX = target.x;
+        this.targetY = target.y;
+
+        // Mirror the desktop path's crosshair emit so the on-screen
+        // reticle tracks the lock target.
+        const camera = this.scene.cameras.main;
+        if (camera) {
+            const hudX = (target.x - camera.scrollX) * (1536 / camera.width);
+            const hudY = (target.y - camera.scrollY) * (864 / camera.height);
+            EventBus.emit('aim-crosshair-update', {
+                x: hudX,
+                y: hudY,
+                isLocked: true,
+                visible: true,
+            });
+        }
+    }
 
     private updateAimTarget(now: number): void {
         if (!this.hasPointerMoved) return;
@@ -639,7 +764,8 @@ export class CharacterController {
                 const found = monsters.find((m) => m.id === this.currentLockedMonsterId);
                 if (found) {
                     const distToMouse = Math.hypot(found.x - rawWorldX, found.y - rawWorldY);
-                    if (distToMouse < AIM_ASSIST.STICKY_TETHER_RADIUS) { // Sticky tether range
+                    if (distToMouse < AIM_ASSIST.STICKY_TETHER_RADIUS) {
+                        // Sticky tether range
                         activeLockedMonster = found;
                     }
                 }
@@ -665,8 +791,12 @@ export class CharacterController {
 
                 // Mouse Reference 100% Synchronized to Locked Monster Screen Position:
                 // When player flicks mouse to break lock, the breakout delta starts DIRECTLY from the monster's body position!
-                const monsterScreenX = rectEl.left + (activeLockedMonster.x - camera.scrollX) * (rectEl.width / camera.width);
-                const monsterScreenY = rectEl.top + (activeLockedMonster.y - camera.scrollY) * (rectEl.height / camera.height);
+                const monsterScreenX =
+                    rectEl.left +
+                    (activeLockedMonster.x - camera.scrollX) * (rectEl.width / camera.width);
+                const monsterScreenY =
+                    rectEl.top +
+                    (activeLockedMonster.y - camera.scrollY) * (rectEl.height / camera.height);
                 this.rawClientX = monsterScreenX;
                 this.rawClientY = monsterScreenY;
             } else {
@@ -733,9 +863,6 @@ export class CharacterController {
             onPointerEvent(e);
             this.firing = true;
         };
-        const onMove = (e: PointerEvent) => {
-            onPointerEvent(e);
-        };
         const stop = () => {
             this.firing = false;
         };
@@ -751,31 +878,40 @@ export class CharacterController {
         };
 
         canvas.addEventListener('pointerdown', onDown);
-        canvas.addEventListener('pointermove', onMove);
         canvas.addEventListener('pointerup', stop);
         canvas.addEventListener('pointerleave', onLeave);
+
+        // Window-level pointermove: any HUD overlay (weapon slots,
+        // character hub, joystick, etc.) sits on top of the canvas with
+        // `pointer-events: auto`, so canvas pointermove stops firing the
+        // moment the cursor enters them. Window listeners keep aim
+        // tracking continuous regardless of which DOM layer the cursor
+        // happens to be in.
+        //
+        // Filter by viewport position rather than DOM ancestry: HUD
+        // overlays aren't children of `#game-container` (they're siblings
+        // inside `#app`), so a contains() check would reject them. We
+        // accept the event whenever the cursor sits inside the canvas's
+        // visible rect — which naturally includes all canvas-stacked
+        // HUD chrome and naturally excludes the editor panel / rotate
+        // overlay (fixed, full-screen, only during portrait).
+        const onWindowMove = (e: PointerEvent): void => {
+            const r = canvas.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) return;
+            const cx = e.clientX;
+            const cy = e.clientY;
+            if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return;
+            onPointerEvent(e);
+        };
+        window.addEventListener('pointermove', onWindowMove);
+        window.addEventListener('pointerleave', onLeave);
+
         this.cleanupFns.push(() => {
             canvas.removeEventListener('pointerdown', onDown);
-            canvas.removeEventListener('pointermove', onMove);
             canvas.removeEventListener('pointerup', stop);
             canvas.removeEventListener('pointerleave', onLeave);
+            window.removeEventListener('pointermove', onWindowMove);
+            window.removeEventListener('pointerleave', onLeave);
         });
-    }
-
-    /**
-     * React to HP reaching 0 from a positive value. Flips the UI store
-     * flag (the React <DeathOverlay> watches it) and pauses the Phaser
-     * scene so the world freezes while the player decides to restart.
-     *
-     * Restart is handled by React: the overlay button calls
-     * `scene.scene.start('GameScene')` which re-runs init() + create()
-     * — the Character constructor reseeds HP from the spec.
-     */
-    private handleDeath(): void {
-        useGameStore.getState().setDead(true);
-        EventBus.emit('player-died');
-        // Pause stops the matter physics step + animation ticks. The
-        // scene remains in memory; restart resumes / re-creates it.
-        this.scene.scene.pause();
     }
 }

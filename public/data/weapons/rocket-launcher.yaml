@@ -2,7 +2,7 @@ name: Rocket Launcher
 damage: 55
 cooldownMs: 1200
 range: 800
-clipSize: 1
+clipSize: 2
 reloadTimeMs: 2500
 bulletsPerShot: 1
 visual:

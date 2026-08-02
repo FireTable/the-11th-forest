@@ -35,66 +35,69 @@ public/data/weapons/
 Ranged vs melee is decided by whether `projectile` is set. Exactly one of them is required (`superRefine` enforces).
 
 ```yaml
-id: assault-rifle                 # optional; loader overwrites with filename
+id: assault-rifle # optional; loader overwrites with filename
 name: Assault Rifle
 damage: 8
 cooldownMs: 250
 range: 600
 
-visual:                           # floating sprite that orbits the holder
+visual: # floating sprite that orbits the holder
     texture: assets/image/weapons/assault-rifle.png
     scale: 0.4
     orbitRadius: 16
-    anchor: [0.45, 0.5]          # grip point relative to texture
-    muzzleOffset: [22, 0]         # bullet spawn point in weapon-local space
+    anchor: [0.45, 0.5] # grip point relative to texture
+    muzzleOffset: [22, 0] # bullet spawn point in weapon-local space
     recoilDistance: 6
     recoilDuration: 80
-    swingAngle: 90                # for melee only
-    rotationOffset: 0             # degrees
+    swingAngle: 90 # for melee only
+    rotationOffset: 0 # degrees
 
-bullet:                           # one per fire; can repeat via bulletsPerShot
+bullet: # one per fire; can repeat via bulletsPerShot
     texture: assets/image/weapons/assault-bullet.png
-    type: projectile              # 'projectile' | 'beam' | 'melee'
+    type: projectile # 'projectile' | 'beam' | 'melee'
     speed: 14
     scale: 0.3
-    color: 0xE0C071               # fallback color if no texture
-    beamWidth: 8                  # beam only
-    beamDuration: 300             # beam only
+    color: 0xE0C071 # fallback color if no texture
+    beamWidth: 8 # beam only
+    beamDuration: 300 # beam only
     anchor: [0.5, 0.5]
     rotationOffset: 0
-    spawnOffset: [0, 0]           # extra offset from muzzle
+    spawnOffset: [0, 0] # extra offset from muzzle
 
-projectile:                       # REQUIRED for ranged (no `bullet` then ranged via projectile)
+projectile: # REQUIRED for ranged (no `bullet` then ranged via projectile)
     speed: 14
-    visual:                       # legacy shape; newer code uses `bullet` + `spawnOffset`
+    visual: # legacy shape; newer code uses `bullet` + `spawnOffset`
         radius: 4
         width: 8
         height: 8
         color: 0xE0C071
 
-clipSize: 30                      # player-only magazine (optional)
+clipSize: 30 # player-only magazine (optional)
 reloadTimeMs: 1500
 bulletsPerShot: 1
-hitWidth: 80                     # melee only — sensor width
-hitHeight: 80                    # melee only — sensor height
+hitWidth: 80 # melee only — sensor width
+hitHeight: 80 # melee only — sensor height
 
 sfx:
-    shoot: assault-rifle-shoot    # optional override; default falls back
-    dryFire: dry-fire             # to bullet-wall, weapon-switch, etc.
+    shoot: assault-rifle-shoot # optional override; default falls back
+    dryFire: dry-fire # to bullet-wall, weapon-switch, etc.
     bulletWall: bullet-wall
     reloadStart: reload-start
     reloadFinish: reload-finish
 
-prompt: Heavy anime assault rifle shot, low punchy burst  # AI regen prompt (used by scripts/elevenlabs-sfx.ts if ElevenLabs provider)
+prompt: Heavy anime assault rifle shot, low punchy burst # AI regen prompt (used by scripts/elevenlabs-sfx.ts if ElevenLabs provider)
 ```
 
 ## Public API (`src/lib/weapons/index.ts`)
 
 ```ts
 import {
-    parseWeaponIndex, parseWeaponYaml,
-    fetchWeapon, fetchWeaponIndex,
-    type WeaponSpec, type WeaponIndex,
+    parseWeaponIndex,
+    parseWeaponYaml,
+    fetchWeapon,
+    fetchWeaponIndex,
+    type WeaponSpec,
+    type WeaponIndex,
 } from '@/lib/weapons';
 ```
 
@@ -110,27 +113,27 @@ Per-frame state, hotbar, magazine, reload, melee swing. Holds an array of `SlotS
 
 Key methods:
 
-| Method | Purpose |
-|---|---|
-| `update(time, tx, ty, fire, halfH)` | per-frame: aim, recoil decay, fire-on-cooldown, reload timer |
-| `switchTo(index)` | swap active weapon (visual tween + sfx) |
-| `manualReload()` | start reload if magazine not full |
-| `refillActiveAmmo(fraction)` | pickup ammo — used by drops |
-| `swapToWeapon(weaponId)` | pickup new weapon — returns false if id not in hotbar |
-| `getActive()` / `getSlot(i)` / `getAmmo()` / `getMaxAmmo()` / `isReloading()` / `getReloadProgress(t)` | HUD bindings |
-| `destroy()` | teardown sprite + tweens |
+| Method                                                                                                 | Purpose                                                      |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `update(time, tx, ty, fire, halfH)`                                                                    | per-frame: aim, recoil decay, fire-on-cooldown, reload timer |
+| `switchTo(index)`                                                                                      | swap active weapon (visual tween + sfx)                      |
+| `manualReload()`                                                                                       | start reload if magazine not full                            |
+| `refillActiveAmmo(fraction)`                                                                           | pickup ammo — used by drops                                  |
+| `swapToWeapon(weaponId)`                                                                               | pickup new weapon — returns false if id not in hotbar        |
+| `getActive()` / `getSlot(i)` / `getAmmo()` / `getMaxAmmo()` / `isReloading()` / `getReloadProgress(t)` | HUD bindings                                                 |
+| `destroy()`                                                                                            | teardown sprite + tweens                                     |
 
 ### `WeaponVisualController` (in `src/game/weapons/visual.ts`)
 
 ```ts
-new WeaponVisualController(scene)
-visual.setWeapon(spec)   // null if no visual.texture; controller stays callable
-visual.update(handX, handY, footY, aimAngle)   // every frame
-visual.triggerRecoil()   // tween backward+return
-visual.triggerSwing()    // rotate arc + fade
-visual.setVisible(false) // hide during death
-visual.getMuzzlePosition(bodyX, bodyY)         // spawn point for bullets
-visual.destroy()
+new WeaponVisualController(scene);
+visual.setWeapon(spec); // null if no visual.texture; controller stays callable
+visual.update(handX, handY, footY, aimAngle); // every frame
+visual.triggerRecoil(); // tween backward+return
+visual.triggerSwing(); // rotate arc + fade
+visual.setVisible(false); // hide during death
+visual.getMuzzlePosition(bodyX, bodyY); // spawn point for bullets
+visual.destroy();
 ```
 
 Mirrors how the player holds the weapon. `Monster` and `Character` both own one so monsters visually carry their weapon the same way the player does (see [`MONSTERS.md`](./MONSTERS.md) — `Monster.weaponVisual`).
@@ -150,13 +153,13 @@ destroyBulletVisual(scene, bullet)
 
 ## Events emitted
 
-| Event | When |
-|---|---|
-| `sfx:weapon-switch` | hotbar swap |
-| `sfx:reload-start` / `sfx:reload-finish` | manual reload lifecycle |
-| `sfx:dry-fire` | trigger with empty magazine |
-| `sfx:bullet-wall` | bullet hit tall wall |
-| `sfx:<weapon>.shoot` | ranged fire (uses `weapon.sfx?.shoot` or falls back to `weapon-switch` path for melee) |
+| Event                                    | When                                                                                   |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| `sfx:weapon-switch`                      | hotbar swap                                                                            |
+| `sfx:reload-start` / `sfx:reload-finish` | manual reload lifecycle                                                                |
+| `sfx:dry-fire`                           | trigger with empty magazine                                                            |
+| `sfx:bullet-wall`                        | bullet hit tall wall                                                                   |
+| `sfx:<weapon>.shoot`                     | ranged fire (uses `weapon.sfx?.shoot` or falls back to `weapon-switch` path for melee) |
 
 ## Events subscribed
 

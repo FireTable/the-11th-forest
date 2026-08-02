@@ -34,21 +34,27 @@ Top-tabs own their own list + per-item expansion. Scene sub-tabs share the curre
 Three pieces of state, three sub-tabs.
 
 #### Scenes sub-tab
+
 List every entry in [`public/data/levels/index.yaml`](../public/data/levels/index.yaml) with a `New` button. Clicking a row restarts Phaser in-process via [`resolveAndRestart()`](../src/lib/phaser-game.ts) and jumps to that scene — no page reload. `New` creates an empty yaml + appends to the index, then jumps to it.
 
 #### Background sub-tab
+
 Replace the scene PNG. Upload triggers `split-sheet.ts` only if you target the materials folder; for scenes, it just writes the file and reads natural size via `pngjs`. If the new size differs from `imageSize`, a confirm dialog asks before patching both fields.
 
 #### Settings sub-tab
+
 Top-level level fields not covered elsewhere: **title** (HUD), **prompt** (AI regen), **music** id, **pixelLighting** flag, **character** id + **characterSpawn** (facing + x + y), **dropSpawns** (level-level drops, distinct from monster drops). All edits flush through the bottom Save button.
 
 #### Monsters sub-tab
+
 Sortable list of `MonsterSpawn` rows. Per row: type (dropdown from `data/monsters/index.yaml`), waveId, x/y, optional trigger (time/clear + delayMs + waveId). Wave auto-numbering: a new spawn inherits the previous row's waveId.
 
 #### Air walls sub-tab
+
 Polygon wall editor. Toggle "Draw on canvas" then click vertices on the Konva overlay; clicking the first vertex closes the polygon. Per-wall kind dropdown (tall/short) and delete.
 
 #### Materials sub-tab
+
 Scene-placed materials list (with inspector) + a library of every folder under `assets/image/materials/`. Click a tile to place it at scene center; click an existing item to inspect/edit mode/scale/rotation/flip.
 
 ### Chars
@@ -61,12 +67,12 @@ The sprite upload endpoint shells out to [`scripts/split-sheet.ts`](../scripts/s
 
 All four use the same generic [`ModuleShell`](../src/editor/sections/modules.tsx) — list of ids from the module's index file, click-to-expand inline form. New entries open a `New` dialog, append to the index, and expand the new row.
 
-| Tab | Form fields (covered) |
-|---|---|
-| Drops | Identity, Effect (instant / refill-ammo / weapon — discriminated), Audio (sfx), Visual (size, tint), AI prompt |
-| Mobs (Monsters) | Identity, Stats, SFX (hit/death/aggro), Drop table (dropId + chance), AI prompt |
+| Tab             | Form fields (covered)                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Drops           | Identity, Effect (instant / refill-ammo / weapon — discriminated), Audio (sfx), Visual (size, tint), AI prompt                                                                                                                                                                                                                                                                                                                                                                                   |
+| Mobs (Monsters) | Identity, Stats, SFX (hit/death/aggro), Drop table (dropId + chance), AI prompt                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Weaps (Weapons) | Identity, Kind toggle (ranged/melee — auto-prunes projectile vs hitWidth/hitHeight), Combat (damage/cooldownMs/range/clipSize/reloadTimeMs/bulletsPerShot), Projectile visual (radius/width/height/color), Bullet (texture/type/scale/color/beamWidth/beamDuration/anchor/rotationOffset/spawnOffset), Weapon visual (texture/scale/orbitRadius/anchor/muzzleOffset/recoilDistance/recoilDuration/swingAngle/rotationOffset), SFX (shoot/dryFire/bulletWall/reloadStart/reloadFinish), AI prompt |
-| Audio | SFX / Music sub-tabs. Identity, Source, Playback (volume + rate+loop for SFX, volume + fadeIn/Out for Music), AI prompt |
+| Audio           | SFX / Music sub-tabs. Identity, Source, Playback (volume + rate+loop for SFX, volume + fadeIn/Out for Music), AI prompt                                                                                                                                                                                                                                                                                                                                                                          |
 
 ---
 
@@ -74,19 +80,19 @@ All four use the same generic [`ModuleShell`](../src/editor/sections/modules.tsx
 
 Every save flows through the dev plugin's `/api/editor/*` endpoints. The plugin lives at [`vite/plugins/editor-api.mjs`](../vite/plugins/editor-api.mjs). Endpoints:
 
-| Endpoint | Module | Validates with |
-|---|---|---|
-| `save-level` | Levels | `SaveLevelSchema` (hand-mirror of `LevelSchema`) |
-| `save-monsters` | Levels (monsters only) | array shape only |
-| `save-character` | Characters | `CharacterSpecSaveSchema` |
-| `save-module-spec` | Drops / Monsters / Weapons / SFX / Music | `MODULE_SCHEMAS[slug]` |
-| `create-module-spec` | Drops / Monsters / Weapons / SFX / Music | `MODULE_SCHEMAS[slug]` |
-| `create-character` | Characters | hardcoded template only |
-| `create-scene` | Levels | id + title shape only |
-| `upload-scene-image` | Levels | PNG data-URL only |
-| `upload-character-sprite` | Characters | runs `split-sheet.ts` subprocess |
-| `upload-material` / `delete-material-item` | Materials | id pattern + filesystem |
-| `list-*` | (all) | read-only |
+| Endpoint                                   | Module                                   | Validates with                                   |
+| ------------------------------------------ | ---------------------------------------- | ------------------------------------------------ |
+| `save-level`                               | Levels                                   | `SaveLevelSchema` (hand-mirror of `LevelSchema`) |
+| `save-monsters`                            | Levels (monsters only)                   | array shape only                                 |
+| `save-character`                           | Characters                               | `CharacterSpecSaveSchema`                        |
+| `save-module-spec`                         | Drops / Monsters / Weapons / SFX / Music | `MODULE_SCHEMAS[slug]`                           |
+| `create-module-spec`                       | Drops / Monsters / Weapons / SFX / Music | `MODULE_SCHEMAS[slug]`                           |
+| `create-character`                         | Characters                               | hardcoded template only                          |
+| `create-scene`                             | Levels                                   | id + title shape only                            |
+| `upload-scene-image`                       | Levels                                   | PNG data-URL only                                |
+| `upload-character-sprite`                  | Characters                               | runs `split-sheet.ts` subprocess                 |
+| `upload-material` / `delete-material-item` | Materials                                | id pattern + filesystem                          |
+| `list-*`                                   | (all)                                    | read-only                                        |
 
 ### Server-side validation
 

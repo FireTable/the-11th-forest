@@ -17,11 +17,7 @@ const timeSpawn = (delayMs: number, idx = 0): PendingSpawn => ({
     trigger: { kind: 'time', delayMs },
 });
 
-const clearSpawn = (
-    waveId: string | undefined,
-    delayMs = 0,
-    idx = 0,
-): PendingSpawn => ({
+const clearSpawn = (waveId: string | undefined, delayMs = 0, idx = 0): PendingSpawn => ({
     index: idx,
     type: 'drone',
     x: 0,

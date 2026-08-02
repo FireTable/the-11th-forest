@@ -41,19 +41,6 @@ export interface ResolvedScene {
     music: Map<string, MusicSpec>;
 }
 
-/** Most-recently-resolved scene bundle. Set by main.ts after the initial
- *  boot resolve; read by the death overlay's Restart button so it can
- *  call `restartSceneWith` without re-fetching YAML. */
-let _cached: ResolvedScene | null = null;
-
-export function cacheResolvedScene(r: ResolvedScene): void {
-    _cached = r;
-}
-
-export function getCachedResolvedScene(): ResolvedScene | null {
-    return _cached;
-}
-
 /**
  * Resolve `sceneId` into a full ResolvedScene. Scene id is taken verbatim —
  * caller decides where it comes from (URL ?scene=, index.yaml[0], editor
@@ -102,9 +89,7 @@ export async function resolveScene(
         [...allWeaponIds].map(async (wid) => [wid, await fetchWeapon(wid)] as const),
     );
     const weaponsById = new Map<string, WeaponSpec>(allWeaponEntries);
-    const weapons = character.hotbar
-        .map((wid) => weaponsById.get(wid)!)
-        .filter(Boolean);
+    const weapons = character.hotbar.map((wid) => weaponsById.get(wid)!).filter(Boolean);
 
     const audioIndex = await fetchAudioIndex();
     const sfxEntries = await Promise.all(
@@ -169,15 +154,12 @@ export async function getSpriteCellDims(
     const url = character.sprite.texture.startsWith('/')
         ? character.sprite.texture
         : `/${character.sprite.texture}`;
-    const natural = await new Promise<{ width: number; height: number }>(
-        (resolve, reject) => {
-            const img = new Image();
-            img.onload = () =>
-                resolve({ width: img.naturalWidth, height: img.naturalHeight });
-            img.onerror = () => reject(new Error(`Failed to load ${url}`));
-            img.src = url;
-        },
-    );
+    const natural = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error(`Failed to load ${url}`));
+        img.src = url;
+    });
     return {
         width: Math.floor(natural.width / character.sprite.grid.cols),
         height: Math.floor(natural.height / character.sprite.grid.rows),

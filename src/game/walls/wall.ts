@@ -50,21 +50,33 @@ export function createWallBodies(
                 label: 'wall:outer-top',
                 collisionFilter: outerFilter,
             }),
-            matter.add.rectangle(width / 2, height + thickness / 2, width + thickness * 2, thickness, {
-                isStatic: true,
-                label: 'wall:outer-bottom',
-                collisionFilter: outerFilter,
-            }),
+            matter.add.rectangle(
+                width / 2,
+                height + thickness / 2,
+                width + thickness * 2,
+                thickness,
+                {
+                    isStatic: true,
+                    label: 'wall:outer-bottom',
+                    collisionFilter: outerFilter,
+                },
+            ),
             matter.add.rectangle(-thickness / 2, height / 2, thickness, height + thickness * 2, {
                 isStatic: true,
                 label: 'wall:outer-left',
                 collisionFilter: outerFilter,
             }),
-            matter.add.rectangle(width + thickness / 2, height / 2, thickness, height + thickness * 2, {
-                isStatic: true,
-                label: 'wall:outer-right',
-                collisionFilter: outerFilter,
-            }),
+            matter.add.rectangle(
+                width + thickness / 2,
+                height / 2,
+                thickness,
+                height + thickness * 2,
+                {
+                    isStatic: true,
+                    label: 'wall:outer-right',
+                    collisionFilter: outerFilter,
+                },
+            ),
         );
     }
 
