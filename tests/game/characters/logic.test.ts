@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { clampToBounds, dodgeIntent, moveIntent, resolveHurtSfx } from '@/game/characters/logic';
+import {
+    clampToBounds,
+    dodgeIntent,
+    moveIntent,
+    pickNearestMonster,
+    resolveHurtSfx,
+} from '@/game/characters/logic';
 
 describe('characters/logic — moveIntent', () => {
     it('returns zero when no key pressed', () => {
@@ -129,5 +135,38 @@ describe('characters/logic — resolveHurtSfx', () => {
 
     it('returns hurt when no gender set (gender-neutral fallback)', () => {
         expect(resolveHurtSfx({ sfx: { hurt: 'n' } })).toBe('n');
+    });
+});
+
+describe('characters/logic — pickNearestMonster (mobile auto-aim)', () => {
+    it('returns null when the list is empty', () => {
+        expect(pickNearestMonster([], 100, 100)).toBeNull();
+    });
+
+    it('returns the only monster when the list has one', () => {
+        const m = { x: 50, y: 50 };
+        expect(pickNearestMonster([m], 100, 100)).toBe(m);
+    });
+
+    it('returns the closest monster when several are in range', () => {
+        const far = { id: 'far', x: 500, y: 500 };
+        const near = { id: 'near', x: 110, y: 100 };
+        const mid = { id: 'mid', x: 200, y: 200 };
+        const got = pickNearestMonster([far, mid, near], 100, 100);
+        expect(got).toBe(near);
+    });
+
+    it('breaks ties by picking the first occurrence (stable / predictable)', () => {
+        const a = { id: 'a', x: 110, y: 100 };
+        const b = { id: 'b', x: 100, y: 110 };
+        // Both are distance sqrt(100) — same magnitude. We pick a (first).
+        const got = pickNearestMonster([a, b], 100, 100);
+        expect(got).toBe(a);
+    });
+
+    it('handles negative coordinates', () => {
+        const m = { id: 'm', x: -50, y: -50 };
+        const got = pickNearestMonster([m], 0, 0);
+        expect(got).toBe(m);
     });
 });

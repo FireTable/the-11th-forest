@@ -25,6 +25,7 @@ export class WeaponHud {
                 name: slotState.spec.name,
                 ammo: slotState.ammo,
                 clipSize: slotState.spec.clipSize ?? 1,
+                texture: slotState.spec.visual?.texture,
             });
         }
 

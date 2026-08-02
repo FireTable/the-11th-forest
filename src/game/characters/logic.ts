@@ -28,7 +28,7 @@ import {
     KEY_R,
     KEY_S,
     KEY_SEVEN,
-    KEY_SHIFT,
+    KEY_SPACE,
     KEY_SIX,
     KEY_THREE,
     KEY_TWO,
@@ -81,7 +81,7 @@ export interface DodgeIntent {
  * Returns null when no dodge should fire.
  */
 export function dodgeIntent(
-    shiftDown: boolean,
+    spaceDown: boolean,
     intent: MoveIntent,
     sp: number,
     spCost: number,
@@ -96,7 +96,7 @@ export function dodgeIntent(
         now - lastDodgeEndAt >= cooldownMs &&
         now >= dodgeActiveUntil;
     const hasDirection = intent.vx !== 0 || intent.vy !== 0;
-    if (!shiftDown || !hasDirection || !canDodge) return null;
+    if (!spaceDown || !hasDirection || !canDodge) return null;
     return {
         vx: intent.vx * dodgeSpeed,
         vy: intent.vy * dodgeSpeed,
@@ -148,6 +148,30 @@ export function clampToBounds(
     };
 }
 
+/**
+ * Pick the nearest monster to (originX, originY) by Euclidean distance.
+ * Pure so the controller and tests can share the auto-aim math without
+ * booting a Phaser scene. Returns null when the list is empty.
+ */
+export function pickNearestMonster<T extends { x: number; y: number }>(
+    monsters: readonly T[],
+    originX: number,
+    originY: number,
+): T | null {
+    if (monsters.length === 0) return null;
+    let nearest: T = monsters[0];
+    let minDist = Math.hypot(monsters[0].x - originX, monsters[0].y - originY);
+    for (let i = 1; i < monsters.length; i++) {
+        const m = monsters[i];
+        const d = Math.hypot(m.x - originX, m.y - originY);
+        if (d < minDist) {
+            minDist = d;
+            nearest = m;
+        }
+    }
+    return nearest;
+}
+
 // ─── Controller ──────────────────────────────────────────────────────────
 
 // Body size + dodge params come from CharacterSpec (loaded from YAML).
@@ -160,6 +184,7 @@ export function clampToBounds(
 export interface WeaponsLike {
     update(time: number, tx: number, ty: number, fire: boolean, halfH: number): void;
     switchTo(index: number): void;
+    cycleSlot(direction: 1 | -1): void;
     manualReload(): void;
     refillActiveAmmo(fraction: number): void;
     swapToWeapon(weaponId: string): boolean;
@@ -232,6 +257,12 @@ export class CharacterController {
     // instead of immediately snapping to wherever the cursor happens to be.
     private targetX: number | null = null;
     private targetY: number | null = null;
+    // Mobile touch state — written by EventBus listeners from
+    // TouchControls.tsx, merged into the keyboard intent on each tick.
+    // null pointer id == joystick not held.
+    private mobileMove: { vx: number; vy: number } | null = null;
+    private mobileFiring = false;
+    private mobileDodge = false;
     /** Last footstep SFX time — throttle to ~5 per second so the loop
      *  doesn't spam when the player holds WASD. */
     private lastFootstepAt = 0;
@@ -270,6 +301,7 @@ export class CharacterController {
 
         this.bindKeyboard();
         this.bindPointer();
+        this.bindMobile();
 
         // Chain the dodge -> idle transition. Bound once in the
         // constructor so we don't leak listeners on every stop event.
@@ -339,17 +371,22 @@ export class CharacterController {
     /** Drive one tick manually — useful for tests; normally scene events do it. */
     update(now: number): void {
         const kb = this.scene.input.keyboard!;
+        const mm = this.mobileMove;
         const intent = moveIntent({
-            up: kb.addKey(KEY_W).isDown,
-            down: kb.addKey(KEY_S).isDown,
-            left: kb.addKey(KEY_A).isDown,
-            right: kb.addKey(KEY_D).isDown,
+            up: kb.addKey(KEY_W).isDown || (mm?.vy ?? 0) < -0.2,
+            down: kb.addKey(KEY_S).isDown || (mm?.vy ?? 0) > 0.2,
+            left: kb.addKey(KEY_A).isDown || (mm?.vx ?? 0) < -0.2,
+            right: kb.addKey(KEY_D).isDown || (mm?.vx ?? 0) > 0.2,
         });
 
         // ── Dodge initiation ────────────────────────────────────────
-        const shiftDown = kb.addKey(KEY_SHIFT).isDown;
+        const spaceDown = kb.addKey(KEY_SPACE).isDown || this.mobileDodge;
+        // Edge-triggered: clear the one-frame dodge flag the moment
+        // the controller consumes it, so holding the touch button
+        // doesn't queue a chain of dodges.
+        this.mobileDodge = false;
         const dodge = dodgeIntent(
-            shiftDown,
+            spaceDown,
             intent,
             this.sp,
             this.spec.dodge.spCost,
@@ -452,6 +489,13 @@ export class CharacterController {
             this.lastHeartbeatAt = now;
         }
 
+        // ── Mobile auto-aim (when FIRE is held on a touch device) ───
+        // While the virtual FIRE button is down, override targetX/Y with
+        // the nearest live monster every frame so bullets trail the
+        // target — independent of the desktop cursor path. When no
+        // monster exists, fall back to whatever the cursor set last.
+        this.applyMobileAutoAim(pos);
+
         // ── Weapon update ───────────────────────────────────────────
         // Default aiming target when cursor hasn't moved yet aligns with character's sprite facing (flipX)
         const defaultAimX = pos.x + (sprite.flipX ? -100 : 100);
@@ -461,7 +505,7 @@ export class CharacterController {
             now,
             this.targetX ?? defaultAimX,
             this.targetY ?? defaultAimY,
-            this.firing && now >= this.dodgeActiveUntil,
+            (this.firing || this.mobileFiring) && now >= this.dodgeActiveUntil,
             this.spec.body.halfH,
         );
 
@@ -573,7 +617,7 @@ export class CharacterController {
         kb.addKey(KEY_A);
         kb.addKey(KEY_S);
         kb.addKey(KEY_D);
-        kb.addKey(KEY_SHIFT);
+        kb.addKey(KEY_SPACE);
 
         kb.addKey(KEY_ONE).on('down', () => weapons.switchTo(0));
         kb.addKey(KEY_TWO).on('down', () => weapons.switchTo(1));
@@ -585,6 +629,56 @@ export class CharacterController {
         kb.addKey(KEY_R).on('down', () => weapons.manualReload());
     }
 
+    /**
+     * Subscribe to touch-control events emitted by `TouchControls.tsx`.
+     * Auto-aim lives in `update()`'s `applyMobileAutoAim` so it tracks
+     * the nearest monster every frame the FIRE button is held —
+     * independent of the desktop cursor path.
+     */
+    private bindMobile(): void {
+        const onMove = (payload?: { vx?: number; vy?: number } | null) => {
+            if (!payload || (payload.vx === 0 && payload.vy === 0)) {
+                this.mobileMove = null;
+            } else {
+                this.mobileMove = { vx: payload.vx ?? 0, vy: payload.vy ?? 0 };
+            }
+        };
+        const onFiring = (payload?: boolean) => {
+            const wasFiring = this.mobileFiring;
+            this.mobileFiring = payload === true;
+            // Mirror desktop `pointerleave`: hide the crosshair on
+            // FIRE release so the lock indicator doesn't linger on
+            // screen after the player lets go.
+            if (wasFiring && !this.mobileFiring) {
+                EventBus.emit('aim-crosshair-update', {
+                    x: -100,
+                    y: -100,
+                    isLocked: false,
+                    visible: false,
+                });
+            }
+        };
+        const onDodge = (payload?: boolean) => {
+            // Edge-trigger: only set when the touch starts; release
+            // is a no-op (the controller clears the flag on consume).
+            if (payload === true) this.mobileDodge = true;
+        };
+
+        EventBus.on('mobile:move', onMove);
+        EventBus.on('mobile:firing', onFiring);
+        EventBus.on('mobile:dodge', onDodge);
+        EventBus.on('mobile:weapon:switch', (payload?: { index?: number }) => {
+            const idx = payload?.index;
+            if (typeof idx === 'number' && idx >= 0) this.parts.weapons.switchTo(idx);
+        });
+        this.cleanupFns.push(() => {
+            EventBus.removeListener('mobile:move', onMove);
+            EventBus.removeListener('mobile:firing', onFiring);
+            EventBus.removeListener('mobile:dodge', onDodge);
+            EventBus.removeListener('mobile:weapon:switch');
+        });
+    }
+
     // Pointer tracking & magnetic aim assist state
     private rawClientX = 0;
     private rawClientY = 0;
@@ -594,6 +688,41 @@ export class CharacterController {
     private lockBreakoutUntil = 0;
     private hasPointerMoved = false;
     private currentLockedMonsterId: number | null = null;
+
+    /**
+     * While the mobile FIRE button is held, override `targetX/Y` with
+     * the live position of the nearest monster each frame so bullets
+     * chase the target even after they spawn. Re-emits the crosshair
+     * event so the on-screen reticle follows.
+     *
+     * No-op when `mobileFiring` is false (desktop path unchanged) or
+     * when no monsters are alive (targetX/Y keep their last value, then
+     * weapons.update falls through to `defaultAimX/Y` on the next frame).
+     */
+    private applyMobileAutoAim(pos: { x: number; y: number }): void {
+        if (!this.mobileFiring) return;
+        const monsters: { id: number; x: number; y: number }[] =
+            (this.scene as any).monsterSystem?.getActiveMonsters() ?? [];
+        const target = pickNearestMonster(monsters, pos.x, pos.y);
+        if (!target) return;
+
+        this.targetX = target.x;
+        this.targetY = target.y;
+
+        // Mirror the desktop path's crosshair emit so the on-screen
+        // reticle tracks the lock target.
+        const camera = this.scene.cameras.main;
+        if (camera) {
+            const hudX = (target.x - camera.scrollX) * (1536 / camera.width);
+            const hudY = (target.y - camera.scrollY) * (864 / camera.height);
+            EventBus.emit('aim-crosshair-update', {
+                x: hudX,
+                y: hudY,
+                isLocked: true,
+                visible: true,
+            });
+        }
+    }
 
     private updateAimTarget(now: number): void {
         if (!this.hasPointerMoved) return;
@@ -723,9 +852,6 @@ export class CharacterController {
             onPointerEvent(e);
             this.firing = true;
         };
-        const onMove = (e: PointerEvent) => {
-            onPointerEvent(e);
-        };
         const stop = () => {
             this.firing = false;
         };
@@ -741,14 +867,40 @@ export class CharacterController {
         };
 
         canvas.addEventListener('pointerdown', onDown);
-        canvas.addEventListener('pointermove', onMove);
         canvas.addEventListener('pointerup', stop);
         canvas.addEventListener('pointerleave', onLeave);
+
+        // Window-level pointermove: any HUD overlay (weapon slots,
+        // character hub, joystick, etc.) sits on top of the canvas with
+        // `pointer-events: auto`, so canvas pointermove stops firing the
+        // moment the cursor enters them. Window listeners keep aim
+        // tracking continuous regardless of which DOM layer the cursor
+        // happens to be in.
+        //
+        // Filter by viewport position rather than DOM ancestry: HUD
+        // overlays aren't children of `#game-container` (they're siblings
+        // inside `#app`), so a contains() check would reject them. We
+        // accept the event whenever the cursor sits inside the canvas's
+        // visible rect — which naturally includes all canvas-stacked
+        // HUD chrome and naturally excludes the editor panel / rotate
+        // overlay (fixed, full-screen, only during portrait).
+        const onWindowMove = (e: PointerEvent): void => {
+            const r = canvas.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) return;
+            const cx = e.clientX;
+            const cy = e.clientY;
+            if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return;
+            onPointerEvent(e);
+        };
+        window.addEventListener('pointermove', onWindowMove);
+        window.addEventListener('pointerleave', onLeave);
+
         this.cleanupFns.push(() => {
             canvas.removeEventListener('pointerdown', onDown);
-            canvas.removeEventListener('pointermove', onMove);
             canvas.removeEventListener('pointerup', stop);
             canvas.removeEventListener('pointerleave', onLeave);
+            window.removeEventListener('pointermove', onWindowMove);
+            window.removeEventListener('pointerleave', onLeave);
         });
     }
 }

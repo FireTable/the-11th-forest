@@ -5,6 +5,9 @@ export interface WeaponSlotData {
     name: string;
     ammo: number;
     clipSize: number;
+    /** Public-path URL for the weapon thumbnail (e.g. `/assets/image/weapons/arcana-staff.png`).
+     *  Undefined for melee weapons or spec.visual entries without a texture. */
+    texture?: string;
 }
 
 export interface GameUIState {

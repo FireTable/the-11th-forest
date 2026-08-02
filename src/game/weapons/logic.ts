@@ -44,6 +44,19 @@ export function isPlayerBullet(body: { label?: string }): boolean {
     return body.label === 'player-bullet';
 }
 
+/**
+ * Wrap-around slot index. `direction` is `+1` (next) or `-1` (previous);
+ * any integer is accepted since the wrap formula only depends on sign.
+ * Single-slot hotbar returns 0. Pure so controllers / TouchControls can
+ * share the same cycle math.
+ */
+export function nextSlotIndex(currentIndex: number, direction: 1 | -1, slotCount: number): number {
+    if (slotCount <= 0) return 0;
+    const len = Math.floor(slotCount);
+    const idx = ((Math.floor(currentIndex) + direction) % len + len) % len;
+    return idx;
+}
+
 /** Whether a body label identifies a wall (any kind). */
 export function isWall(body: { label?: string }): boolean {
     return typeof body.label === 'string' && body.label.startsWith('wall:');
@@ -153,6 +166,14 @@ export class WeaponController {
         this.currentIndex = index;
         this.visualController.setWeapon(this.slots[index].spec);
         EventBus.emit(SFX_EVENT('weapon-switch'));
+    }
+
+    /** Mobile ◀/▶ button handler — cycle to the previous or next slot,
+     *  wrapping around. Delegates to `nextSlotIndex` so the wrap math
+     *  is shared with the node-runnable tests. */
+    cycleSlot(direction: 1 | -1): void {
+        const next = nextSlotIndex(this.currentIndex, direction, this.slots.length);
+        this.switchTo(next);
     }
 
     /** R key — manual reload. Only when ammo < clipSize and not already reloading. */
