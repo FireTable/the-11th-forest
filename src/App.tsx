@@ -2,6 +2,9 @@ import { Suspense, lazy } from 'react';
 
 import { PhaserGame } from '@/PhaserGame';
 import { GameHUDLayer } from '@/components/hud/GameHUDLayer';
+import { PixelCrosshair } from '@/components/hud/PixelCrosshair';
+import { RotateOverlay } from '@/components/hud/RotateOverlay';
+import { TouchControls } from '@/components/hud/TouchControls';
 
 /**
  * Top-level React component.
@@ -32,6 +35,9 @@ function App() {
             <Suspense fallback={null}>
                 <EditorPanel />
             </Suspense>
+            <PixelCrosshair />
+            <RotateOverlay />
+            <TouchControls />
         </div>
     );
 }
