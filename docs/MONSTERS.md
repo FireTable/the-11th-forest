@@ -27,49 +27,49 @@ public/data/monsters/
 ## YAML schema — `public/data/monsters/<id>.yaml`
 
 ```yaml
-id: drone                    # optional; loader overwrites with filename
+id: drone # optional; loader overwrites with filename
 name: Thorn Drone
 hp: 160
 moveSpeed: 4
 
-body:                        # half-extents, used by Matter rectangle
+body: # half-extents, used by Matter rectangle
     halfW: 20
     halfH: 20
 
-weaponId: plasma-sword       # id from public/data/weapons/
+weaponId: plasma-sword # id from public/data/weapons/
 
-sfx:                         # optional overrides
+sfx: # optional overrides
     hit: monster-hit
     death: monster-death
     aggro: monster-aggro
 
-drops:                       # rolled on death; chance 0..1
+drops: # rolled on death; chance 0..1
     - dropId: hp-shard
       chance: 0.4
     - dropId: sp-fragment
       chance: 0.3
 
-sprite:                      # optional; debug rectangle used if absent
+sprite: # optional; debug rectangle used if absent
     texture: assets/image/monsters/drone.png
     grid: { rows: 4, cols: 4 }
     scale: 1.0
     offset: { left: 0, bottom: 4 }
-    script:                  # pixel-art post-process
+    script: # pixel-art post-process
         downsample: 4
         colors: 32
         pad: 2
 
-anims:                       # all required when sprite is set
-    idle:  { frames: [0, 3],   frameRate: 6,  repeat: -1 }
-    move:  { frames: [4, 7],   frameRate: 10, repeat: -1 }
-    hit:   { frames: [8, 11],  frameRate: 12, repeat: 0  }
-    death: { frames: [12, 14], frameRate: 10, repeat: 0  }
+anims: # all required when sprite is set
+    idle: { frames: [0, 3], frameRate: 6, repeat: -1 }
+    move: { frames: [4, 7], frameRate: 10, repeat: -1 }
+    hit: { frames: [8, 11], frameRate: 12, repeat: 0 }
+    death: { frames: [12, 14], frameRate: 10, repeat: 0 }
 
-prompt: |                    # AI image-gen template (chroma-key sprite sheet)
+prompt: | # AI image-gen template (chroma-key sprite sheet)
     The 11th Forest — Sacred Forest Sanctuary Thorn Drone sprite sheet
     …
 
-imageSize: 2048x2048         # required for AI generation; ignored at runtime
+imageSize: 2048x2048 # required for AI generation; ignored at runtime
 ```
 
 `MonsterTrigger` (used on the level, not on the monster itself) is documented in [`SCENES.md`](./SCENES.md#spawn-triggers).
@@ -78,9 +78,13 @@ imageSize: 2048x2048         # required for AI generation; ignored at runtime
 
 ```ts
 import {
-    parseMonsterIndex, parseMonsterYaml,
-    fetchMonster, fetchMonsterIndex,
-    type MonsterSpec, type MonsterIndex, type DropRef,
+    parseMonsterIndex,
+    parseMonsterYaml,
+    fetchMonster,
+    fetchMonsterIndex,
+    type MonsterSpec,
+    type MonsterIndex,
+    type DropRef,
 } from '@/lib/monsters';
 ```
 
@@ -95,12 +99,14 @@ Constructor: `(scene, spec, weapon, x, y, waveId?)`. The `waveId` tag flows in f
 ### `MonsterController` (in `src/game/monsters/monster.ts`)
 
 Orchestrator. Owns:
+
 - `monsters: Monster[]` — currently alive
 - `pendingSpawns: { pending: PendingSpawn; spec; weapon }[]` — wave-triggered spawns waiting for their fire condition
 - `projectiles: MonsterProjectile[]`
 - `pathfinder?: PathfindingService`
 
 Constructor:
+
 ```ts
 new MonsterController(scene, spawns, playerBody, cb, pathfinder?)
 ```
@@ -109,14 +115,15 @@ Where `spawns: { spec; weapon; x; y; trigger?: MonsterTrigger; waveId? }[]`. The
 
 Key methods:
 
-| Method | Purpose |
-|---|---|
-| `update(time)` | per-frame: advance spawn queue, pathfinding, AI tick, attack, projectile sync |
-| `applyBulletDamage(dmg, hitBody)` | called by WeaponController when player bullet hits monster body |
-| `setDebugVisible(v)` | toggle green outline rectangles |
-| `destroy()` | teardown all monsters + projectiles |
+| Method                            | Purpose                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| `update(time)`                    | per-frame: advance spawn queue, pathfinding, AI tick, attack, projectile sync |
+| `applyBulletDamage(dmg, hitBody)` | called by WeaponController when player bullet hits monster body               |
+| `setDebugVisible(v)`              | toggle green outline rectangles                                               |
+| `destroy()`                       | teardown all monsters + projectiles                                           |
 
 Internal methods:
+
 - `advancePendingSpawns(time)` — calls `advanceSpawnQueue` and instantiates fired monsters
 - `performAttack(monster, dirToPlayer)` — ranged or melee based on `weapon.projectile`
 - `bindCollisions()` — Matter collisionstart handler for `monster-projectile`, `monster-melee`, `monster` (body) ↔ player
@@ -152,24 +159,24 @@ Triggers fire **once** per spawn — fired entries are removed from the queue.
 
 `PathfindingService` builds a grid from the level's `airWalls` and provides:
 
-| Method | Purpose |
-|---|---|
-| `worldToGrid(x, y)` / `gridToWorld(gx, gy)` | coord conversion |
-| `hasLineOfSight(start, end, bodyRadius?)` | straight-line check, used as A* shortcut |
-| `findPath(start, target)` | A* over the wall grid; returns smoothed waypoints |
+| Method                                      | Purpose                                           |
+| ------------------------------------------- | ------------------------------------------------- |
+| `worldToGrid(x, y)` / `gridToWorld(gx, gy)` | coord conversion                                  |
+| `hasLineOfSight(start, end, bodyRadius?)`   | straight-line check, used as A* shortcut          |
+| `findPath(start, target)`                   | A* over the wall grid; returns smoothed waypoints |
 
 Pure AI helpers (no Phaser): `distBetween`, `dirTo`, `decideAIState`, `chaseVelocity`, `pickClosestMonster`, `calcSeparationForce`, `getSurroundOffset`, `getPathLookAheadPoint`. These compose inside the controller's per-frame loop.
 
 ## Events emitted
 
-| Event | When |
-|---|---|
-| `sfx:monster-aggro` | monster acquired target, first aggro frame |
-| `sfx:monster-hit` | monster took damage |
-| `sfx:<swing-sfx>` | melee swing (uses weapon's `sfx.shoot`) |
+| Event                                       | When                                                |
+| ------------------------------------------- | --------------------------------------------------- |
+| `sfx:monster-aggro`                         | monster acquired target, first aggro frame          |
+| `sfx:monster-hit`                           | monster took damage                                 |
+| `sfx:<swing-sfx>`                           | melee swing (uses weapon's `sfx.shoot`)             |
 | `sfx:<weapon>.shoot` or `sfx:monster-shoot` | ranged fire (uses weapon's `sfx.shoot` or fallback) |
-| `sfx:monster-death` | death animation start |
-| `sfx:player-hit` | monster melee or projectile lands on player |
+| `sfx:monster-death`                         | death animation start                               |
+| `sfx:player-hit`                            | monster melee or projectile lands on player         |
 
 ## Events subscribed
 

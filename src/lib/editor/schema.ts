@@ -27,9 +27,28 @@ export const BoundingBoxSchema = z.object({
 /** A single editor mutation request — used by the wall-canvas panel. */
 export const WallMutationSchema = z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('add'), wallId: z.string().min(1), vertex: AirWallVertexSchema }),
-    z.object({ kind: z.literal('move'), wallId: z.string().min(1), index: z.number().int().gte(0), x: z.number(), y: z.number() }),
-    z.object({ kind: z.literal('remove'), wallId: z.string().min(1), index: z.number().int().gte(0) }),
-    z.object({ kind: z.literal('move-polygon'), wallId: z.string().min(1), dx: z.number(), dy: z.number() }),
-    z.object({ kind: z.literal('set-kind'), wallId: z.string().min(1), wallKind: AirWallKindSchema }),
+    z.object({
+        kind: z.literal('move'),
+        wallId: z.string().min(1),
+        index: z.number().int().gte(0),
+        x: z.number(),
+        y: z.number(),
+    }),
+    z.object({
+        kind: z.literal('remove'),
+        wallId: z.string().min(1),
+        index: z.number().int().gte(0),
+    }),
+    z.object({
+        kind: z.literal('move-polygon'),
+        wallId: z.string().min(1),
+        dx: z.number(),
+        dy: z.number(),
+    }),
+    z.object({
+        kind: z.literal('set-kind'),
+        wallId: z.string().min(1),
+        wallKind: AirWallKindSchema,
+    }),
     z.object({ kind: z.literal('delete'), wallId: z.string().min(1) }),
 ]);

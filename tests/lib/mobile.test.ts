@@ -22,8 +22,14 @@ describe('lib/mobile — viewport detection', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
-        Object.defineProperty(window, 'innerWidth', { value: originalInnerWidth, configurable: true });
-        Object.defineProperty(window, 'innerHeight', { value: originalInnerHeight, configurable: true });
+        Object.defineProperty(window, 'innerWidth', {
+            value: originalInnerWidth,
+            configurable: true,
+        });
+        Object.defineProperty(window, 'innerHeight', {
+            value: originalInnerHeight,
+            configurable: true,
+        });
     });
 
     function setViewport(w: number, h: number): void {

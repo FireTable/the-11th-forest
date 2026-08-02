@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /*
  * shadcn-style design tokens. Default theme is dark + cyan accent to
@@ -57,15 +57,15 @@
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);
     --radius-xl: calc(var(--radius) + 4px);
-    --font-pixel: "Silkscreen", monospace;
-    --font-press-start: "Press Start 2P", monospace;
+    --font-pixel: 'Silkscreen', monospace;
+    --font-press-start: 'Press Start 2P', monospace;
 }
 
 /* Pixel Art Retro UI Borders & Effects */
 .pixel-box {
     background-color: rgba(15, 23, 42, 0.92);
     border: 2px solid #000000;
-    box-shadow: 
+    box-shadow:
         inset -2px -2px 0px 0px rgba(0, 0, 0, 0.6),
         inset 2px 2px 0px 0px rgba(255, 255, 255, 0.15),
         3px 3px 0px 0px rgba(0, 0, 0, 0.8);
@@ -74,7 +74,7 @@
 
 .pixel-box-emerald {
     border: 2px solid #064e3b;
-    box-shadow: 
+    box-shadow:
         inset -2px -2px 0px 0px #022c22,
         inset 2px 2px 0px 0px #34d399,
         3px 3px 0px 0px #000000;
@@ -82,7 +82,7 @@
 
 .pixel-box-amber {
     border: 2px solid #78350f;
-    box-shadow: 
+    box-shadow:
         inset -2px -2px 0px 0px #451a03,
         inset 2px 2px 0px 0px #fbbf24,
         3px 3px 0px 0px #000000;
@@ -91,7 +91,7 @@
 .pixel-bar-bg {
     background-color: #090d16;
     border: 1px solid #1e293b;
-    box-shadow: inset 1px 1px 2px rgba(0,0,0,0.8);
+    box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 @layer base {
@@ -167,7 +167,8 @@
 }
 
 @keyframes crosshairBreathe {
-    0%, 100% {
+    0%,
+    100% {
         transform: scale(1);
     }
     50% {

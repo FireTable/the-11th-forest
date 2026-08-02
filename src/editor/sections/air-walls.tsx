@@ -9,10 +9,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    handleWallKindChange,
-    handleWallRemove,
-} from '@/editor/panel';
+import { handleWallKindChange, handleWallRemove } from '@/editor/panel';
 import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 interface Props {
@@ -31,13 +28,7 @@ interface Props {
  * side panel UI: drawing-mode toggle, add placeholder wall, per-wall
  * kind dropdown + delete.
  */
-export function AirWallsSection({
-    level,
-    setLevel,
-    drawing,
-    setDrawing,
-    onAddWall,
-}: Props) {
+export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWall }: Props) {
     return (
         <div>
             <div className="flex gap-2">
@@ -76,9 +67,7 @@ export function AirWallsSection({
             )}
 
             {level.airWalls.length === 0 ? (
-                <div className="text-neutral-500 italic text-center py-4 mt-3">
-                    No walls yet.
-                </div>
+                <div className="text-neutral-500 italic text-center py-4 mt-3">No walls yet.</div>
             ) : (
                 <div className="mt-3 space-y-2">
                     {level.airWalls.map((w) => (
@@ -108,7 +97,10 @@ interface RowProps {
 function WallPreview({ points, kind }: { points: AirWallVertex[]; kind: AirWallKind }) {
     if (points.length < 3) return null;
 
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minX = Infinity,
+        maxX = -Infinity,
+        minY = Infinity,
+        maxY = -Infinity;
     for (const [x, y] of points) {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
@@ -118,7 +110,7 @@ function WallPreview({ points, kind }: { points: AirWallVertex[]; kind: AirWallK
 
     const bw = Math.max(1, maxX - minX);
     const bh = Math.max(1, maxY - minY);
-    
+
     // Fit into 24x18 inner box with 4px padding in 32x26 container
     const svgW = 32;
     const svgH = 26;
@@ -130,13 +122,14 @@ function WallPreview({ points, kind }: { points: AirWallVertex[]; kind: AirWallK
     const offsetX = pad + (drawW - bw * scale) / 2;
     const offsetY = pad + (drawH - bh * scale) / 2;
 
-    const pathData = points
-        .map(([x, y], i) => {
-            const sx = ((x - minX) * scale + offsetX).toFixed(1);
-            const sy = ((y - minY) * scale + offsetY).toFixed(1);
-            return `${i === 0 ? 'M' : 'L'} ${sx} ${sy}`;
-        })
-        .join(' ') + ' Z';
+    const pathData =
+        points
+            .map(([x, y], i) => {
+                const sx = ((x - minX) * scale + offsetX).toFixed(1);
+                const sy = ((y - minY) * scale + offsetY).toFixed(1);
+                return `${i === 0 ? 'M' : 'L'} ${sx} ${sy}`;
+            })
+            .join(' ') + ' Z';
 
     const stroke = kind === 'tall' ? '#ff3344' : '#3388ff';
     const fill = kind === 'tall' ? 'rgba(255, 51, 68, 0.3)' : 'rgba(51, 136, 255, 0.3)';
@@ -147,7 +140,13 @@ function WallPreview({ points, kind }: { points: AirWallVertex[]; kind: AirWallK
             height={svgH}
             className="bg-neutral-950 rounded border border-neutral-800 shrink-0"
         >
-            <path d={pathData} fill={fill} stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" />
+            <path
+                d={pathData}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+            />
         </svg>
     );
 }
@@ -161,9 +160,7 @@ function WallRow({ id, kind, points, setLevel, level }: RowProps) {
             </span>
             <Select
                 value={kind}
-                onValueChange={(v) =>
-                    handleWallKindChange(setLevel, level, id, v as AirWallKind)
-                }
+                onValueChange={(v) => handleWallKindChange(setLevel, level, id, v as AirWallKind)}
             >
                 <SelectTrigger size="sm" className="h-7 text-xs px-2 w-[72px] shrink-0">
                     <SelectValue />

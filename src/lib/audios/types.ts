@@ -13,12 +13,7 @@
 
 import type { z } from 'zod';
 
-import type {
-    AudioIndexSchema,
-    MusicSpecSchema,
-    SfxSpecSchema,
-    SoundSpecSchema,
-} from './schema';
+import type { AudioIndexSchema, MusicSpecSchema, SfxSpecSchema, SoundSpecSchema } from './schema';
 
 export type SfxSpec = z.infer<typeof SfxSpecSchema>;
 

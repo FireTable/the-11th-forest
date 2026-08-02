@@ -63,11 +63,7 @@ export class AudioController {
     private readonly throttle = new SfxThrottle();
     private readonly unsubscribers: Array<() => void> = [];
 
-    constructor(
-        scene: Phaser.Scene,
-        sfxSpecs: Iterable<SfxSpec>,
-        musicSpecs: Iterable<MusicSpec>,
-    ) {
+    constructor(scene: Phaser.Scene, sfxSpecs: Iterable<SfxSpec>, musicSpecs: Iterable<MusicSpec>) {
         this.scene = scene;
         this.sfxSpecs = new Map();
         for (const s of sfxSpecs) this.sfxSpecs.set(s.id, s);

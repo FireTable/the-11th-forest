@@ -40,16 +40,24 @@ export const PixelCrosshair: React.FC = () => {
         visible: false,
         isLocked: false,
     });
-    const [rect, setRect] = useState<{ left: number; top: number; width: number; height: number } | null>(
-        null,
-    );
+    const [rect, setRect] = useState<{
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+    } | null>(null);
     const wrapRef = useRef<HTMLDivElement | null>(null);
     // Track the latest coords so visibility toggle-on uses the most
     // recent aim position rather than the stale default `-100, -100`.
     const lastCoordRef = useRef<{ x: number; y: number }>({ x: -100, y: -100 });
 
     useEffect(() => {
-        const onAimUpdate = (data: { x: number; y: number; isLocked: boolean; visible: boolean }) => {
+        const onAimUpdate = (data: {
+            x: number;
+            y: number;
+            isLocked: boolean;
+            visible: boolean;
+        }) => {
             lastCoordRef.current = { x: data.x, y: data.y };
             // Direct DOM write — no React render for the position change.
             const wrap = wrapRef.current;

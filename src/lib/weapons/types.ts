@@ -26,9 +26,17 @@
 
 import type { z } from 'zod';
 
-import type { WeaponIndexSchema, WeaponPairedBulletSchema, WeaponSpecSchema, WeaponVisualSchema } from './schema';
+import type {
+    WeaponIndexSchema,
+    WeaponPairedBulletSchema,
+    WeaponSpecSchema,
+    WeaponVisualSchema,
+} from './schema';
 
-export type ProjectileVisual = Extract<z.infer<typeof WeaponSpecSchema>, { projectile: unknown }>['projectile'];
+export type ProjectileVisual = Extract<
+    z.infer<typeof WeaponSpecSchema>,
+    { projectile: unknown }
+>['projectile'];
 
 export type WeaponVisualSpec = z.infer<typeof WeaponVisualSchema>;
 export type WeaponPairedBulletSpec = z.infer<typeof WeaponPairedBulletSchema>;

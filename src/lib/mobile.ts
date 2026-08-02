@@ -42,9 +42,11 @@ export function isPortraitViewport(): boolean {
  */
 export function requestLandscapeLock(): void {
     if (typeof screen === 'undefined') return;
-    const orientation = (screen as Screen & {
-        orientation?: { lock?: (o: 'landscape' | 'portrait') => Promise<void> };
-    }).orientation;
+    const orientation = (
+        screen as Screen & {
+            orientation?: { lock?: (o: 'landscape' | 'portrait') => Promise<void> };
+        }
+    ).orientation;
     if (!orientation?.lock) return;
     orientation.lock('landscape').catch(() => {
         // ponytail: silent fail — the rotate overlay covers the gap.

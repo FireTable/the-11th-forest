@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-    CAT,
-    PROJECTILE_MONSTER_MASK,
-    PROJECTILE_PLAYER_MASK,
-} from '@/lib/constants';
+import { CAT, PROJECTILE_MONSTER_MASK, PROJECTILE_PLAYER_MASK } from '@/lib/constants';
 
 import { isPlayerBullet, isWall, nextSlotIndex } from '@/game/weapons/logic';
 

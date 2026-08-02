@@ -13,10 +13,7 @@
 import type { Level } from './types';
 import type { MonsterSpec } from '@/lib/monsters';
 
-export function collectDropIds(
-    level: Level,
-    monsterSpecs: Map<string, MonsterSpec>,
-): Set<string> {
+export function collectDropIds(level: Level, monsterSpecs: Map<string, MonsterSpec>): Set<string> {
     const ids = new Set<string>();
     level.dropSpawns?.forEach((d) => ids.add(d.type));
     monsterSpecs.forEach((spec) => {

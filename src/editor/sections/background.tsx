@@ -135,8 +135,8 @@ export function BackgroundSection({ sceneId, level, setLevel, onAfterSave }: Pro
                     className="hidden"
                 />
                 <div className="text-[11px] text-neutral-500 italic">
-                    Replaces the PNG file. If the new size differs, you'll be asked to confirm
-                    the <code>imageSize</code> change. Air walls are NOT auto-scaled.
+                    Replaces the PNG file. If the new size differs, you'll be asked to confirm the{' '}
+                    <code>imageSize</code> change. Air walls are NOT auto-scaled.
                 </div>
             </div>
 
@@ -163,13 +163,13 @@ export function BackgroundSection({ sceneId, level, setLevel, onAfterSave }: Pro
                                     ? `${pendingSizeChange.previousSize.width}×${pendingSizeChange.previousSize.height}`
                                     : 'unset'}
                             </strong>
-                            . Air walls and monster positions will be misaligned until you
-                            re-draw them.
+                            . Air walls and monster positions will be misaligned until you re-draw
+                            them.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="text-[11px] text-neutral-500 italic">
-                        Confirm to update <code>imageSize</code>. Cancel to keep the old size
-                        (the new PNG will still replace the old one).
+                        Confirm to update <code>imageSize</code>. Cancel to keep the old size (the
+                        new PNG will still replace the old one).
                     </div>
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button

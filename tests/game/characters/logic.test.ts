@@ -50,35 +50,25 @@ describe('characters/logic — dodgeIntent', () => {
     const FWD = { vx: 1, vy: 0 };
 
     it('returns null when shift not pressed', () => {
-        expect(
-            dodgeIntent(false, FWD, 100, 15, 600, 0, 0, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(false, FWD, 100, 15, 600, 0, 0, 28, 1000)).toBeNull();
     });
 
     it('returns null when no movement intent', () => {
-        expect(
-            dodgeIntent(true, NO_INTENT, 100, 15, 600, 0, 0, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(true, NO_INTENT, 100, 15, 600, 0, 0, 28, 1000)).toBeNull();
     });
 
     it('returns null when SP below cost', () => {
-        expect(
-            dodgeIntent(true, FWD, 10, 15, 600, 0, 0, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(true, FWD, 10, 15, 600, 0, 0, 28, 1000)).toBeNull();
     });
 
     it('returns null when cooldown not elapsed', () => {
         // lastDodgeEndAt=900, now=1000, cooldown=600 → only 100ms passed
-        expect(
-            dodgeIntent(true, FWD, 100, 15, 600, 900, 0, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(true, FWD, 100, 15, 600, 900, 0, 28, 1000)).toBeNull();
     });
 
     it('returns null when a previous dodge is still active', () => {
         // dodgeActiveUntil=1200, now=1000 → still dodging
-        expect(
-            dodgeIntent(true, FWD, 100, 15, 600, 0, 1200, 28, 1000),
-        ).toBeNull();
+        expect(dodgeIntent(true, FWD, 100, 15, 600, 0, 1200, 28, 1000)).toBeNull();
     });
 
     it('returns dodge velocity when all conditions met', () => {
@@ -113,11 +103,18 @@ describe('characters/logic — clampToBounds', () => {
 });
 describe('characters/logic — resolveHurtSfx', () => {
     it('returns female variant when gender=female and hurtFemale set', () => {
-        expect(resolveHurtSfx({ gender: 'female', sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' } })).toBe('f');
+        expect(
+            resolveHurtSfx({
+                gender: 'female',
+                sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' },
+            }),
+        ).toBe('f');
     });
 
     it('returns male variant when gender=male and hurtMale set', () => {
-        expect(resolveHurtSfx({ gender: 'male', sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' } })).toBe('m');
+        expect(
+            resolveHurtSfx({ gender: 'male', sfx: { hurtFemale: 'f', hurtMale: 'm', hurt: 'n' } }),
+        ).toBe('m');
     });
 
     it('falls back to hurt when gender set but per-gender field missing', () => {

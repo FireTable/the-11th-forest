@@ -75,9 +75,7 @@ export function SpritePicker({
 
     // A value can be either the bare id ("wanderer") or the full path
     // ("assets/image/characters/wanderer.png") — match either.
-    const matched = sprites.find(
-        (s) => s.path === value || s.id === value || s.url === value,
-    );
+    const matched = sprites.find((s) => s.path === value || s.id === value || s.url === value);
     const preview = matched?.url ?? (value.startsWith('/') ? value : null);
 
     return (
@@ -116,15 +114,11 @@ export function SpritePicker({
             )}
 
             {!preview && !value && (
-                <div className="text-[11px] italic text-neutral-500">
-                    No sprite selected.
-                </div>
+                <div className="text-[11px] italic text-neutral-500">No sprite selected.</div>
             )}
 
             {sprites.length === 0 && !error && (
-                <div className="text-[11px] italic text-neutral-500">
-                    (no PNGs in {folder}/)
-                </div>
+                <div className="text-[11px] italic text-neutral-500">(no PNGs in {folder}/)</div>
             )}
 
             <div className="grid grid-cols-4 gap-1">
@@ -167,12 +161,7 @@ export function SpritePicker({
 // ─── Id picker (SFX / music / drops / monsters / weapons / characters) ─
 
 export type IdKind =
-    | 'audios-sfx'
-    | 'audios-music'
-    | 'drops'
-    | 'monsters'
-    | 'weapons'
-    | 'characters';
+    'audios-sfx' | 'audios-music' | 'drops' | 'monsters' | 'weapons' | 'characters';
 
 const KIND_LABEL: Record<IdKind, string> = {
     'audios-sfx': 'SFX',

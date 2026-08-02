@@ -50,8 +50,7 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 export function isDev(opts?: { viteDev?: boolean; hostname?: string }): boolean {
     const viteDev = opts?.viteDev ?? (import.meta.env as { DEV?: boolean }).DEV === true;
     const hostname =
-        opts?.hostname ??
-        (typeof window !== 'undefined' ? window.location.hostname : '');
+        opts?.hostname ?? (typeof window !== 'undefined' ? window.location.hostname : '');
     return viteDev && LOCAL_HOSTS.has(hostname);
 }
 
@@ -93,11 +92,7 @@ export function getCheats(storage: Storage = localStorage): Cheats {
  * `dev:cheat:<key>` so subscribers (AudioController, Character) can
  * react without coupling to React.
  */
-export function applyCheat(
-    key: CheatKey,
-    value: boolean,
-    storage: Storage = localStorage,
-): void {
+export function applyCheat(key: CheatKey, value: boolean, storage: Storage = localStorage): void {
     const next: Cheats = { ...loadCheats(storage), [key]: value };
     saveCheats(next, storage);
     EventBus.emit(`dev:cheat:${key}`, { key, value });

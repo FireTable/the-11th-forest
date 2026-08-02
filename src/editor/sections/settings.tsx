@@ -99,11 +99,11 @@ export function SettingsSection({ level, setLevel }: Props) {
 
             <Section title="Audio">
                 <Field label="Music">
-                    <Select
-                        value={level.music ?? _UNSET}
-                        onValueChange={setMusic}
-                    >
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                    <Select value={level.music ?? _UNSET} onValueChange={setMusic}>
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue placeholder="(default)" />
                         </SelectTrigger>
                         <SelectContent>
@@ -122,11 +122,12 @@ export function SettingsSection({ level, setLevel }: Props) {
                 <Field label="Pixel lighting">
                     <Select
                         value={level.pixelLighting ? 'true' : 'false'}
-                        onValueChange={(v) =>
-                            setLevel({ ...level, pixelLighting: v === 'true' })
-                        }
+                        onValueChange={(v) => setLevel({ ...level, pixelLighting: v === 'true' })}
                     >
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -139,11 +140,11 @@ export function SettingsSection({ level, setLevel }: Props) {
 
             <Section title="Character">
                 <Field label="character id">
-                    <Select
-                        value={level.character ?? _UNSET}
-                        onValueChange={setCharacter}
-                    >
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                    <Select value={level.character ?? _UNSET} onValueChange={setCharacter}>
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue placeholder="(default)" />
                         </SelectTrigger>
                         <SelectContent>
@@ -169,7 +170,10 @@ export function SettingsSection({ level, setLevel }: Props) {
                             })
                         }
                     >
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -201,9 +205,7 @@ export function SettingsSection({ level, setLevel }: Props) {
                         onChange={(e) =>
                             setSpawn({
                                 facing: level.characterSpawn?.facing ?? 'right',
-                                x:
-                                    level.characterSpawn?.x ??
-                                    Math.round(level.imageSize.width / 2),
+                                x: level.characterSpawn?.x ?? Math.round(level.imageSize.width / 2),
                                 y: Number(e.target.value),
                             })
                         }
@@ -213,18 +215,13 @@ export function SettingsSection({ level, setLevel }: Props) {
             </Section>
 
             <Section title="Drop spawns (level-level)">
-                <DropSpawnEditor
-                    spawns={level.dropSpawns ?? []}
-                    onChange={setDropSpawns}
-                />
+                <DropSpawnEditor spawns={level.dropSpawns ?? []} onChange={setDropSpawns} />
             </Section>
 
             <Section title="AI prompt (scene regen)">
                 <Textarea
                     value={level.prompt ?? ''}
-                    onChange={(e) =>
-                        setLevel({ ...level, prompt: e.target.value || undefined })
-                    }
+                    onChange={(e) => setLevel({ ...level, prompt: e.target.value || undefined })}
                     rows={4}
                     placeholder="Optional — used by AI scene/background regen pipeline."
                     className="col-span-2 text-[11px] bg-neutral-950 border-neutral-700 min-h-20"

@@ -84,8 +84,6 @@ describe('resolveDefaultSceneId', () => {
             text: () => Promise.resolve('levels: []\n'),
         });
         vi.stubGlobal('fetch', fakeFetch);
-        await expect(resolveDefaultSceneId()).rejects.toThrow(
-            /Level index is empty/,
-        );
+        await expect(resolveDefaultSceneId()).rejects.toThrow(/Level index is empty/);
     });
 });

@@ -180,7 +180,11 @@ export function MaterialsSection({ level, setLevel }: Props) {
 
         // Emit to Phaser scene
         EventBus.emit('material-delete', targetId);
-    };    const handleFolderUpload = async (targetFolder: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    };
+    const handleFolderUpload = async (
+        targetFolder: string,
+        e: React.ChangeEvent<HTMLInputElement>,
+    ) => {
         const file = e.target.files?.[0];
         if (!file || !targetFolder.trim()) return;
 
@@ -218,7 +222,7 @@ export function MaterialsSection({ level, setLevel }: Props) {
 
     const handleDeleteMaterialFile = (imgPath: string, e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent placing into scene when clicking delete
-        
+
         // Check if any material instance in the level uses this asset texture
         const usedInstances = (level.materials || []).filter((m) => m.texture === imgPath);
         if (usedInstances.length > 0) {
@@ -269,7 +273,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
                 <Input
                     placeholder="Folder name (e.g. ruins, trees)"
                     value={folderName}
-                    onChange={(e) => setFolderName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    onChange={(e) =>
+                        setFolderName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+                    }
                     className="h-8 text-xs bg-neutral-950 border-neutral-700"
                 />
                 <Button
@@ -288,16 +294,20 @@ export function MaterialsSection({ level, setLevel }: Props) {
                     onChange={handleFileUpload}
                     className="hidden"
                 />
-                {statusMsg && <div className="text-[11px] text-neutral-400 italic">{statusMsg}</div>}
+                {statusMsg && (
+                    <div className="text-[11px] text-neutral-400 italic">{statusMsg}</div>
+                )}
             </div>
 
             {/* Placed Scene Materials List (Accordion style Inspector) */}
             <div className="flex flex-col gap-2 bg-neutral-900 border border-neutral-800 rounded p-2.5">
                 <div className="flex items-center justify-between font-semibold text-neutral-300">
                     <span>Scene Placed Materials</span>
-                    <span className="text-[10px] text-neutral-500">{level.materials?.length || 0} items</span>
+                    <span className="text-[10px] text-neutral-500">
+                        {level.materials?.length || 0} items
+                    </span>
                 </div>
-                {(!level.materials || level.materials.length === 0) ? (
+                {!level.materials || level.materials.length === 0 ? (
                     <div className="text-neutral-500 italic text-center py-2 text-[11px]">
                         No materials placed in this level yet
                     </div>
@@ -320,10 +330,15 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                         onClick={() => {
                                             const nextMat = isSelected ? null : m;
                                             setSelectedMat(nextMat);
-                                            EventBus.emit('material-select-id', nextMat?.id ?? null);
+                                            EventBus.emit(
+                                                'material-select-id',
+                                                nextMat?.id ?? null,
+                                            );
                                         }}
                                         className={`flex items-center justify-between p-2 cursor-pointer transition ${
-                                            isSelected ? 'bg-cyan-950/40 text-cyan-200 font-medium' : 'text-neutral-300'
+                                            isSelected
+                                                ? 'bg-cyan-950/40 text-cyan-200 font-medium'
+                                                : 'text-neutral-300'
                                         }`}
                                     >
                                         <div className="flex items-center gap-2 overflow-hidden">
@@ -332,7 +347,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                 alt="mat icon"
                                                 className="w-5 h-5 object-contain bg-neutral-900 rounded p-0.5"
                                             />
-                                            <span className="truncate font-mono text-[11px]">{filename}</span>
+                                            <span className="truncate font-mono text-[11px]">
+                                                {filename}
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 shrink-0">
                                             <span className="uppercase text-[9px] bg-neutral-800 px-1 rounded text-neutral-400">
@@ -344,17 +361,24 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     const targetId = m.id;
-                                                    const nextMats = (level.materials || []).filter((item) => item.id !== targetId);
+                                                    const nextMats = (level.materials || []).filter(
+                                                        (item) => item.id !== targetId,
+                                                    );
                                                     setLevel({ ...level, materials: nextMats });
-                                                    if (selectedMat?.id === targetId) setSelectedMat(null);
+                                                    if (selectedMat?.id === targetId)
+                                                        setSelectedMat(null);
                                                     EventBus.emit('material-delete', targetId);
                                                 }}
                                                 className="w-4 h-4 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
                                                 title="Remove this material from scene"
                                             >
-                                                <span className="text-[11px] font-bold leading-none">✕</span>
+                                                <span className="text-[11px] font-bold leading-none">
+                                                    ✕
+                                                </span>
                                             </Button>
-                                            <span className="text-[11px] ml-0.5">{isSelected ? '▼' : '▶'}</span>
+                                            <span className="text-[11px] ml-0.5">
+                                                {isSelected ? '▼' : '▶'}
+                                            </span>
                                         </div>
                                     </div>
 
@@ -369,7 +393,11 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                     <Input
                                                         type="number"
                                                         value={selectedMat.x}
-                                                        onChange={(e) => handleUpdateSelected({ x: Number(e.target.value) })}
+                                                        onChange={(e) =>
+                                                            handleUpdateSelected({
+                                                                x: Number(e.target.value),
+                                                            })
+                                                        }
                                                         className="h-7 text-xs bg-neutral-900 border-neutral-700"
                                                     />
                                                 </div>
@@ -380,7 +408,11 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                     <Input
                                                         type="number"
                                                         value={selectedMat.y}
-                                                        onChange={(e) => handleUpdateSelected({ y: Number(e.target.value) })}
+                                                        onChange={(e) =>
+                                                            handleUpdateSelected({
+                                                                y: Number(e.target.value),
+                                                            })
+                                                        }
                                                         className="h-7 text-xs bg-neutral-900 border-neutral-700"
                                                     />
                                                 </div>
@@ -393,7 +425,11 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                         step="0.1"
                                                         min="0.1"
                                                         value={selectedMat.scale ?? 1}
-                                                        onChange={(e) => handleUpdateSelected({ scale: Number(e.target.value) })}
+                                                        onChange={(e) =>
+                                                            handleUpdateSelected({
+                                                                scale: Number(e.target.value),
+                                                            })
+                                                        }
                                                         className="h-7 text-xs bg-neutral-900 border-neutral-700"
                                                     />
                                                 </div>
@@ -408,7 +444,11 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                         type="number"
                                                         step="15"
                                                         value={selectedMat.rotation ?? 0}
-                                                        onChange={(e) => handleUpdateSelected({ rotation: Number(e.target.value) })}
+                                                        onChange={(e) =>
+                                                            handleUpdateSelected({
+                                                                rotation: Number(e.target.value),
+                                                            })
+                                                        }
                                                         className="h-7 text-xs bg-neutral-900 border-neutral-700"
                                                     />
                                                 </div>
@@ -419,16 +459,32 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                     <div className="flex gap-1.5 pt-0.5">
                                                         <Button
                                                             size="sm"
-                                                            variant={selectedMat.flipX ? 'default' : 'outline'}
-                                                            onClick={() => handleUpdateSelected({ flipX: !selectedMat.flipX })}
+                                                            variant={
+                                                                selectedMat.flipX
+                                                                    ? 'default'
+                                                                    : 'outline'
+                                                            }
+                                                            onClick={() =>
+                                                                handleUpdateSelected({
+                                                                    flipX: !selectedMat.flipX,
+                                                                })
+                                                            }
                                                             className="h-6 text-[10px] flex-1 px-1 bg-neutral-800 hover:bg-neutral-700"
                                                         >
                                                             Flip X
                                                         </Button>
                                                         <Button
                                                             size="sm"
-                                                            variant={selectedMat.flipY ? 'default' : 'outline'}
-                                                            onClick={() => handleUpdateSelected({ flipY: !selectedMat.flipY })}
+                                                            variant={
+                                                                selectedMat.flipY
+                                                                    ? 'default'
+                                                                    : 'outline'
+                                                            }
+                                                            onClick={() =>
+                                                                handleUpdateSelected({
+                                                                    flipY: !selectedMat.flipY,
+                                                                })
+                                                            }
                                                             className="h-6 text-[10px] flex-1 px-1 bg-neutral-800 hover:bg-neutral-700"
                                                         >
                                                             Flip Y
@@ -452,16 +508,27 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                 <Select
                                                     value={selectedMat.mode || 'y-sort'}
                                                     onValueChange={(v) =>
-                                                        handleUpdateSelected({ mode: v as MaterialMode })
+                                                        handleUpdateSelected({
+                                                            mode: v as MaterialMode,
+                                                        })
                                                     }
                                                 >
-                                                    <SelectTrigger size="sm" className="mt-0.5 h-7 text-xs bg-neutral-900 border-neutral-700 w-full">
+                                                    <SelectTrigger
+                                                        size="sm"
+                                                        className="mt-0.5 h-7 text-xs bg-neutral-900 border-neutral-700 w-full"
+                                                    >
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="y-sort">Y-Sort (Dynamic Depth: mat.Y)</SelectItem>
-                                                        <SelectItem value="background">Background (Floor: depth 10)</SelectItem>
-                                                        <SelectItem value="foreground">Foreground (Top: depth 10000)</SelectItem>
+                                                        <SelectItem value="y-sort">
+                                                            Y-Sort (Dynamic Depth: mat.Y)
+                                                        </SelectItem>
+                                                        <SelectItem value="background">
+                                                            Background (Floor: depth 10)
+                                                        </SelectItem>
+                                                        <SelectItem value="foreground">
+                                                            Foreground (Top: depth 10000)
+                                                        </SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -473,7 +540,11 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                 <Input
                                                     type="number"
                                                     value={selectedMat.depthOffset || 0}
-                                                    onChange={(e) => handleUpdateSelected({ depthOffset: Number(e.target.value) })}
+                                                    onChange={(e) =>
+                                                        handleUpdateSelected({
+                                                            depthOffset: Number(e.target.value),
+                                                        })
+                                                    }
                                                     className="h-7 text-xs bg-neutral-900 border-neutral-700"
                                                 />
                                             </div>
@@ -499,19 +570,28 @@ export function MaterialsSection({ level, setLevel }: Props) {
             <div className="flex flex-col gap-3">
                 <div className="font-semibold text-neutral-400">Material Library</div>
                 {folders.length === 0 ? (
-                    <div className="text-neutral-500 italic text-center py-2">No material packs found</div>
+                    <div className="text-neutral-500 italic text-center py-2">
+                        No material packs found
+                    </div>
                 ) : (
                     folders.map((f) => {
                         const isCollapsed = !!collapsedFolders[f.name];
                         return (
-                            <div key={f.name} className="flex flex-col gap-1.5 bg-neutral-950 p-2 rounded border border-neutral-800">
+                            <div
+                                key={f.name}
+                                className="flex flex-col gap-1.5 bg-neutral-950 p-2 rounded border border-neutral-800"
+                            >
                                 <div className="font-medium text-neutral-300 capitalize text-[11px] flex justify-between items-center select-none">
                                     <div
                                         onClick={() => toggleFolderCollapse(f.name)}
                                         className="flex items-center gap-1.5 cursor-pointer hover:text-white transition"
                                     >
-                                        <span className="text-[10px] text-neutral-500">{isCollapsed ? '▶' : '▼'}</span>
-                                        <span>{f.name} ({f.images.length})</span>
+                                        <span className="text-[10px] text-neutral-500">
+                                            {isCollapsed ? '▶' : '▼'}
+                                        </span>
+                                        <span>
+                                            {f.name} ({f.images.length})
+                                        </span>
                                     </div>
                                     <Button
                                         size="xs"
@@ -558,7 +638,9 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                                 <Button
                                                     variant="destructive"
                                                     size="icon-xs"
-                                                    onClick={(e) => handleDeleteMaterialFile(img, e)}
+                                                    onClick={(e) =>
+                                                        handleDeleteMaterialFile(img, e)
+                                                    }
                                                     className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full p-0 bg-red-600/90 hover:bg-red-500 text-white text-[8px] font-bold opacity-0 group-hover:opacity-100 shadow"
                                                     title="Delete asset file permanently"
                                                 >
@@ -578,7 +660,13 @@ export function MaterialsSection({ level, setLevel }: Props) {
             <Dialog
                 open={deleteDialog.open}
                 onOpenChange={(open: boolean) => {
-                    if (!open) setDeleteDialog({ open: false, imgPath: '', blocked: false, usageCount: 0 });
+                    if (!open)
+                        setDeleteDialog({
+                            open: false,
+                            imgPath: '',
+                            blocked: false,
+                            usageCount: 0,
+                        });
                 }}
             >
                 <DialogContent
@@ -586,7 +674,12 @@ export function MaterialsSection({ level, setLevel }: Props) {
                         if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Enter') {
                             e.preventDefault();
                             if (deleteDialog.blocked) {
-                                setDeleteDialog({ open: false, imgPath: '', blocked: false, usageCount: 0 });
+                                setDeleteDialog({
+                                    open: false,
+                                    imgPath: '',
+                                    blocked: false,
+                                    usageCount: 0,
+                                });
                             } else {
                                 confirmDeleteMaterialFile();
                             }
@@ -596,17 +689,22 @@ export function MaterialsSection({ level, setLevel }: Props) {
                 >
                     <DialogHeader>
                         <DialogTitle className="text-base font-semibold">
-                            {deleteDialog.blocked ? '⚠️ Cannot Delete Material' : 'Confirm Asset Deletion'}
+                            {deleteDialog.blocked
+                                ? '⚠️ Cannot Delete Material'
+                                : 'Confirm Asset Deletion'}
                         </DialogTitle>
                         <DialogDescription className="text-xs text-neutral-400 pt-1">
                             {deleteDialog.blocked ? (
                                 <span className="text-red-400">
-                                    This material is currently placed in the scene ({deleteDialog.usageCount} instance
-                                    {deleteDialog.usageCount > 1 ? 's' : ''}). Please remove it from the scene before deleting the file asset.
+                                    This material is currently placed in the scene (
+                                    {deleteDialog.usageCount} instance
+                                    {deleteDialog.usageCount > 1 ? 's' : ''}). Please remove it from
+                                    the scene before deleting the file asset.
                                 </span>
                             ) : (
                                 <span>
-                                    Are you sure you want to permanently delete this material asset file from disk? This action cannot be undone.
+                                    Are you sure you want to permanently delete this material asset
+                                    file from disk? This action cannot be undone.
                                 </span>
                             )}
                         </DialogDescription>
@@ -630,7 +728,14 @@ export function MaterialsSection({ level, setLevel }: Props) {
                             <Button
                                 size="sm"
                                 autoFocus
-                                onClick={() => setDeleteDialog({ open: false, imgPath: '', blocked: false, usageCount: 0 })}
+                                onClick={() =>
+                                    setDeleteDialog({
+                                        open: false,
+                                        imgPath: '',
+                                        blocked: false,
+                                        usageCount: 0,
+                                    })
+                                }
                                 className="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs"
                             >
                                 Got it
@@ -640,7 +745,14 @@ export function MaterialsSection({ level, setLevel }: Props) {
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => setDeleteDialog({ open: false, imgPath: '', blocked: false, usageCount: 0 })}
+                                    onClick={() =>
+                                        setDeleteDialog({
+                                            open: false,
+                                            imgPath: '',
+                                            blocked: false,
+                                            usageCount: 0,
+                                        })
+                                    }
                                     className="bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700 text-xs"
                                 >
                                     Cancel

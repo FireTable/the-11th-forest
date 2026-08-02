@@ -1,5 +1,5 @@
 drops:
-  - hp-shard
-  - sp-fragment
-  - ammo-cache
-  - overcharge-core
+    - hp-shard
+    - sp-fragment
+    - ammo-cache
+    - overcharge-core

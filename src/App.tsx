@@ -23,9 +23,7 @@ import { TouchControls } from '@/components/hud/TouchControls';
  * shares the same surface — no separate floating widget at the app
  * root.
  */
-const EditorPanel = lazy(() =>
-    import('@/editor/panel').then((m) => ({ default: m.EditorPanel })),
-);
+const EditorPanel = lazy(() => import('@/editor/panel').then((m) => ({ default: m.EditorPanel })));
 
 function App() {
     return (

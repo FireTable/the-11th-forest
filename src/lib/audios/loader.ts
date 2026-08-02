@@ -20,11 +20,7 @@ import type { AudioIndex, MusicSpec, SfxSpec, SoundSpec } from './types';
 const BASE_SFX = '/data/audios/sfx';
 const BASE_MUSIC = '/data/audios/music';
 
-function expectKind<T extends SoundSpec>(
-    spec: SoundSpec,
-    kind: T['kind'],
-    id: string,
-): T {
+function expectKind<T extends SoundSpec>(spec: SoundSpec, kind: T['kind'], id: string): T {
     if (spec.kind !== kind) {
         throw new Error(`Audio ${id}: expected kind=${kind}, got ${spec.kind}`);
     }

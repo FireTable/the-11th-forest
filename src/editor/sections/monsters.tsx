@@ -206,11 +206,11 @@ function MonsterRow({
                 <span className="text-neutral-500 font-mono text-[10px] w-5 text-center">
                     #{index + 1}
                 </span>
-                <Select
-                    value={spawn.type}
-                    onValueChange={(v) => onPatch(index, { type: v })}
-                >
-                    <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700 flex-1 min-w-0">
+                <Select value={spawn.type} onValueChange={(v) => onPatch(index, { type: v })}>
+                    <SelectTrigger
+                        size="sm"
+                        className="h-7 text-xs bg-neutral-950 border-neutral-700 flex-1 min-w-0"
+                    >
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -323,7 +323,10 @@ function MonsterRow({
                                 onPatchTrigger(index, { kind: v as MonsterTrigger['kind'] })
                             }
                         >
-                            <SelectTrigger size="sm" className="h-6 text-[11px] bg-neutral-950 border-neutral-700">
+                            <SelectTrigger
+                                size="sm"
+                                className="h-6 text-[11px] bg-neutral-950 border-neutral-700"
+                            >
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

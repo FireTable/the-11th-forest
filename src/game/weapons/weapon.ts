@@ -22,17 +22,18 @@ import type { WeaponSpec } from '@/lib/weapons';
 /**
  * Queue weapon and paired bullet texture assets into the Phaser Loader.
  */
-export function loadWeaponAssets(
-    scene: Phaser.Scene,
-    weaponSpecs: Iterable<WeaponSpec>,
-): void {
+export function loadWeaponAssets(scene: Phaser.Scene, weaponSpecs: Iterable<WeaponSpec>): void {
     for (const spec of weaponSpecs) {
         if (spec.visual?.texture && !scene.textures.exists(spec.visual.texture)) {
-            const url = spec.visual.texture.startsWith('/') ? spec.visual.texture : `/${spec.visual.texture}`;
+            const url = spec.visual.texture.startsWith('/')
+                ? spec.visual.texture
+                : `/${spec.visual.texture}`;
             scene.load.image(spec.visual.texture, url);
         }
         if (spec.bullet?.texture && !scene.textures.exists(spec.bullet.texture)) {
-            const url = spec.bullet.texture.startsWith('/') ? spec.bullet.texture : `/${spec.bullet.texture}`;
+            const url = spec.bullet.texture.startsWith('/')
+                ? spec.bullet.texture
+                : `/${spec.bullet.texture}`;
             scene.load.image(spec.bullet.texture, url);
         }
     }
@@ -189,7 +190,7 @@ export function spawnMeleeHitbox(
         const sprite = scene.add.image(hx, hy, opts.texture);
         sprite.setOrigin(0.5, 0.5);
         // Dynamic depth: Calculate character feetY + 5 so it rests BETWEEN character sprite (feetY) and handheld weapon (feetY + 10)
-        const feetY = opts.feetY ?? (opts.origin.y + 32);
+        const feetY = opts.feetY ?? opts.origin.y + 32;
         const effectDepth = Math.round(feetY) + 5;
         sprite.setDepth(effectDepth);
         sprite.setFlipX(isLeft);
@@ -212,7 +213,7 @@ export function spawnMeleeHitbox(
         visualObj = sprite;
     } else {
         const rect = scene.add.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, 0xc084fc, 0.7);
-        const feetY = opts.feetY ?? (opts.origin.y + 32);
+        const feetY = opts.feetY ?? opts.origin.y + 32;
         const effectDepth = Math.round(feetY) + 5;
         rect.setDepth(effectDepth);
         scene.tweens.add({
@@ -247,10 +248,7 @@ export function destroyBulletVisual(scene: Phaser.Scene, bullet: BulletRecord): 
 }
 
 /** Compute velocity { x, y } for a bullet fired at `angle` with given `speed`. */
-export function bulletVelocity(
-    angle: number,
-    speed: number,
-): { x: number; y: number } {
+export function bulletVelocity(angle: number, speed: number): { x: number; y: number } {
     return {
         x: Math.cos(angle) * speed,
         y: Math.sin(angle) * speed,

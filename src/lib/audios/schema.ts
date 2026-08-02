@@ -52,10 +52,7 @@ export const MusicSpecSchema = z
 
 // ─── Union ───────────────────────────────────────────────────────────────
 
-export const SoundSpecSchema = z.discriminatedUnion('kind', [
-    SfxSpecSchema,
-    MusicSpecSchema,
-]);
+export const SoundSpecSchema = z.discriminatedUnion('kind', [SfxSpecSchema, MusicSpecSchema]);
 
 // ─── Index ──────────────────────────────────────────────────────────────
 

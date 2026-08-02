@@ -14,7 +14,12 @@ const MIN_HUD_SCALE = 0.45;
 const MAX_HUD_SCALE = 1.0;
 
 export const GameHUDLayer: React.FC = () => {
-    const [bounds, setBounds] = useState<{ width: number; height: number; left: number; top: number }>({
+    const [bounds, setBounds] = useState<{
+        width: number;
+        height: number;
+        left: number;
+        top: number;
+    }>({
         width: 0,
         height: 0,
         left: 0,
@@ -61,18 +66,21 @@ export const GameHUDLayer: React.FC = () => {
     const heightScale = bounds.height > 0 ? bounds.height / nativeH : rawScale;
     const scale = Math.max(MIN_HUD_SCALE, Math.min(MAX_HUD_SCALE, Math.min(rawScale, heightScale)));
 
-    const style: React.CSSProperties = bounds.width > 0 ? {
-        position: 'absolute',
-        left: `${bounds.left}px`,
-        top: `${bounds.top}px`,
-        width: `${nativeW}px`,
-        height: `${nativeH}px`,
-        transform: `scale(${scale})`,
-        transformOrigin: 'top left',
-    } : {
-        position: 'absolute',
-        inset: 0,
-    };
+    const style: React.CSSProperties =
+        bounds.width > 0
+            ? {
+                  position: 'absolute',
+                  left: `${bounds.left}px`,
+                  top: `${bounds.top}px`,
+                  width: `${nativeW}px`,
+                  height: `${nativeH}px`,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
+              }
+            : {
+                  position: 'absolute',
+                  inset: 0,
+              };
 
     return (
         <div style={style} className="pointer-events-none overflow-hidden z-10">
@@ -82,4 +90,3 @@ export const GameHUDLayer: React.FC = () => {
         </div>
     );
 };
-

@@ -31,7 +31,10 @@ loadEnv({ path: '.env.local', override: true }); // .env.local
 // Minimal CLI flag parser: `--key value` and `--flag`. Positional args are
 // collected into `_positional`. Keeps the script zero-dep on top of
 // `openai` / `tsx` / `dotenv` / `js-yaml`.
-function parseArgs(argv: string[]): { flags: Record<string, string | boolean>; positional: string[] } {
+function parseArgs(argv: string[]): {
+    flags: Record<string, string | boolean>;
+    positional: string[];
+} {
     const flags: Record<string, string | boolean> = {};
     const positional: string[] = [];
     for (let i = 0; i < argv.length; i++) {
@@ -106,8 +109,7 @@ async function generateImage(opts: MainOpts): Promise<void> {
     type Choice = {
         message?: {
             content?:
-            | string
-            | Array<{ type?: string; text?: string; image_url?: { url?: string } }>;
+                string | Array<{ type?: string; text?: string; image_url?: { url?: string } }>;
         };
     };
     const content = (res.choices as Choice[])[0]?.message?.content;
@@ -160,7 +162,9 @@ const { flags, positional } = parseArgs(process.argv.slice(2));
 
 const sceneId = positional[0];
 if (!sceneId) {
-    console.error('Usage: pnpm tsx scripts/generate-image.ts <scene-id> [--image <path>] [--prompt <text>] [--size <WxH>]');
+    console.error(
+        'Usage: pnpm tsx scripts/generate-image.ts <scene-id> [--image <path>] [--prompt <text>] [--size <WxH>]',
+    );
     process.exit(2);
 }
 

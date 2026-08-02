@@ -208,9 +208,21 @@ export class StatusHud extends BaseHud {
         if (showHp) {
             // Dark border & shadow
             this.bg.fillStyle(0x0f172a, 0.95);
-            this.bg.fillRoundedRect(cx - BAR_W / 2 - 1, cy - 1, BAR_W + 2, totalHeight + 2, RADIUS + 1);
+            this.bg.fillRoundedRect(
+                cx - BAR_W / 2 - 1,
+                cy - 1,
+                BAR_W + 2,
+                totalHeight + 2,
+                RADIUS + 1,
+            );
             this.bg.lineStyle(1, 0x334155, 1);
-            this.bg.strokeRoundedRect(cx - BAR_W / 2 - 1, cy - 1, BAR_W + 2, totalHeight + 2, RADIUS + 1);
+            this.bg.strokeRoundedRect(
+                cx - BAR_W / 2 - 1,
+                cy - 1,
+                BAR_W + 2,
+                totalHeight + 2,
+                RADIUS + 1,
+            );
         }
 
         // 2. Draw Name Label (Positioned cleanly above the status bar)
@@ -248,7 +260,10 @@ export class StatusHud extends BaseHud {
         // 5. Draw Left Circular Progress Rings (Supports simultaneous Dodge Roll & Reloading)
         this.reloadCircle.clear();
 
-        const isDodgeCooldown = !!state.dodgeCooldownStartedAt && !!state.dodgeCooldownTimeMs && (time < state.dodgeCooldownStartedAt + state.dodgeCooldownTimeMs);
+        const isDodgeCooldown =
+            !!state.dodgeCooldownStartedAt &&
+            !!state.dodgeCooldownTimeMs &&
+            time < state.dodgeCooldownStartedAt + state.dodgeCooldownTimeMs;
         const hasDodgeRing = !!(state.dodgeActive || isDodgeCooldown);
         const hasReloadRing = !!(showReloading && state.reloadStartedAt && state.reloadTimeMs);
 

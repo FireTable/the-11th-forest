@@ -21,7 +21,7 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
         parent,
         backgroundColor: '#000000',
         pipeline: {
-            'PixelLightPostFX': PixelLightPostFX,
+            PixelLightPostFX: PixelLightPostFX,
         },
         scale: {
             mode: Scale.FIT,
@@ -38,16 +38,18 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
                 debug: false,
             },
         },
-        scene: [new LoadScene(scene.id, scene.level, {
-            weapons: scene.weapons,
-            weaponsById: scene.weaponsById,
-            character: scene.character,
-            spriteCell: scene.spriteCell,
-            monsterSpecs: scene.monsters,
-            dropSpecs: scene.drops,
-            sfxSpecs: scene.sfx,
-            musicSpecs: scene.music,
-        })],
+        scene: [
+            new LoadScene(scene.id, scene.level, {
+                weapons: scene.weapons,
+                weaponsById: scene.weaponsById,
+                character: scene.character,
+                spriteCell: scene.spriteCell,
+                monsterSpecs: scene.monsters,
+                dropSpecs: scene.drops,
+                sfxSpecs: scene.sfx,
+                musicSpecs: scene.music,
+            }),
+        ],
     } as any);
 };
 

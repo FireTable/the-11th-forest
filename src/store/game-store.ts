@@ -39,7 +39,13 @@ export interface GameUIState {
     // Setters
     setLevelTitle: (title: string) => void;
     setLevelElapsedMs: (ms: number) => void;
-    setCharacterStats: (stats: { name?: string; hp: number; maxHp: number; sp: number; maxSp: number }) => void;
+    setCharacterStats: (stats: {
+        name?: string;
+        hp: number;
+        maxHp: number;
+        sp: number;
+        maxSp: number;
+    }) => void;
     setWeaponStats: (stats: {
         activeIndex: number;
         name: string;

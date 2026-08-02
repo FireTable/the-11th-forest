@@ -48,19 +48,13 @@ drops: []
 
     it('rejects non-positive moveSpeed', () => {
         expect(() =>
-            parseMonsterYaml(
-                `${meleeYaml.replace('moveSpeed: 4', 'moveSpeed: 0')}`,
-                'drone',
-            ),
+            parseMonsterYaml(`${meleeYaml.replace('moveSpeed: 4', 'moveSpeed: 0')}`, 'drone'),
         ).toThrow(/moveSpeed/);
     });
 
     it('rejects drop chance outside [0, 1]', () => {
         expect(() =>
-            parseMonsterYaml(
-                `${meleeYaml.replace('chance: 0.4', 'chance: 1.5')}`,
-                'drone',
-            ),
+            parseMonsterYaml(`${meleeYaml.replace('chance: 0.4', 'chance: 1.5')}`, 'drone'),
         ).toThrow(/chance/);
     });
 

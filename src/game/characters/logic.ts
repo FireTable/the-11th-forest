@@ -91,10 +91,7 @@ export function dodgeIntent(
     dodgeSpeed: number,
     now: number,
 ): DodgeIntent | null {
-    const canDodge =
-        sp >= spCost &&
-        now - lastDodgeEndAt >= cooldownMs &&
-        now >= dodgeActiveUntil;
+    const canDodge = sp >= spCost && now - lastDodgeEndAt >= cooldownMs && now >= dodgeActiveUntil;
     const hasDirection = intent.vx !== 0 || intent.vy !== 0;
     if (!spaceDown || !hasDirection || !canDodge) return null;
     return {
@@ -320,7 +317,9 @@ export class CharacterController {
             if (this.infiniteHp) this.hp = INFINITE_HP_VALUE;
         };
         EventBus.on('dev:cheat:infiniteHp', infiniteHpHandler);
-        this.cleanupFns.push(() => EventBus.removeListener('dev:cheat:infiniteHp', infiniteHpHandler));
+        this.cleanupFns.push(() =>
+            EventBus.removeListener('dev:cheat:infiniteHp', infiniteHpHandler),
+        );
     }
 
     // ─── Public API ──────────────────────────────────────────────────────
@@ -335,7 +334,10 @@ export class CharacterController {
             this.hp = Math.max(0, Math.min(this.spec.hp, this.hp + hpDelta));
             const actualDelta = this.hp - oldHp;
             if (actualDelta !== 0 && this.parts.statusHud?.showFloatingNumber) {
-                this.parts.statusHud.showFloatingNumber(actualDelta, actualDelta > 0 ? 'heal' : 'damage');
+                this.parts.statusHud.showFloatingNumber(
+                    actualDelta,
+                    actualDelta > 0 ? 'heal' : 'damage',
+                );
             }
             if (hpDelta < 0) {
                 const sfx = resolveHurtSfx(this.spec);
@@ -423,9 +425,10 @@ export class CharacterController {
         const pos = this.parts.body.position;
         // Calculate visual offset. `left` shifts right (+) / left (-), `bottom` shifts up (-) / down (+)
         const rawX = this.spec.sprite?.offset?.left ?? this.spec.sprite?.offset?.x ?? 0;
-        const rawY = this.spec.sprite?.offset?.bottom !== undefined 
-            ? -this.spec.sprite.offset.bottom 
-            : (this.spec.sprite?.offset?.y ?? 0);
+        const rawY =
+            this.spec.sprite?.offset?.bottom !== undefined
+                ? -this.spec.sprite.offset.bottom
+                : (this.spec.sprite?.offset?.y ?? 0);
         const offX = rawX * (sprite.flipX ? -1 : 1);
         const offY = rawY;
         sprite.setPosition(pos.x + offX, pos.y + this.spec.body.halfH + offY);
@@ -441,7 +444,10 @@ export class CharacterController {
             this.parts.debugBodyRect.setDepth(feetY + 1);
         }
         if (this.parts.debugHitboxRect) {
-            this.parts.debugHitboxRect.setPosition(pos.x, pos.y + this.spec.body.halfH - sprite.displayHeight / 2);
+            this.parts.debugHitboxRect.setPosition(
+                pos.x,
+                pos.y + this.spec.body.halfH - sprite.displayHeight / 2,
+            );
             this.parts.debugHitboxRect.setDepth(feetY + 2);
         }
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
@@ -461,10 +467,7 @@ export class CharacterController {
 
         // ── SP regen ────────────────────────────────────────────────
         if (now >= this.dodgeActiveUntil && this.sp < this.spec.sp) {
-            this.sp = Math.min(
-                this.spec.sp,
-                this.sp + (this.spec.sp * 16) / this.spec.spRegenMs,
-            );
+            this.sp = Math.min(this.spec.sp, this.sp + (this.spec.sp * 16) / this.spec.spRegenMs);
         }
 
         // ── Footstep SFX (throttled; cadence from spec) ─────────────
@@ -514,7 +517,10 @@ export class CharacterController {
         this.parts.weaponHud.draw(this.parts.weapons, this.scene.time.now);
         // Character body position center is at (feetY - halfH).
         // Distance from body.position to sprite top is: displayHeight - halfH
-        const topOffset = Math.max(this.spec.body.halfH, this.parts.sprite.displayHeight - this.spec.body.halfH);
+        const topOffset = Math.max(
+            this.spec.body.halfH,
+            this.parts.sprite.displayHeight - this.spec.body.halfH,
+        );
         const slotState = this.parts.weapons.getActiveSlotState();
         this.parts.statusHud.update(
             {
@@ -758,7 +764,8 @@ export class CharacterController {
                 const found = monsters.find((m) => m.id === this.currentLockedMonsterId);
                 if (found) {
                     const distToMouse = Math.hypot(found.x - rawWorldX, found.y - rawWorldY);
-                    if (distToMouse < AIM_ASSIST.STICKY_TETHER_RADIUS) { // Sticky tether range
+                    if (distToMouse < AIM_ASSIST.STICKY_TETHER_RADIUS) {
+                        // Sticky tether range
                         activeLockedMonster = found;
                     }
                 }
@@ -784,8 +791,12 @@ export class CharacterController {
 
                 // Mouse Reference 100% Synchronized to Locked Monster Screen Position:
                 // When player flicks mouse to break lock, the breakout delta starts DIRECTLY from the monster's body position!
-                const monsterScreenX = rectEl.left + (activeLockedMonster.x - camera.scrollX) * (rectEl.width / camera.width);
-                const monsterScreenY = rectEl.top + (activeLockedMonster.y - camera.scrollY) * (rectEl.height / camera.height);
+                const monsterScreenX =
+                    rectEl.left +
+                    (activeLockedMonster.x - camera.scrollX) * (rectEl.width / camera.width);
+                const monsterScreenY =
+                    rectEl.top +
+                    (activeLockedMonster.y - camera.scrollY) * (rectEl.height / camera.height);
                 this.rawClientX = monsterScreenX;
                 this.rawClientY = monsterScreenY;
             } else {

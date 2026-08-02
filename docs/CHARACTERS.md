@@ -25,28 +25,28 @@ public/data/characters/
 ## YAML schema — `public/data/characters/<id>.yaml`
 
 ```yaml
-id: wanderer                # optional; loader overwrites with filename
+id: wanderer # optional; loader overwrites with filename
 name: Wanderer
-imageSize: 2048x2048        # AI-gen template size, ignored at runtime
+imageSize: 2048x2048 # AI-gen template size, ignored at runtime
 
 hp: 100
 sp: 100
-moveSpeed: 220             # px/sec
-spRegenMs: 1000            # SP regen interval
+moveSpeed: 220 # px/sec
+spRegenMs: 1000 # SP regen interval
 
-gender: female             # 'male' | 'female' — affects hurt sfx routing
+gender: female # 'male' | 'female' — affects hurt sfx routing
 
-body:                       # Matter rectangle half-extents
+body: # Matter rectangle half-extents
     halfW: 28
     halfH: 24
 
-dodge:                      # Shift-dash tuning
+dodge: # Shift-dash tuning
     spCost: 15
-    speed: 14               # multiplier over moveSpeed during dash
-    durationMs: 220         # i-frame + dash duration
+    speed: 14 # multiplier over moveSpeed during dash
+    durationMs: 220 # i-frame + dash duration
     cooldownMs: 600
 
-hotbar:                     # starting weapons in display order
+hotbar: # starting weapons in display order
     - assault-rifle
     - laser-cannon
     - plasma-sword
@@ -65,21 +65,21 @@ sprite:
         pad: 2
 
 anims:
-    idle:  { frames: [0, 4],  frameRate: 3,  repeat: -1 }
-    walk:  { frames: [5, 9],  frameRate: 12, repeat: -1 }
+    idle: { frames: [0, 4], frameRate: 3, repeat: -1 }
+    walk: { frames: [5, 9], frameRate: 12, repeat: -1 }
     dodge: { frames: [10, 14], frameRate: 16, repeat: 0 }
 
-sfx:                        # per-character audio identity
+sfx: # per-character audio identity
     dodge: dodge
-    hurtFemale: player-hurt-female    # used when gender=female
-    hurtMale:   player-hurt-male      # used when gender=male
+    hurtFemale: player-hurt-female # used when gender=female
+    hurtMale: player-hurt-male # used when gender=male
     footstep: footstep
-    footstepThrottleMs: 200           # min gap between footstep sfx
+    footstepThrottleMs: 200 # min gap between footstep sfx
     lowHpHeartbeat: low-hp-heartbeat
-    lowHpThreshold: 0.3               # HP fraction that starts the loop
+    lowHpThreshold: 0.3 # HP fraction that starts the loop
     lowHpPulseMs: 900
 
-prompt: |                            # AI sprite-sheet template (chroma key)
+prompt: | # AI sprite-sheet template (chroma key)
     The 11th Forest — Wanderer sprite sheet
     …
 ```
@@ -88,9 +88,13 @@ prompt: |                            # AI sprite-sheet template (chroma key)
 
 ```ts
 import {
-    parseCharacterIndex, parseCharacterYaml,
-    fetchCharacter, fetchCharacterIndex,
-    type CharacterSpec, type AnimSpec, type SpriteSpec,
+    parseCharacterIndex,
+    parseCharacterYaml,
+    fetchCharacter,
+    fetchCharacterIndex,
+    type CharacterSpec,
+    type AnimSpec,
+    type SpriteSpec,
 } from '@/lib/characters';
 ```
 
@@ -99,38 +103,38 @@ import {
 ### `CharacterController` (in `src/game/characters/logic.ts`)
 
 ```ts
-new CharacterController(scene, parts, spec)
+new CharacterController(scene, parts, spec);
 ```
 
 Where `parts: CharacterRuntimeParts` is the bag of HUD/weapon refs the controller delegates to. Pure helpers (no Phaser) are also exported for testing:
 
-| Helper | Purpose |
-|---|---|
-| `moveIntent(keys)` | map key state → unit velocity |
-| `dodgeIntent(shift, intent, sp, spCost, cd, lastEnd, until, speed, now)` | decide dodge + return velocity |
-| `resolveHurtSfx(spec)` | pick `sfx.hurtFemale`/`hurtMale` based on `spec.gender`, fallback `sfx.hurt` |
-| `clampToBounds(pos, halfW, halfH, worldW, worldH)` | clamp to arena rectangle |
+| Helper                                                                   | Purpose                                                                      |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `moveIntent(keys)`                                                       | map key state → unit velocity                                                |
+| `dodgeIntent(shift, intent, sp, spCost, cd, lastEnd, until, speed, now)` | decide dodge + return velocity                                               |
+| `resolveHurtSfx(spec)`                                                   | pick `sfx.hurtFemale`/`hurtMale` based on `spec.gender`, fallback `sfx.hurt` |
+| `clampToBounds(pos, halfW, halfH, worldW, worldH)`                       | clamp to arena rectangle                                                     |
 
 `resolveHurtSfx` is the gender-routing pure helper (vitest-covered):
 
-| `gender` | `hurtFemale` set | `hurtMale` set | returns |
-|---|---|---|---|
-| `'female'` | yes | — | `hurtFemale` |
-| `'female'` | no | — | `hurt` (fallback) |
-| `'female'` | — | — | `hurt` if set, else `null` |
-| `'male'` | — | yes | `hurtMale` |
-| `'male'` | — | no | `hurt` if set, else `null` |
-| undefined | — | — | `hurt` if set, else `null` |
+| `gender`   | `hurtFemale` set | `hurtMale` set | returns                    |
+| ---------- | ---------------- | -------------- | -------------------------- |
+| `'female'` | yes              | —              | `hurtFemale`               |
+| `'female'` | no               | —              | `hurt` (fallback)          |
+| `'female'` | —                | —              | `hurt` if set, else `null` |
+| `'male'`   | —                | yes            | `hurtMale`                 |
+| `'male'`   | —                | no             | `hurt` if set, else `null` |
+| undefined  | —                | —              | `hurt` if set, else `null` |
 
 ### Controller methods
 
-| Method | Purpose |
-|---|---|
-| `update(now)` | per-frame: HP/SP regen, low-HP heartbeat, dodge/footstep timers, drive anims |
+| Method                   | Purpose                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `update(now)`            | per-frame: HP/SP regen, low-HP heartbeat, dodge/footstep timers, drive anims        |
 | `heal(hpDelta, spDelta)` | positive = heal, negative = damage; emits `sfx:hurtFemale`/`sfx:hurtMale` on damage |
-| `refillAmmo(fraction)` | delegated to `parts.weapons.refillActiveAmmo` |
-| `pickUpWeapon(weaponId)` | delegated to `parts.weapons.swapToWeapon` |
-| `destroy()` | teardown |
+| `refillAmmo(fraction)`   | delegated to `parts.weapons.refillActiveAmmo`                                       |
+| `pickUpWeapon(weaponId)` | delegated to `parts.weapons.swapToWeapon`                                           |
+| `destroy()`              | teardown                                                                            |
 
 ### HUD contract
 
@@ -138,10 +142,10 @@ The controller doesn't know about Phaser HUD objects directly — it operates on
 
 ```ts
 interface CharacterRuntimeParts {
-    weapons: WeaponsLike;        // swapToWeapon, refillActiveAmmo
-    statusHud?: StatusHudLike;   // showFloatingNumber
-    aimCrosshair?: AimCrosshairLike;  // mouse-aim tween
-    weaponHud?: WeaponHudLike;   // update(reload, ammo, etc.)
+    weapons: WeaponsLike; // swapToWeapon, refillActiveAmmo
+    statusHud?: StatusHudLike; // showFloatingNumber
+    aimCrosshair?: AimCrosshairLike; // mouse-aim tween
+    weaponHud?: WeaponHudLike; // update(reload, ammo, etc.)
 }
 ```
 
@@ -153,13 +157,13 @@ Async asset load + sprite registration. Returns a `CharacterRuntime` describing 
 
 ## Events emitted
 
-| Event | When |
-|---|---|
-| `sfx:dodge` | Shift-dash triggered |
-| `sfx:hurtFemale` / `sfx:hurtMale` / `sfx:hurt` | took damage (gender-routed by `resolveHurtSfx`) |
-| `sfx:footstep` | periodic, throttled by `sfx.footstepThrottleMs` |
-| `sfx:low-hp-heartbeat` | every `lowHpPulseMs` while HP ≤ `lowHpThreshold * maxHp` |
-| `aim-crosshair-update` | every frame the aim moves (cursor + crosshair sync) |
+| Event                                          | When                                                     |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| `sfx:dodge`                                    | Shift-dash triggered                                     |
+| `sfx:hurtFemale` / `sfx:hurtMale` / `sfx:hurt` | took damage (gender-routed by `resolveHurtSfx`)          |
+| `sfx:footstep`                                 | periodic, throttled by `sfx.footstepThrottleMs`          |
+| `sfx:low-hp-heartbeat`                         | every `lowHpPulseMs` while HP ≤ `lowHpThreshold * maxHp` |
+| `aim-crosshair-update`                         | every frame the aim moves (cursor + crosshair sync)      |
 
 ## Events subscribed
 

@@ -35,15 +35,39 @@ describe('nextWallId', () => {
 
     it('increments past the highest existing numeric suffix', () => {
         const walls: AirWall[] = [
-            { id: 'wall-1', kind: 'tall', points: [[0, 0], [1, 0], [1, 1]] },
-            { id: 'wall-3', kind: 'short', points: [[0, 0], [1, 0], [1, 1]] },
+            {
+                id: 'wall-1',
+                kind: 'tall',
+                points: [
+                    [0, 0],
+                    [1, 0],
+                    [1, 1],
+                ],
+            },
+            {
+                id: 'wall-3',
+                kind: 'short',
+                points: [
+                    [0, 0],
+                    [1, 0],
+                    [1, 1],
+                ],
+            },
         ];
         expect(nextWallId(walls)).toBe('wall-4');
     });
 
     it('ignores non-numeric ids when picking the suffix', () => {
         const walls: AirWall[] = [
-            { id: 'custom-7', kind: 'tall', points: [[0, 0], [1, 0], [1, 1]] },
+            {
+                id: 'custom-7',
+                kind: 'tall',
+                points: [
+                    [0, 0],
+                    [1, 0],
+                    [1, 1],
+                ],
+            },
         ];
         expect(nextWallId(walls)).toBe('wall-1');
     });

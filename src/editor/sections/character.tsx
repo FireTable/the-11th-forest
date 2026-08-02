@@ -89,13 +89,14 @@ interface CharacterSpec {
         offset?: { left?: number; bottom?: number; x?: number; y?: number };
         script?: { downsample?: number; colors?: number; pad?: number };
     };
-    anims?: Record<
-        string,
-        { frames: [number, number]; frameRate: number; repeat: number }
-    >;
+    anims?: Record<string, { frames: [number, number]; frameRate: number; repeat: number }>;
 }
 
-export function CharacterSection({ onSaveStateChange }: { onSaveStateChange?: (state: CharacterSaveState | null) => void }) {
+export function CharacterSection({
+    onSaveStateChange,
+}: {
+    onSaveStateChange?: (state: CharacterSaveState | null) => void;
+}) {
     const [chars, setChars] = useState<CharacterRow[]>([]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [spec, setSpec] = useState<CharacterSpec | null>(null);
@@ -380,14 +381,14 @@ function CharacterForm({ spec, onPatch, onPatchDeep }: FormProps) {
                         value={spec.gender ?? '_none'}
                         onValueChange={(v) =>
                             onPatch({
-                                gender:
-                                    v === '_none'
-                                        ? undefined
-                                        : (v as 'male' | 'female'),
+                                gender: v === '_none' ? undefined : (v as 'male' | 'female'),
                             })
                         }
                     >
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue placeholder="(none)" />
                         </SelectTrigger>
                         <SelectContent>
@@ -451,10 +452,7 @@ function CharacterForm({ spec, onPatch, onPatchDeep }: FormProps) {
             </Section>
 
             <Section title="Hotbar">
-                <HotbarEditor
-                    hotbar={spec.hotbar}
-                    onChange={(h) => onPatch({ hotbar: h })}
-                />
+                <HotbarEditor hotbar={spec.hotbar} onChange={(h) => onPatch({ hotbar: h })} />
             </Section>
 
             <Section title="Sprite">
@@ -470,18 +468,13 @@ function CharacterForm({ spec, onPatch, onPatchDeep }: FormProps) {
             </Section>
 
             <Section title="SFX">
-                <SfxEditor
-                    sfx={spec.sfx ?? {}}
-                    onChange={(s) => onPatch({ sfx: s })}
-                />
+                <SfxEditor sfx={spec.sfx ?? {}} onChange={(s) => onPatch({ sfx: s })} />
             </Section>
 
             <Section title="AI prompt (regen)">
                 <Textarea
                     value={spec.prompt ?? ''}
-                    onChange={(e) =>
-                        onPatch({ prompt: e.target.value || undefined })
-                    }
+                    onChange={(e) => onPatch({ prompt: e.target.value || undefined })}
                     rows={3}
                     placeholder="Optional — used by AI regen pipeline."
                     className="col-span-2 text-[11px] bg-neutral-950 border-neutral-700 min-h-20"
@@ -1081,9 +1074,7 @@ function SfxEditor({
             <Field label="hurtFemale">
                 <Input
                     value={sfx.hurtFemale ?? ''}
-                    onChange={(e) =>
-                        onChange({ ...sfx, hurtFemale: e.target.value || undefined })
-                    }
+                    onChange={(e) => onChange({ ...sfx, hurtFemale: e.target.value || undefined })}
                     className="h-7 text-xs bg-neutral-950 border-neutral-700"
                 />
             </Field>

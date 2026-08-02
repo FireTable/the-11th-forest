@@ -367,7 +367,10 @@ function DropsForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                 </Field>
                 <Field label="Kind">
                     <Select value={spec.kind} onValueChange={(v) => patch({ kind: v })}>
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -388,7 +391,10 @@ function DropsForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                             else setEffect({ type: 'weapon', weaponId: 'assault-rifle' });
                         }}
                     >
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -541,27 +547,21 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     <IdPicker
                         kind="audios-sfx"
                         value={spec.sfx?.hit ?? ''}
-                        onChange={(v) =>
-                            patch({ sfx: { ...spec.sfx, hit: v || undefined } })
-                        }
+                        onChange={(v) => patch({ sfx: { ...spec.sfx, hit: v || undefined } })}
                     />
                 </Field>
                 <Field label="death">
                     <IdPicker
                         kind="audios-sfx"
                         value={spec.sfx?.death ?? ''}
-                        onChange={(v) =>
-                            patch({ sfx: { ...spec.sfx, death: v || undefined } })
-                        }
+                        onChange={(v) => patch({ sfx: { ...spec.sfx, death: v || undefined } })}
                     />
                 </Field>
                 <Field label="aggro">
                     <IdPicker
                         kind="audios-sfx"
                         value={spec.sfx?.aggro ?? ''}
-                        onChange={(v) =>
-                            patch({ sfx: { ...spec.sfx, aggro: v || undefined } })
-                        }
+                        onChange={(v) => patch({ sfx: { ...spec.sfx, aggro: v || undefined } })}
                     />
                 </Field>
                 <NumberField
@@ -575,10 +575,7 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                 />
             </Section>
             <Section title="Drops">
-                <DropsEditor
-                    drops={spec.drops ?? []}
-                    onChange={(d) => patch({ drops: d })}
-                />
+                <DropsEditor drops={spec.drops ?? []} onChange={(d) => patch({ drops: d })} />
             </Section>
             <Section title="AI prompt (regen)">
                 <Textarea
@@ -695,7 +692,10 @@ export function WeaponsSectionEditor({
                 cooldownMs: 200,
                 range: 600,
                 bullet: { type: 'projectile', scale: 1 },
-                projectile: { speed: 600, visual: { radius: 4, width: 8, height: 8, color: 0xffff66 } },
+                projectile: {
+                    speed: 600,
+                    visual: { radius: 4, width: 8, height: 8, color: 0xffff66 },
+                },
                 clipSize: 30,
                 reloadTimeMs: 1500,
                 sfx: {},
@@ -740,7 +740,10 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                         value={isMelee ? 'melee' : 'ranged'}
                         onValueChange={(v) => setKind(v as 'ranged' | 'melee')}
                     >
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -898,7 +901,10 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                             })
                         }
                     >
-                        <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                        <SelectTrigger
+                            size="sm"
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1007,9 +1013,7 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                                 bullet: {
                                     ...(spec.bullet ?? { type: 'projectile', scale: 1 }),
                                     rotationOffset:
-                                        e.target.value === ''
-                                            ? undefined
-                                            : Number(e.target.value),
+                                        e.target.value === '' ? undefined : Number(e.target.value),
                                 },
                             })
                         }
@@ -1176,18 +1180,14 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     <IdPicker
                         kind="audios-sfx"
                         value={spec.sfx?.shoot ?? ''}
-                        onChange={(v) =>
-                            patch({ sfx: { ...spec.sfx, shoot: v || undefined } })
-                        }
+                        onChange={(v) => patch({ sfx: { ...spec.sfx, shoot: v || undefined } })}
                     />
                 </Field>
                 <Field label="dryFire">
                     <IdPicker
                         kind="audios-sfx"
                         value={spec.sfx?.dryFire ?? ''}
-                        onChange={(v) =>
-                            patch({ sfx: { ...spec.sfx, dryFire: v || undefined } })
-                        }
+                        onChange={(v) => patch({ sfx: { ...spec.sfx, dryFire: v || undefined } })}
                     />
                 </Field>
                 <Field label="bulletWall">
@@ -1284,7 +1284,11 @@ export function AudiosSection({
                 <AudioEditor slug="audios-sfx" label="SFX" onSaveStateChange={onSaveStateChange} />
             )}
             {tab === 'music' && (
-                <AudioEditor slug="audios-music" label="Music" onSaveStateChange={onSaveStateChange} />
+                <AudioEditor
+                    slug="audios-music"
+                    label="Music"
+                    onSaveStateChange={onSaveStateChange}
+                />
             )}
         </div>
     );
@@ -1385,7 +1389,10 @@ function AudioForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                                 value={spec.loop ? 'true' : 'false'}
                                 onValueChange={(v) => patch({ loop: v === 'true' })}
                             >
-                                <SelectTrigger size="sm" className="h-7 text-xs bg-neutral-950 border-neutral-700">
+                                <SelectTrigger
+                                    size="sm"
+                                    className="h-7 text-xs bg-neutral-950 border-neutral-700"
+                                >
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

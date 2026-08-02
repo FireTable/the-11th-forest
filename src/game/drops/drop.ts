@@ -29,10 +29,7 @@ export function animKey(spec: DropSpec, track: string): string {
     return `drop:anim:${spec.id}:${track}`;
 }
 
-export function loadDropAssets(
-    scene: Pick<Phaser.Scene, 'load'>,
-    specs: Iterable<DropSpec>,
-): void {
+export function loadDropAssets(scene: Pick<Phaser.Scene, 'load'>, specs: Iterable<DropSpec>): void {
     for (const spec of specs) {
         if (!spec.sprite) continue;
         const key = textureKey(spec);
@@ -85,13 +82,7 @@ export class DropInstance {
     isLanded = true;
     isAttracting = false;
 
-    constructor(
-        scene: Phaser.Scene,
-        spec: DropSpec,
-        x: number,
-        y: number,
-        isFromMonster = false,
-    ) {
+    constructor(scene: Phaser.Scene, spec: DropSpec, x: number, y: number, isFromMonster = false) {
         this.spec = spec;
 
         // If from monster, calculate wall-clamped landing position for parabolic drop
@@ -202,11 +193,7 @@ export class DropInstance {
             new Phaser.Math.Vector2(targetX, targetY),
         );
 
-        graphics.lineStyle(
-            popConfig.LINE_WIDTH,
-            popConfig.LINE_COLOR,
-            popConfig.LINE_ALPHA,
-        );
+        graphics.lineStyle(popConfig.LINE_WIDTH, popConfig.LINE_COLOR, popConfig.LINE_ALPHA);
         curve.draw(graphics);
 
         // Tween drop sprite along the curve
@@ -284,9 +271,7 @@ export class DropController {
         // Self-spawn static drops at scene init.
         if (spawns) {
             for (const s of spawns) {
-                this.staticDrops.push(
-                    new DropInstance(scene, getDrop(s.type), s.x, s.y, false),
-                );
+                this.staticDrops.push(new DropInstance(scene, getDrop(s.type), s.x, s.y, false));
             }
         }
 
@@ -362,12 +347,7 @@ export class DropController {
                 const a = pair.bodyA;
                 const b = pair.bodyB;
                 if (!a || !b) continue;
-                const dropBody =
-                    a.label === 'drop'
-                        ? a
-                        : b.label === 'drop'
-                          ? b
-                          : null;
+                const dropBody = a.label === 'drop' ? a : b.label === 'drop' ? b : null;
                 if (!dropBody) continue;
                 const playerBody = dropBody === a ? b : a;
                 if (playerBody !== this.character.body) continue;

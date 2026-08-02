@@ -29,9 +29,7 @@ export function wallCategory(kind: AirWallKind): number {
  */
 export function wallMask(kind: AirWallKind): number {
     const melee = CAT.CHARACTER | CAT.MONSTER_MELEE;
-    return kind === 'tall'
-        ? melee | CAT.BULLET | CAT.MONSTER_PROJECTILE
-        : melee;
+    return kind === 'tall' ? melee | CAT.BULLET | CAT.MONSTER_PROJECTILE : melee;
 }
 
 /**

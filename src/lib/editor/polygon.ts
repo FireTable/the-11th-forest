@@ -73,12 +73,8 @@ export function isMeaningfulPolygon(
 }
 
 /** Normalize either tuple or object vertex storage to a uniform Point[]. */
-function asPointList(
-    points: readonly Point[] | readonly AirWallVertex[],
-): Point[] {
-    return points.map((p): Point =>
-        Array.isArray(p) ? { x: p[0], y: p[1] } : p,
-    );
+function asPointList(points: readonly Point[] | readonly AirWallVertex[]): Point[] {
+    return points.map((p): Point => (Array.isArray(p) ? { x: p[0], y: p[1] } : p));
 }
 
 /**

@@ -17,13 +17,14 @@ No `src/game/events/`. No yaml.
 ```ts
 import { EventBus } from '@/lib/events';
 
-EventBus.emit('sfx:pickup-hp');                     // no payload
-EventBus.emit('level-loaded', { id, level });       // with payload
+EventBus.emit('sfx:pickup-hp'); // no payload
+EventBus.emit('level-loaded', { id, level }); // with payload
 
-const off = EventBus.on('sfx:pickup-hp', () => {    // subscribe
+const off = EventBus.on('sfx:pickup-hp', () => {
+    // subscribe
     // ...
 });
-off();                                              // unsubscribe
+off(); // unsubscribe
 ```
 
 ```ts
@@ -33,21 +34,21 @@ type Listener<T = unknown> = (payload: T) => void;
 The bus is generic — payload types are inferred at the call site via `Listener<MyPayload>` (no runtime check). For type safety, wrap with a typed emitter helper at the module boundary:
 
 ```ts
-const SFX_EVENT = (id: string): string => `sfx:${id}`;   // src/lib/constants.ts
+const SFX_EVENT = (id: string): string => `sfx:${id}`; // src/lib/constants.ts
 EventBus.emit(SFX_EVENT('pickup-hp'));
 ```
 
 ## Event naming convention
 
-| Prefix | Producer | Consumer |
-|---|---|---|
-| `sfx:<id>` | gameplay (weapons / monsters / characters / drops) | `AudioController` |
-| `music:<id>` | scenes | `AudioController` |
-| `music-stop` / `music-pause` / `music-resume` | scenes (scene lifecycle) | `AudioController` |
-| `level-loaded` | scene | debug panel + others |
-| `current-scene-ready` | scene | scene consumers (awaiting the scene ref) |
-| `editor-open` | debug panel | scene |
-| `aim-crosshair-update` | `CharacterController` | React crosshair component |
+| Prefix                                        | Producer                                           | Consumer                                 |
+| --------------------------------------------- | -------------------------------------------------- | ---------------------------------------- |
+| `sfx:<id>`                                    | gameplay (weapons / monsters / characters / drops) | `AudioController`                        |
+| `music:<id>`                                  | scenes                                             | `AudioController`                        |
+| `music-stop` / `music-pause` / `music-resume` | scenes (scene lifecycle)                           | `AudioController`                        |
+| `level-loaded`                                | scene                                              | debug panel + others                     |
+| `current-scene-ready`                         | scene                                              | scene consumers (awaiting the scene ref) |
+| `editor-open`                                 | debug panel                                        | scene                                    |
+| `aim-crosshair-update`                        | `CharacterController`                              | React crosshair component                |
 
 All event names are stable contracts — renaming a published event is a breaking change to every consumer.
 

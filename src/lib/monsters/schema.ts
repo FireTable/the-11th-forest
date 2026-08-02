@@ -88,7 +88,10 @@ export const MonsterSpecSchema = z
     .object({
         id: z.string().min(1).optional(),
         name: z.string().min(1),
-        imageSize: z.string().regex(/^\d+x\d+$/).optional(),
+        imageSize: z
+            .string()
+            .regex(/^\d+x\d+$/)
+            .optional(),
         prompt: z.string().optional(),
         hp: z.number().gte(0),
         moveSpeed: z.number().gt(0),

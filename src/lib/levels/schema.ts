@@ -39,23 +39,21 @@ const AirWallRectSchema = z
     })
     .strict();
 
-export const AirWallSchema = z
-    .union([AirWallPolygonSchema, AirWallRectSchema])
-    .transform((v) => {
-        if ('points' in v) {
-            return {
-                id: v.id,
-                kind: v.kind,
-                points: v.points.map((p) => [Math.round(p[0]), Math.round(p[1])] as [number, number]),
-            };
-        }
-        const rect = rectToPoints(v.x, v.y, v.width, v.height);
+export const AirWallSchema = z.union([AirWallPolygonSchema, AirWallRectSchema]).transform((v) => {
+    if ('points' in v) {
         return {
             id: v.id,
             kind: v.kind,
-            points: rect.map((p) => [p.x, p.y] as [number, number]),
+            points: v.points.map((p) => [Math.round(p[0]), Math.round(p[1])] as [number, number]),
         };
-    });
+    }
+    const rect = rectToPoints(v.x, v.y, v.width, v.height);
+    return {
+        id: v.id,
+        kind: v.kind,
+        points: rect.map((p) => [p.x, p.y] as [number, number]),
+    };
+});
 
 // ─── Spawn entries (flat x, y only) ──────────────────────────────────────
 

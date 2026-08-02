@@ -24,7 +24,6 @@ export const SceneHubOverlay: React.FC = () => {
                 <div className="absolute -bottom-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400" />
                 <div className="absolute -bottom-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400" />
 
-
                 <div className="flex flex-col items-center gap-0.5">
                     <span className="text-xs font-bold tracking-wider text-amber-500 uppercase drop-shadow-[1px_1px_0px_#000] leading-tight">
                         {levelTitle}

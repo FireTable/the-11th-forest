@@ -89,9 +89,7 @@ export async function resolveScene(
         [...allWeaponIds].map(async (wid) => [wid, await fetchWeapon(wid)] as const),
     );
     const weaponsById = new Map<string, WeaponSpec>(allWeaponEntries);
-    const weapons = character.hotbar
-        .map((wid) => weaponsById.get(wid)!)
-        .filter(Boolean);
+    const weapons = character.hotbar.map((wid) => weaponsById.get(wid)!).filter(Boolean);
 
     const audioIndex = await fetchAudioIndex();
     const sfxEntries = await Promise.all(
@@ -156,15 +154,12 @@ export async function getSpriteCellDims(
     const url = character.sprite.texture.startsWith('/')
         ? character.sprite.texture
         : `/${character.sprite.texture}`;
-    const natural = await new Promise<{ width: number; height: number }>(
-        (resolve, reject) => {
-            const img = new Image();
-            img.onload = () =>
-                resolve({ width: img.naturalWidth, height: img.naturalHeight });
-            img.onerror = () => reject(new Error(`Failed to load ${url}`));
-            img.src = url;
-        },
-    );
+    const natural = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error(`Failed to load ${url}`));
+        img.src = url;
+    });
     return {
         width: Math.floor(natural.width / character.sprite.grid.cols),
         height: Math.floor(natural.height / character.sprite.grid.rows),

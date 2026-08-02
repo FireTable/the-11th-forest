@@ -54,7 +54,13 @@ interface StageBox {
     height: number;
 }
 
-export function WallCanvas({ level, drawing, active = true, onLevelChange, onAirWallDrawn }: Props) {
+export function WallCanvas({
+    level,
+    drawing,
+    active = true,
+    onLevelChange,
+    onAirWallDrawn,
+}: Props) {
     const wrapperRef = useRef<HTMLDivElement>(null);
     const [box, setBox] = useState<StageBox>({ x: 0, y: 0, width: 0, height: 0 });
     const [draftPoints, setDraftPoints] = useState<AirWallVertex[]>([]);
@@ -97,10 +103,7 @@ export function WallCanvas({ level, drawing, active = true, onLevelChange, onAir
     // image → display scale (same math as Phaser Scale.FIT).
     const scale = useMemo(() => {
         if (box.width === 0 || box.height === 0) return 1;
-        return Math.min(
-            box.width / level.imageSize.width,
-            box.height / level.imageSize.height,
-        );
+        return Math.min(box.width / level.imageSize.width, box.height / level.imageSize.height);
     }, [box, level.imageSize]);
 
     function handleStagePointer(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
@@ -128,11 +131,11 @@ export function WallCanvas({ level, drawing, active = true, onLevelChange, onAir
                 return;
             }
         }
-        
+
         // Prevent duplicate consecutive points
         const last = currentDraft[currentDraft.length - 1];
         if (last && last[0] === imgX && last[1] === imgY) return;
-        
+
         setDraftPoints([...currentDraft, [imgX, imgY]]);
     }
 
@@ -149,10 +152,7 @@ export function WallCanvas({ level, drawing, active = true, onLevelChange, onAir
     const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
 
     return (
-        <div
-            ref={wrapperRef}
-            className="absolute inset-0 pointer-events-none"
-        >
+        <div ref={wrapperRef} className="absolute inset-0 pointer-events-none">
             {box.width > 0 && box.height > 0 && (
                 <div
                     className={`absolute ${active ? 'pointer-events-auto' : 'pointer-events-none'}`}
@@ -175,85 +175,89 @@ export function WallCanvas({ level, drawing, active = true, onLevelChange, onAir
                             handleStagePointer(e);
                         }}
                     >
-                    <Layer listening={active}>
-                        {level.airWalls.map((w) => {
-                            const isSelected = selectedWallId === w.id;
-                            const canDrag = active && !drawing;
-                            return (
-                                <Group
-                                    key={w.id}
-                                    draggable={canDrag}
-                                    onClick={(e) => {
-                                        e.cancelBubble = true;
-                                        setSelectedWallId(w.id);
-                                    }}
-                                    onTap={(e) => {
-                                        e.cancelBubble = true;
-                                        setSelectedWallId(w.id);
-                                    }}
-                                    onDragEnd={(e) => {
-                                        const node = e.target;
-                                        // Only handle dragEnd if the event target is this Group
-                                        if (node.nodeType === 'Group') {
-                                            const dx = Math.round(node.x() / scale);
-                                            const dy = Math.round(node.y() / scale);
-                                            node.x(0);
-                                            node.y(0);
-                                            if (dx !== 0 || dy !== 0) {
-                                                onLevelChange(moveWallPolygon(level, w.id, dx, dy));
-                                            }
-                                        }
-                                    }}
-                                >
-                                    <WallShape
-                                        wall={w}
-                                        scale={scale}
-                                        isSelected={isSelected}
-                                    />
-                                    {active && (
-                                        <VertexHandles
-                                            wall={w}
-                                            scale={scale}
-                                            onMove={(i, x, y) =>
-                                                onLevelChange(movePoint(level, w.id, i, x, y))
-                                            }
-                                            onRemove={(i) => onLevelChange(removePoint(level, w.id, i))}
-                                        />
-                                    )}
-                                </Group>
-                            );
-                        })}
-                    </Layer>
-                    {drawing && (
-                        <Layer listening={false}>
-                            {draftPoints.length >= 2 && (
-                                <Line
-                                    points={draftPoints.flatMap(([x, y]) => [x * scale, y * scale])}
-                                    stroke={COLORS.draftLine}
-                                    strokeWidth={2}
-                                    lineJoin="round"
-                                    dash={[6, 4]}
-                                />
-                            )}
-                            {draftPoints.map(([x, y], i) => {
-                                // Origin point (vertex 0) is half-size so
-                                // the user can tell where to click to close.
-                                const radius = i === 0 ? DRAFT_POINT_RADIUS / 2 : DRAFT_POINT_RADIUS;
-                                const opacity = i === 0 ? 0.7 : 1;
+                        <Layer listening={active}>
+                            {level.airWalls.map((w) => {
+                                const isSelected = selectedWallId === w.id;
+                                const canDrag = active && !drawing;
                                 return (
-                                    <Circle
-                                        key={i}
-                                        x={x * scale}
-                                        y={y * scale}
-                                        radius={radius}
-                                        fill={COLORS.draftLine}
-                                        opacity={opacity}
-                                    />
+                                    <Group
+                                        key={w.id}
+                                        draggable={canDrag}
+                                        onClick={(e) => {
+                                            e.cancelBubble = true;
+                                            setSelectedWallId(w.id);
+                                        }}
+                                        onTap={(e) => {
+                                            e.cancelBubble = true;
+                                            setSelectedWallId(w.id);
+                                        }}
+                                        onDragEnd={(e) => {
+                                            const node = e.target;
+                                            // Only handle dragEnd if the event target is this Group
+                                            if (node.nodeType === 'Group') {
+                                                const dx = Math.round(node.x() / scale);
+                                                const dy = Math.round(node.y() / scale);
+                                                node.x(0);
+                                                node.y(0);
+                                                if (dx !== 0 || dy !== 0) {
+                                                    onLevelChange(
+                                                        moveWallPolygon(level, w.id, dx, dy),
+                                                    );
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <WallShape wall={w} scale={scale} isSelected={isSelected} />
+                                        {active && (
+                                            <VertexHandles
+                                                wall={w}
+                                                scale={scale}
+                                                onMove={(i, x, y) =>
+                                                    onLevelChange(movePoint(level, w.id, i, x, y))
+                                                }
+                                                onRemove={(i) =>
+                                                    onLevelChange(removePoint(level, w.id, i))
+                                                }
+                                            />
+                                        )}
+                                    </Group>
                                 );
                             })}
                         </Layer>
-                    )}
-                </Stage>
+                        {drawing && (
+                            <Layer listening={false}>
+                                {draftPoints.length >= 2 && (
+                                    <Line
+                                        points={draftPoints.flatMap(([x, y]) => [
+                                            x * scale,
+                                            y * scale,
+                                        ])}
+                                        stroke={COLORS.draftLine}
+                                        strokeWidth={2}
+                                        lineJoin="round"
+                                        dash={[6, 4]}
+                                    />
+                                )}
+                                {draftPoints.map(([x, y], i) => {
+                                    // Origin point (vertex 0) is half-size so
+                                    // the user can tell where to click to close.
+                                    const radius =
+                                        i === 0 ? DRAFT_POINT_RADIUS / 2 : DRAFT_POINT_RADIUS;
+                                    const opacity = i === 0 ? 0.7 : 1;
+                                    return (
+                                        <Circle
+                                            key={i}
+                                            x={x * scale}
+                                            y={y * scale}
+                                            radius={radius}
+                                            fill={COLORS.draftLine}
+                                            opacity={opacity}
+                                        />
+                                    );
+                                })}
+                            </Layer>
+                        )}
+                    </Stage>
                 </div>
             )}
         </div>

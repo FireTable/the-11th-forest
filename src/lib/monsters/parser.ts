@@ -30,9 +30,7 @@ function pathOf(issue: { path: ReadonlyArray<PropertyKey> }): string {
 }
 
 function rethrow(zerr: ZodError, id: string): never {
-    const summary = zerr.issues
-        .map((i) => `${pathOf(i)}: ${i.message}`)
-        .join('; ');
+    const summary = zerr.issues.map((i) => `${pathOf(i)}: ${i.message}`).join('; ');
     throw new Error(`Monster ${id}: ${summary}`);
 }
 
@@ -54,9 +52,7 @@ export function parseMonsterIndex(text: string): MonsterIndex {
     }
     const result = MonsterIndexSchema.safeParse(raw);
     if (!result.success) {
-        const summary = result.error.issues
-            .map((i) => `${pathOf(i)}: ${i.message}`)
-            .join('; ');
+        const summary = result.error.issues.map((i) => `${pathOf(i)}: ${i.message}`).join('; ');
         throw new Error(`Monster index: ${summary}`);
     }
     return result.data;

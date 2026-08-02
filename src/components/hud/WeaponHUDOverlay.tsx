@@ -20,14 +20,8 @@ const SLOT_GAP_PX = 6;
 const SLOT_BOTTOM_PX = 124;
 
 export const WeaponHUDOverlay: React.FC = () => {
-    const {
-        activeWeaponIndex,
-        activeWeaponName,
-        isReloading,
-        reloadProgress,
-        slots,
-        hubsVisible,
-    } = useGameStore();
+    const { activeWeaponIndex, activeWeaponName, isReloading, reloadProgress, slots, hubsVisible } =
+        useGameStore();
     const mobile = useIsMobile();
 
     if (!hubsVisible || !activeWeaponName || slots.length === 0) return null;

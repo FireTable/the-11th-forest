@@ -36,14 +36,15 @@ public/assets/audio/
 
 ```yaml
 kind: sfx
-id: pickup-hp               # optional; loader overwrites with filename
+id: pickup-hp # optional; loader overwrites with filename
 name: Pickup HP
 source: assets/audio/sfx/pickup-hp.wav
-volume: 0.8                 # 0..1, default 1
-rate: 1                     # playback rate, default 1
-loop: false                 # default false
-prompt: Soft magical healing chime pickup, anime RPG  # AI regen prompt
-                            # (used by scripts/elevenlabs-sfx.ts when present)
+volume: 0.8 # 0..1, default 1
+rate: 1 # playback rate, default 1
+loop: false # default false
+prompt:
+    Soft magical healing chime pickup, anime RPG # AI regen prompt
+    # (used by scripts/elevenlabs-sfx.ts when present)
 ```
 
 ### `public/data/audios/music/<id>.yaml`
@@ -54,25 +55,26 @@ id: forest-ambient
 name: Forest Ambient
 source: assets/audio/music/forest-ambient.mp3
 volume: 0.4
-fadeIn: 1500               # ms, default 0
-fadeOut: 1000              # ms, default 0
-prompt: "Calm iyashikei anime forest ambience, lo-fi peaceful soundtrack for magical forest exploration.
-         Designed for seamless looping: the final chord resolves and decays back into the same motif as the opening.
-         …"
+fadeIn: 1500 # ms, default 0
+fadeOut: 1000 # ms, default 0
+prompt:
+    'Calm iyashikei anime forest ambience, lo-fi peaceful soundtrack for magical forest exploration.
+    Designed for seamless looping: the final chord resolves and decays back into the same motif as the opening.
+    …'
 ```
 
 ### `public/data/audios/index.yaml`
 
 ```yaml
 sfx:
-  - assault-rifle-shoot
-  - shotgun-shoot
-  - player-hurt-female
-  - player-hurt-male
-  # … one entry per shipped sfx
+    - assault-rifle-shoot
+    - shotgun-shoot
+    - player-hurt-female
+    - player-hurt-male
+    # … one entry per shipped sfx
 music:
-  - forest-ambient
-  - boss-arena
+    - forest-ambient
+    - boss-arena
 ```
 
 The loader iterates the `sfx:` and `music:` lists in order. **Only ids in this file get preloaded** — orphan yamls are silently ignored at load time.
@@ -81,9 +83,15 @@ The loader iterates the `sfx:` and `music:` lists in order. **Only ids in this f
 
 ```ts
 import {
-    parseAudioYaml, parseAudioIndex,
-    fetchAudioIndex, fetchAudioSfx, fetchAudioMusic,
-    type AudioIndex, type SfxSpec, type MusicSpec, type SoundSpec,
+    parseAudioYaml,
+    parseAudioIndex,
+    fetchAudioIndex,
+    fetchAudioSfx,
+    fetchAudioMusic,
+    type AudioIndex,
+    type SfxSpec,
+    type MusicSpec,
+    type SoundSpec,
 } from '@/lib/audios';
 ```
 
@@ -105,31 +113,31 @@ Bulk-loads every `source:` via Phaser's loader. Call this from `preload()` (scen
 
 ### Methods
 
-| Method | Purpose |
-|---|---|
-| `playSfx(id)` | play one-shot, respects `volume`, `rate`, `loop` |
-| `playMusic(id)` | cross-fade to new track (`fadeIn`/`fadeOut` honoured) |
-| `stopMusic()` | stop currently-playing music (with `fadeOut`) |
-| `pauseMusic()` / `resumeMusic()` | pause / resume |
-| `setSfxVolume(v)` / `setMusicVolume(v)` | per-bus volume (master) |
-| `destroy()` | teardown |
+| Method                                  | Purpose                                               |
+| --------------------------------------- | ----------------------------------------------------- |
+| `playSfx(id)`                           | play one-shot, respects `volume`, `rate`, `loop`      |
+| `playMusic(id)`                         | cross-fade to new track (`fadeIn`/`fadeOut` honoured) |
+| `stopMusic()`                           | stop currently-playing music (with `fadeOut`)         |
+| `pauseMusic()` / `resumeMusic()`        | pause / resume                                        |
+| `setSfxVolume(v)` / `setMusicVolume(v)` | per-bus volume (master)                               |
+| `destroy()`                             | teardown                                              |
 
 ## Events subscribed
 
-| Event | When |
-|---|---|
-| `sfx:<id>` | play that sfx (e.g. `sfx:pickup-hp`) |
-| `music:<id>` | switch to that music track |
-| `music-stop` | stop current track |
-| `music-pause` | pause |
-| `music-resume` | resume |
+| Event          | When                                 |
+| -------------- | ------------------------------------ |
+| `sfx:<id>`     | play that sfx (e.g. `sfx:pickup-hp`) |
+| `music:<id>`   | switch to that music track           |
+| `music-stop`   | stop current track                   |
+| `music-pause`  | pause                                |
+| `music-resume` | resume                               |
 
 Event-name helpers (from `src/lib/constants.ts`):
 
 ```ts
-SFX_EVENT(id)        // → 'sfx:<id>'
-MUSIC_EVENT(id)      // → 'music:<id>'
-MUSIC_STOP / MUSIC_PAUSE / MUSIC_RESUME
+SFX_EVENT(id); // → 'sfx:<id>'
+MUSIC_EVENT(id); // → 'music:<id>'
+MUSIC_STOP / MUSIC_PAUSE / MUSIC_RESUME;
 ```
 
 Use these instead of string-concatenating in callers — keeps the prefix in one place.

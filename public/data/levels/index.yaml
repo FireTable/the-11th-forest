@@ -8,4 +8,4 @@
 # To add a new level: append its id below AND create data/levels/<id>.yaml.
 
 levels:
-  - sacred-forest-sanctuary
+    - sacred-forest-sanctuary
