@@ -5,7 +5,36 @@
  * effects — monster.ts wires these into its per-frame tick.
  */
 
+// easystarjs is a CommonJS module; vitest's ESM loader doesn't always
+// expose named exports for CJS packages, so default-import and pull
+// off the .js class. Vite handles the same shape via its own CJS
+// interop at build time.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import EasyStarPkg from 'easystarjs';
+const EasyStarCtor = (EasyStarPkg as unknown as { js: new () => EasyStarInstance }).js;
+
 export type MonsterAIState = 'chase' | 'attack';
+
+/** Subset of easystar.js API we use. Kept local to avoid leaking the
+ *  CommonJS interop type into module consumers. */
+interface EasyStarInstance {
+    enableSync(): void;
+    enableDiagonals(): void;
+    disableCornerCutting(): void;
+    setGrid(grid: number[][]): void;
+    setAcceptableTiles(tiles: number[] | number): void;
+    setTileCost(tileType: number, cost: number): void;
+    findPath(
+        sx: number,
+        sy: number,
+        ex: number,
+        ey: number,
+        cb: (path: { x: number; y: number }[]) => void,
+    ): number;
+    /** Drive the queued path calculation forward. Required even in
+     *  sync mode — findPath alone queues but never iterates. */
+    calculate(): void;
+}
 
 /** Euclidean distance between two points. */
 export function distBetween(a: { x: number; y: number }, b: { x: number; y: number }): number {
@@ -56,20 +85,22 @@ export interface PathGridPoint {
     y: number;
 }
 
-interface AStarNode {
-    x: number;
-    y: number;
-    g: number;
-    h: number;
-    f: number;
-    parent: AStarNode | null;
-}
-
 export class PathfindingService {
     private readonly gridWidth: number;
     private readonly gridHeight: number;
     private readonly cellSize: number;
-    private readonly grid: number[][]; // 0: walkable, 1: blocked
+    /** Wall-only grid (1 = wall, 0 = walkable). The 1-cell safety buffer
+     *  used to live here as value 2; it has been removed in favour of
+     *  per-monster inflation in findPath() — a buffer zone that's
+     *  merely "expensive" is still passable, which is exactly why
+     *  monster bodies clipped walls. Inflation makes the buffer
+     *  outright blocked for monsters whose body half-extent doesn't
+     *  fit. */
+    private readonly grid: number[][];
+    /** Cached inflated easystar instances, keyed by inflation cell count.
+     *  Same inflation → same derived grid → reuse. Each entry already
+     *  has its grid + acceptableTiles + tileCost configured. */
+    private readonly inflatedEasystars: Map<number, EasyStarInstance> = new Map();
 
     constructor(
         levelSize: { width: number; height: number },
@@ -83,8 +114,65 @@ export class PathfindingService {
         // Initialize empty walkable grid
         this.grid = Array.from({ length: this.gridHeight }, () => Array(this.gridWidth).fill(0));
 
-        // Rasterize air-wall polygons onto grid with boundary padding
+        // Rasterize air-wall polygons onto grid. Only walls (1) are
+        // marked — body-aware inflation is applied per-monster at
+        // findPath() time.
         this.rasterizeAirWalls(airWalls);
+    }
+
+    /**
+     * Build (or fetch from cache) an easystar instance whose grid has
+     * every wall cell expanded outward by `inflation` cells in all 8
+     * directions. A cell inside that expanded zone is treated as a
+     * wall — so the resulting path can only traverse cells where the
+     * monster's body rectangle actually fits.
+     *
+     * `inflation` is in cells; the caller converts from world units.
+     * Cached so we don't re-derive the grid every frame.
+     */
+    private getEasystarForInflation(inflation: number): EasyStarInstance {
+        const cached = this.inflatedEasystars.get(inflation);
+        if (cached) return cached;
+        const derived = this.inflateGrid(inflation);
+        const es = new EasyStarCtor();
+        es.enableSync();
+        es.enableDiagonals();
+        es.disableCornerCutting();
+        es.setGrid(derived);
+        es.setAcceptableTiles([0]);
+        this.inflatedEasystars.set(inflation, es);
+        return es;
+    }
+
+    /** Return a fresh grid where each wall cell's `radius`-Chebyshev
+     *  neighbourhood is also marked as wall. Caller passes the result
+     *  to a new easystar instance (or caches it). */
+    private inflateGrid(radius: number): number[][] {
+        const out: number[][] = Array.from({ length: this.gridHeight }, (_, gy) =>
+            Array.from({ length: this.gridWidth }, (_, gx) => {
+                if (this.grid[gy][gx] === 1) return 1;
+                // Stay 0 unless a wall is within `radius` Chebyshev
+                // distance — cheap O(n·r²) loop, fine for the small
+                // grids we have.
+                for (let dy = -radius; dy <= radius; dy++) {
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const ny = gy + dy;
+                        const nx = gx + dx;
+                        if (
+                            ny < 0 ||
+                            ny >= this.gridHeight ||
+                            nx < 0 ||
+                            nx >= this.gridWidth
+                        )
+                            continue;
+                        if (this.grid[ny][nx] === 1) return 1;
+                    }
+                }
+                return 0;
+            }),
+        );
+        return out;
     }
 
     /** Convert world coordinates (pixels) to grid coordinates. */
@@ -306,128 +394,225 @@ export class PathfindingService {
         return idx;
     }
 
-    /** Synchronous pure A* pathfinding with string-pulling smoothing. Returns world positions or null. */
+    /**
+     * A* pathfinding with body-aware inflation. Returns world positions or null.
+     *
+     * @param start       World position. Use the monster foot (body centre +
+     *                    halfH) so waypoints clear walls.
+     * @param end         World position.
+     * @param bodyHalfW   Monster body half-width in world units.
+     * @param bodyHalfH   Monster body half-height in world units.
+     * @param safety      Multiplier on body extents (1.3 = 30% padding).
+     */
     findPath(
         start: { x: number; y: number },
         end: { x: number; y: number },
+        bodyHalfW = 0,
+        bodyHalfH = 0,
+        safety = 1.0,
     ): { x: number; y: number }[] | null {
-        const startG = this.worldToGrid(start);
-        const endG = this.worldToGrid(end);
+        // Try a series of inflation radii, starting at the body's safe
+        // value and shrinking if the inflated grid can't reach the
+        // target (e.g. a corridor narrower than 2 * inflation). Each
+        // shrink brings us closer to the wall — but never below 0
+        // (no inflation, just walls). Falls back to a straight line
+        // if even inflation=0 can't connect.
+        const idealInflation = Math.max(
+            0,
+            Math.ceil((Math.max(bodyHalfW, bodyHalfH) * 2 * safety) / this.cellSize),
+        );
+        for (let inflation = idealInflation; inflation >= 0; inflation--) {
+            const result = this.findPathWithInflation(
+                start,
+                end,
+                bodyHalfW,
+                bodyHalfH,
+                inflation,
+            );
+            if (result !== null) return result;
+        }
+        // Last resort: straight line to target. The collisionstart
+        // escape will keep the monster from wedging itself when it
+        // hits a wall on the way.
+        return [start, end];
+    }
+
+    /** Inner findPath with a fixed inflation. Returns null when A*
+     *  can't reach — caller decides whether to retry with smaller
+     *  inflation. */
+    private findPathWithInflation(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+        bodyHalfW: number,
+        bodyHalfH: number,
+        inflation: number,
+    ): { x: number; y: number }[] | null {
+        // Snap start/end onto the inflated grid so a monster spawned
+        // flush against a wall still gets a valid path.
+        const startG = this.snapToWalkable(this.worldToGrid(start), inflation);
+        const endG = this.snapToWalkable(this.worldToGrid(end), inflation);
 
         if (startG.x === endG.x && startG.y === endG.y) {
             return [end];
         }
 
-        // Fast path: direct line of sight bypasses grid search completely
-        if (this.hasLineOfSight(start, end)) {
+        // Fast path: LoS uses the inflated grid so we don't return a
+        // straight line that grazes a wall the body can't fit through.
+        if (this.hasLineOfSightGrid(startG, endG, inflation)) {
             return [start, end];
         }
 
-        const openList: AStarNode[] = [];
-        const closedSet = new Set<string>();
+        const es = this.getEasystarForInflation(inflation);
+        let result: { x: number; y: number }[] | null = null;
+        let found = false;
+        es.findPath(
+            startG.x,
+            startG.y,
+            endG.x,
+            endG.y,
+            (path: { x: number; y: number }[]) => {
+                if (!path || path.length === 0) return;
+                const worldPoints = path.map((p) => this.gridToWorld(p));
+                const smoothed = this.smoothPath(worldPoints);
+                // Shift every interior waypoint BACKWARDS along the
+                // chase direction by body half-extent. A* grid centres describe
+                // "where the path point is"; for a body of half-extent
+                // H, the FEET sit H below the body centre. We start
+                // the path at the foot (mp + halfH) and want every
+                // waypoint to live in the same foot coord convention
+                // — so shift every interior waypoint FORWARD by H
+                // along the bisector of its incoming and outgoing
+                // segments. The body centre then sits halfH BEHIND
+                // the waypoint, with the body extending forward by
+                // halfH into the next cell. Walls stay clear because
+                // the inflated grid already excludes them.
+                const shift = Math.max(bodyHalfW, bodyHalfH);
+                result = this.shiftWaypointsBack(smoothed, shift);
+                found = true;
+            },
+        );
+        es.calculate();
+        return found ? result : null;
+    }
 
-        const getKey = (x: number, y: number) => `${x},${y}`;
-        const heuristic = (x1: number, y1: number, x2: number, y2: number) =>
-            Math.hypot(x2 - x1, y2 - y1);
-
-        const startNode: AStarNode = {
-            x: startG.x,
-            y: startG.y,
-            g: 0,
-            h: heuristic(startG.x, startG.y, endG.x, endG.y),
-            f: 0,
-            parent: null,
-        };
-        startNode.f = startNode.g + startNode.h;
-        openList.push(startNode);
-
-        // Directions: 8-way movement (orthogonals + diagonals)
-        const neighbors = [
-            { x: 0, y: -1, cost: 1 },
-            { x: 1, y: 0, cost: 1 },
-            { x: 0, y: 1, cost: 1 },
-            { x: -1, y: 0, cost: 1 },
-            { x: 1, y: -1, cost: 1.414 },
-            { x: 1, y: 1, cost: 1.414 },
-            { x: -1, y: 1, cost: 1.414 },
-            { x: -1, y: -1, cost: 1.414 },
-        ];
-
-        let maxSteps = 1500;
-
-        while (openList.length > 0 && maxSteps-- > 0) {
-            // Pick lowest f node
-            let currentIdx = 0;
-            for (let i = 1; i < openList.length; i++) {
-                if (openList[i].f < openList[currentIdx].f) {
-                    currentIdx = i;
-                }
+    /** Shift each interior waypoint backwards along the chase
+     *  direction by `shift` world units. First and last waypoints
+     *  stay put (those are the start / goal positions the monster
+     *  has to reach exactly). */
+    private shiftWaypointsBack(
+        path: { x: number; y: number }[],
+        shift: number,
+    ): { x: number; y: number }[] {
+        if (path.length <= 2 || shift <= 0) return path;
+        const out: { x: number; y: number }[] = [path[0]];
+        for (let i = 1; i < path.length - 1; i++) {
+            const prev = path[i - 1];
+            const curr = path[i];
+            const next = path[i + 1];
+            // Direction: average of "back" (curr → prev) and "forward"
+            // (curr → next) so a sharp bend doesn't pick the wrong
+            // way. When one direction is zero-length, fall back to
+            // the other.
+            let dxB = prev.x - curr.x;
+            let dyB = prev.y - curr.y;
+            let lenB = Math.hypot(dxB, dyB);
+            let dxF = next.x - curr.x;
+            let dyF = next.y - curr.y;
+            let lenF = Math.hypot(dxF, dyF);
+            if (lenB === 0 && lenF === 0) {
+                out.push(curr);
+                continue;
             }
-
-            const current = openList[currentIdx];
-
-            if (current.x === endG.x && current.y === endG.y) {
-                // Reconstruct path
-                const rawPath: PathGridPoint[] = [];
-                let curr: AStarNode | null = current;
-                while (curr) {
-                    rawPath.unshift({ x: curr.x, y: curr.y });
-                    curr = curr.parent;
-                }
-                const worldPoints = rawPath.map((p) => this.gridToWorld(p));
-                return this.smoothPath(worldPoints);
+            // Sum the two unit vectors, normalised. If both contribute,
+            // the result is the bisector; if only one, that's the
+            // direction.
+            const ux = (lenB > 0 ? dxB / lenB : 0) + (lenF > 0 ? dxF / lenF : 0);
+            const uy = (lenB > 0 ? dyB / lenB : 0) + (lenF > 0 ? dyF / lenF : 0);
+            const ulen = Math.hypot(ux, uy);
+            if (ulen === 0) {
+                out.push(curr);
+                continue;
             }
+            // Shift FORWARD by `shift` (foot coord convention —
+            // start point is at the monster's foot, waypoints should
+            // be too).
+            out.push({
+                x: curr.x + (ux / ulen) * shift,
+                y: curr.y + (uy / ulen) * shift,
+            });
+        }
+        out.push(path[path.length - 1]);
+        return out;
+    }
 
-            openList.splice(currentIdx, 1);
-            closedSet.add(getKey(current.x, current.y));
-
-            for (const n of neighbors) {
-                const nx = current.x + n.x;
-                const ny = current.y + n.y;
-
-                if (
-                    nx < 0 ||
-                    nx >= this.gridWidth ||
-                    ny < 0 ||
-                    ny >= this.gridHeight ||
-                    this.grid[ny][nx] === 1
-                ) {
-                    continue;
-                }
-
-                // Prevent diagonal corner cutting into walls
-                if (n.x !== 0 && n.y !== 0) {
-                    if (this.grid[current.y][nx] === 1 || this.grid[ny][current.x] === 1) {
-                        continue;
-                    }
-                }
-
-                if (closedSet.has(getKey(nx, ny))) continue;
-
-                const stepCost = this.grid[ny][nx] === 2 ? n.cost * 2.5 : n.cost;
-                const gScore = current.g + stepCost;
-                let neighborNode = openList.find((node) => node.x === nx && node.y === ny);
-
-                if (!neighborNode) {
-                    neighborNode = {
-                        x: nx,
-                        y: ny,
-                        g: gScore,
-                        h: heuristic(nx, ny, endG.x, endG.y),
-                        f: 0,
-                        parent: current,
-                    };
-                    neighborNode.f = neighborNode.g + neighborNode.h;
-                    openList.push(neighborNode);
-                } else if (gScore < neighborNode.g) {
-                    neighborNode.g = gScore;
-                    neighborNode.f = neighborNode.g + neighborNode.h;
-                    neighborNode.parent = current;
+    /** If a grid cell sits on an inflated wall, walk outward to the nearest
+     *  non-wall cell in the same inflation's grid. Prevents null results
+     *  when the endpoint or start is on a wall. */
+    private snapToWalkable(
+        start: PathGridPoint,
+        inflation: number,
+        maxRadius = 2,
+    ): PathGridPoint {
+        const inflated = this.inflateGrid(inflation);
+        const w = inflated[0]?.length ?? 0;
+        const h = inflated.length;
+        if (start.x >= 0 && start.x < w && start.y >= 0 && start.y < h) {
+            if (inflated[start.y][start.x] === 0) return start;
+        }
+        // Spiral outward up to maxRadius cells to find a walkable cell.
+        // Capped so a monster spawned flush against a wall doesn't get
+        // its A* start teleported across the map — the first waypoint
+        // would then be several cells away from the actual body and
+        // the gap looks like a glitch.
+        const cap = Math.min(maxRadius, Math.max(w, h));
+        for (let r = 1; r <= cap; r++) {
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+                    const nx = start.x + dx;
+                    const ny = start.y + dy;
+                    if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                    if (inflated[ny][nx] === 0) return { x: nx, y: ny };
                 }
             }
         }
+        // No walkable cell within maxRadius — return the original
+        // start (may be on a wall). A* will likely fail, then the
+        // outer fallback retries with smaller inflation.
+        return start;
+    }
 
-        return null;
+    /** Cheap grid LoS using the inflated grid. Bresenham-ish: walk
+     *  start → end and check every cell on the way. */
+    private hasLineOfSightGrid(
+        a: PathGridPoint,
+        b: PathGridPoint,
+        inflation: number,
+    ): boolean {
+        const inflated = this.inflateGrid(inflation);
+        const dx = Math.abs(b.x - a.x);
+        const dy = Math.abs(b.y - a.y);
+        const sx = a.x < b.x ? 1 : -1;
+        const sy = a.y < b.y ? 1 : -1;
+        let err = dx - dy;
+        let x = a.x;
+        let y = a.y;
+        const w = inflated[0]?.length ?? 0;
+        const h = inflated.length;
+        while (true) {
+            if (x < 0 || x >= w || y < 0 || y >= h) return false;
+            if (inflated[y][x] === 1) return false;
+            if (x === b.x && y === b.y) return true;
+            const e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y += sy;
+            }
+        }
     }
 
     /** Simple Point-in-Polygon check (Ray casting). */

@@ -35,6 +35,10 @@ async function getMonsterSpriteCellDims(
     };
 }
 import { PathfindingService } from '@/game/monsters/logic';
+import {
+    createPathDebugOverlay,
+    type PathDebugOverlayHandles,
+} from '@/game/monsters/path-debug-overlay';
 import { DEPTH, MUSIC_EVENT, PIXEL_LIGHTING_CONFIG } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
@@ -92,6 +96,7 @@ export class LoadScene extends Phaser.Scene {
     private dropSystem!: DropController;
     private materialManager!: MaterialManager;
     private audio!: AudioController;
+    private pathDebugOverlay!: PathDebugOverlayHandles;
     /** `this.time.now` value at the moment create() finished wiring the
      *  level. Subtracted from current `this.time.now` to get elapsed. */
     private levelStartAt = 0;
@@ -183,12 +188,17 @@ export class LoadScene extends Phaser.Scene {
             this.character.debugBodyRect.setVisible(isEditor);
             this.character.debugHitboxRect.setVisible(isEditor);
             this.monsterSystem.setDebugVisible(isEditor);
+            this.pathDebugOverlay.setVisible(isEditor);
         };
         EventBus.on('editor-open', onEditorOpen);
         this.events.once('shutdown', () => EventBus.removeListener('editor-open', onEditorOpen));
 
         // Initialize A* Pathfinding service with level air walls
         const pathfinder = new PathfindingService(this.level.imageSize, this.level.airWalls);
+
+        // Editor-only visualisation of the grid + per-monster paths.
+        // Stays hidden in production; toggled by the editor-open event.
+        this.pathDebugOverlay = createPathDebugOverlay(this, pathfinder);
 
         // Wire monster controller — self-spawns from level.monsters.
         this.monsterSystem = new MonsterController(
@@ -342,6 +352,7 @@ export class LoadScene extends Phaser.Scene {
 
         this.events.on('update', () => {
             this.monsterSystem.update(this.time.now);
+            this.pathDebugOverlay.refresh(this.monsterSystem.getDebugMonsters(), this.character.body);
             this.dropSystem.update();
             this.materialManager.update();
             // Push elapsed time to the UI store. Throttled to ~5Hz so we
@@ -366,6 +377,7 @@ export class LoadScene extends Phaser.Scene {
 
     shutdown(): void {
         this.audio?.destroy();
+        this.pathDebugOverlay?.destroy();
     }
 
     /**
