@@ -1,0 +1,14 @@
+name: Vine Lash
+damage: 11
+cooldownMs: 450
+range: 120
+hitWidth: 70
+hitHeight: 70
+visual:
+    texture: assets/image/weapons/vine-lash.png
+    scale: 0.18
+    orbitRadius: 16
+    anchor: [0.3, 0.5]
+    swingAngle: 220
+sfx:
+    bulletWall: bullet-wall

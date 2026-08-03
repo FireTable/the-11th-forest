@@ -1,4 +1,5 @@
 weapons:
+    # Player weapons
     - assault-rifle
     - laser-cannon
     - plasma-sword
@@ -7,3 +8,10 @@ weapons:
     - rocket-launcher
     - drone-claws
     - gunner-blast
+    # Monster weapons (level-2 Rusted Hollow Citadel)
+    - thorn-scythe-claws
+    - moss-bark-rifle
+    - vine-lash
+    - rune-shield
+    - branch-sweep
+    - bramble-knuckles

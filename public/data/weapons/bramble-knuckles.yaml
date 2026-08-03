@@ -1,0 +1,16 @@
+name: Bramble Knuckles
+# Fast close-range punch; replaces the level-2-spec spore-shot slot
+# since the AI sheet generated bramble-knuckles instead.
+damage: 9
+cooldownMs: 320
+range: 40
+hitWidth: 60
+hitHeight: 60
+visual:
+    texture: assets/image/weapons/bramble-knuckles.png
+    scale: 0.18
+    orbitRadius: 12
+    anchor: [0.2, 0.5]
+    swingAngle: 180
+sfx:
+    bulletWall: bullet-wall

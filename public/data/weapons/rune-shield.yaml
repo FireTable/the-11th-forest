@@ -1,0 +1,15 @@
+name: Rune Shield Bash
+damage: 18
+cooldownMs: 1300
+range: 90
+hitWidth: 110
+hitHeight: 110
+visual:
+    texture: assets/image/weapons/rune-shield.png
+    scale: 0.2
+    orbitRadius: 18
+    anchor: [0.5, 0.5]
+    swingAngle: 140
+sfx:
+    shoot: shotgun-shoot
+    bulletWall: bullet-wall
