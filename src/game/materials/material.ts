@@ -244,13 +244,17 @@ export class MaterialManager {
         EventBus.on('material-update-props', onUpdate);
         EventBus.on('material-delete', onDelete);
 
-        this.scene.events.once('shutdown', () => {
+        const unbind = () => {
             EventBus.removeListener('editor-open', onEditorOpen);
             EventBus.removeListener('editor-material-tab-active', onMaterialTabActive);
             EventBus.removeListener('material-add', onAdd);
             EventBus.removeListener('material-select-id', onSelect);
             EventBus.removeListener('material-update-props', onUpdate);
             EventBus.removeListener('material-delete', onDelete);
-        });
+        };
+        // Game teardown (HMR / React unmount) emits `destroy` without `shutdown`,
+        // so both must unbind or this manager leaks onto the bus with dead sprites.
+        this.scene.events.once('shutdown', unbind);
+        this.scene.events.once('destroy', unbind);
     }
 }

@@ -76,6 +76,14 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
         window.addEventListener('pagehide', onPageHide);
 
         EventBus.on('current-scene-ready', (scene_instance: Phaser.Scene) => {
+            // The boot splash in index.html covers everything up to here:
+            // bundle download, YAML resolve, Phaser boot, asset load. Now
+            // the world is on screen, so fade it out.
+            const boot = document.getElementById('boot');
+            if (boot) {
+                boot.classList.add('boot-done');
+                setTimeout(() => boot.remove(), 400); // matches the CSS fade
+            }
             if (currentActiveScene && typeof currentActiveScene === 'function') {
                 currentActiveScene(scene_instance);
             }

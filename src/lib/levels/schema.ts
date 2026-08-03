@@ -135,6 +135,23 @@ export const PlacedMaterialSchema = z
         y: Math.round(v.y),
     }));
 
+// ─── Teleporter ───────────────────────────────────────────────────────────
+
+export const TeleporterSchema = z
+    .object({
+        id: z.string().optional(),
+        x: z.number(),
+        y: z.number(),
+        targetScene: z.string().optional(),
+        radius: z.number().positive().default(40),
+    })
+    .strict()
+    .transform((v) => ({
+        ...v,
+        x: Math.round(v.x),
+        y: Math.round(v.y),
+    }));
+
 // ─── Level ────────────────────────────────────────────────────────────────
 
 export const LevelSchema = z
@@ -151,6 +168,7 @@ export const LevelSchema = z
         monsters: z.array(MonsterSpawnSchema).optional(),
         dropSpawns: z.array(DropSpawnSchema).optional(),
         materials: z.array(PlacedMaterialSchema).optional(),
+        teleporters: z.array(TeleporterSchema).optional(),
     })
     .strict()
     .transform((v) => {
@@ -168,6 +186,7 @@ export const LevelSchema = z
             ...(v.monsters !== undefined ? { monsters: v.monsters } : {}),
             ...(v.dropSpawns !== undefined ? { dropSpawns: v.dropSpawns } : {}),
             ...(v.materials !== undefined ? { materials: v.materials } : {}),
+            ...(v.teleporters !== undefined ? { teleporters: v.teleporters } : {}),
         };
     });
 

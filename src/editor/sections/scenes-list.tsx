@@ -19,7 +19,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import type { Level } from '@/lib/levels/types';
 import { resolveAndRestart } from '@/lib/phaser-game';
+
+import { TeleportersSection } from './teleporters';
 
 interface SceneRow {
     id: string;
@@ -29,9 +32,11 @@ interface SceneRow {
 interface Props {
     currentSceneId: string | null;
     onSceneChange: (id: string) => void;
+    level?: Level | null;
+    setLevel?: (next: Level) => void;
 }
 
-export function ScenesListSection({ currentSceneId, onSceneChange }: Props) {
+export function ScenesListSection({ currentSceneId, onSceneChange, level, setLevel }: Props) {
     const [scenes, setScenes] = useState<SceneRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -159,6 +164,12 @@ export function ScenesListSection({ currentSceneId, onSceneChange }: Props) {
                     );
                 })}
             </div>
+
+            {level && setLevel && (
+                <div className="border-t border-neutral-800 pt-3 mt-1">
+                    <TeleportersSection level={level} setLevel={setLevel} />
+                </div>
+            )}
 
             <Dialog open={newOpen} onOpenChange={setNewOpen}>
                 <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">

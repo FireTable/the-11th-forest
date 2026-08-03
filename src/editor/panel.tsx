@@ -272,6 +272,8 @@ export function EditorPanel() {
                         <ScenesListSection
                             currentSceneId={sceneId}
                             onSceneChange={handleSceneChange}
+                            level={level}
+                            setLevel={handleLevelChange}
                         />
                     )}
                     {!level && topTab === 'scenes' && sceneSubTab !== 'scenes' && (

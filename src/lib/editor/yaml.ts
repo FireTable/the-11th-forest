@@ -56,6 +56,9 @@ export function serializeLevelYaml(level: Level): string {
     if (level.materials !== undefined) {
         payload.materials = level.materials;
     }
+    if (level.teleporters !== undefined) {
+        payload.teleporters = level.teleporters;
+    }
     return stringifyYaml(payload, {
         lineWidth: -1,
         sortKeys: false,

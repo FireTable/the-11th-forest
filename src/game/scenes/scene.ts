@@ -88,6 +88,7 @@ export interface SceneAssets {
  * editor's drawing tools live in the editor panel (Konva overlay), not
  * here. Keeps the scene focused on what gameplay needs.
  */
+import { TeleporterController } from '@/game/scenes/teleporter';
 import { loadWeaponAssets } from '@/game/weapons/weapon';
 
 export class LoadScene extends Phaser.Scene {
@@ -95,6 +96,7 @@ export class LoadScene extends Phaser.Scene {
     private monsterSystem!: MonsterController;
     private dropSystem!: DropController;
     private materialManager!: MaterialManager;
+    private teleporterSystem!: TeleporterController;
     private audio!: AudioController;
     private pathDebugOverlay!: PathDebugOverlayHandles;
     /** `this.time.now` value at the moment create() finished wiring the
@@ -191,7 +193,9 @@ export class LoadScene extends Phaser.Scene {
             this.pathDebugOverlay.setVisible(isEditor);
         };
         EventBus.on('editor-open', onEditorOpen);
-        this.events.once('shutdown', () => EventBus.removeListener('editor-open', onEditorOpen));
+        const unbindEditorOpen = () => EventBus.removeListener('editor-open', onEditorOpen);
+        this.events.once('shutdown', unbindEditorOpen);
+        this.events.once('destroy', unbindEditorOpen);
 
         // Initialize A* Pathfinding service with level air walls
         const pathfinder = new PathfindingService(this.level.imageSize, this.level.airWalls);
@@ -350,11 +354,21 @@ export class LoadScene extends Phaser.Scene {
             });
         }
 
-        this.events.on('update', () => {
+        // Wire TeleporterController (code-drawn magic circle & scene transition)
+        this.teleporterSystem = new TeleporterController(
+            this,
+            this.level.teleporters,
+            this.id,
+            () => (this.character?.body?.position ? this.character.body.position : null),
+            () => this.monsterSystem.isAllCleared(),
+        );
+
+        this.events.on('update', (_time: number, delta: number) => {
             this.monsterSystem.update(this.time.now);
             this.pathDebugOverlay.refresh(this.monsterSystem.getDebugMonsters(), this.character.body);
             this.dropSystem.update();
             this.materialManager.update();
+            this.teleporterSystem.update(delta);
             // Push elapsed time to the UI store. Throttled to ~5Hz so we
             // don't re-render React 60 times/sec for a 1-second-resolution
             // display.
@@ -376,6 +390,7 @@ export class LoadScene extends Phaser.Scene {
     }
 
     shutdown(): void {
+        this.teleporterSystem?.destroy();
         this.audio?.destroy();
         this.pathDebugOverlay?.destroy();
     }

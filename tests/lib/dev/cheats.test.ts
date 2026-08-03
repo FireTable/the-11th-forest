@@ -63,25 +63,25 @@ describe('isDev', () => {
 describe('loadCheats / saveCheats', () => {
     it('returns defaults on empty storage', () => {
         const s = new MemoryStorage();
-        expect(loadCheats(s)).toEqual({ infiniteHp: false, muted: false });
+        expect(loadCheats(s)).toEqual({ infiniteHp: false, muted: false, oneHitKill: false });
     });
 
     it('round-trips a full state', () => {
         const s = new MemoryStorage();
-        saveCheats({ infiniteHp: true, muted: true }, s);
-        expect(loadCheats(s)).toEqual({ infiniteHp: true, muted: true });
+        saveCheats({ infiniteHp: true, muted: true, oneHitKill: true }, s);
+        expect(loadCheats(s)).toEqual({ infiniteHp: true, muted: true, oneHitKill: true });
     });
 
     it('falls back to per-field defaults when a key is missing', () => {
         const s = new MemoryStorage();
         s.setItem('dev.cheats', JSON.stringify({ muted: true }));
-        expect(loadCheats(s)).toEqual({ infiniteHp: false, muted: true });
+        expect(loadCheats(s)).toEqual({ infiniteHp: false, muted: true, oneHitKill: false });
     });
 
     it('ignores corrupt JSON and returns defaults', () => {
         const s = new MemoryStorage();
         s.setItem('dev.cheats', '{not json');
-        expect(loadCheats(s)).toEqual({ infiniteHp: false, muted: false });
+        expect(loadCheats(s)).toEqual({ infiniteHp: false, muted: false, oneHitKill: false });
     });
 });
 
@@ -96,8 +96,8 @@ describe('applyCheat', () => {
             applyCheat('infiniteHp', true, s);
 
             expect(received).toEqual([{ key: 'infiniteHp', value: true }]);
-            expect(loadCheats(s)).toEqual({ infiniteHp: true, muted: false });
-            expect(getCheats(s)).toEqual({ infiniteHp: true, muted: false });
+            expect(loadCheats(s)).toEqual({ infiniteHp: true, muted: false, oneHitKill: false });
+            expect(getCheats(s)).toEqual({ infiniteHp: true, muted: false, oneHitKill: false });
         } finally {
             EventBus.removeListener('dev:cheat:infiniteHp', handler);
         }

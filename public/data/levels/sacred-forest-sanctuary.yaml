@@ -485,3 +485,8 @@ materials:
     'y': 1320
     mode: foreground
     depthOffset: 0
+teleporters:
+  - id: teleporter-msckzhf5
+    x: 1370
+    'y': 125
+    radius: 60

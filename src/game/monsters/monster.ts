@@ -27,6 +27,7 @@ import {
     MONSTER_DEATH_FADE_MS,
     SFX_EVENT,
 } from '@/lib/constants';
+import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import type { WeaponSpec } from '@/lib/weapons';
 import { spawnProjectile, spawnMeleeHitbox } from '@/game/weapons/weapon';
@@ -429,6 +430,12 @@ export class MonsterController {
         return this.monsters.filter((m) => !m.dead && m.state !== 'dying');
     }
 
+    /** Check if all monsters in this level are dead and no pending spawns remain. */
+    public isAllCleared(): boolean {
+        const aliveCount = this.monsters.filter((m) => !m.dead && m.state !== 'dying').length;
+        return aliveCount === 0 && this.pendingSpawns.length === 0;
+    }
+
     /** Per-frame: AI tick + projectile sync + cleanup. */
     update(time: number): void {
         this.advancePendingSpawns(time);
@@ -824,9 +831,10 @@ export class MonsterController {
             }) ?? pickClosestMonster(hitBody.position, this.monsters, 200);
 
         if (target && target.state !== 'dying') {
-            target.hp -= bulletDamage;
+            const finalDamage = getCheats().oneHitKill ? 999999 : bulletDamage;
+            target.hp -= finalDamage;
             target.lastHitAt = this.scene.time.now;
-            target.statusHud.showFloatingNumber(bulletDamage, 'damage');
+            target.statusHud.showFloatingNumber(finalDamage, 'damage');
             EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'), {
                 key: `monster:${target.spec.id}`,
                 throttleMs: target.spec.sfx?.throttleMs,
