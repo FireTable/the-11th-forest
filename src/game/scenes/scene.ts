@@ -115,7 +115,11 @@ export class LoadScene extends Phaser.Scene {
     }
 
     preload(): void {
-        this.load.image('background', this.level.background);
+        // Per-scene texture key — `background` alone collides with the
+        // texture cache: Phaser reuses the first loaded image under
+        // that key, so every subsequent scene would render the first
+        // scene's background. Namespace with the scene id.
+        this.load.image(`background:${this.id}`, this.level.background);
         // The character module owns its own asset loading + animation
         // registration; we just delegate here, with cell dims derived
         // in main.ts from the texture's natural size + grid.
@@ -142,7 +146,7 @@ export class LoadScene extends Phaser.Scene {
     create(): void {
         // World size === image size, so the background displays at native
         // dimensions and air-wall coords align 1:1 with image pixel space.
-        const bg = this.add.image(0, 0, 'background').setOrigin(0, 0);
+        const bg = this.add.image(0, 0, `background:${this.id}`).setOrigin(0, 0);
         const isPixelLightingEnabled = this.level.pixelLighting ?? PIXEL_LIGHTING_CONFIG.ENABLE;
         if (isPixelLightingEnabled) {
             bg.setTint(PIXEL_LIGHTING_CONFIG.BACKGROUND_TINT);

@@ -8,6 +8,7 @@ import { EventBus } from '@/lib/events/bus';
 import { addWall, removeWall, setWallKind } from '@/lib/editor/air-walls';
 import { getCurrentLevel } from '@/lib/levels/current-level';
 import { isMobileLike } from '@/lib/mobile';
+import { getPhaserGame } from '@/lib/phaser-game';
 import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 import { AirWallsSection } from './sections/air-walls';
@@ -59,6 +60,56 @@ export function EditorPanel() {
     if (!isDev() || isMobileLike()) return null;
 
     const [open, setOpen] = useState(false);
+
+    // While the editor is open, Phaser would otherwise eat keystrokes
+    // (W/A/S/D, arrows, space, etc. — keys the game uses for player
+    // input). Two-pronged defence:
+    //   1. Flip the keyboard plugin's `enabled` flag on every scene.
+    //   2. Register a capture-phase window listener that swallows
+    //      keydown for any target that isn't a DOM input — even if
+    //      Phaser's listeners are still attached, they never see the
+    //      event after our capture handler stops propagation. The
+    //      skip-inputs branch keeps every <input> / <textarea> /
+    //      contenteditable working normally.
+    useEffect(() => {
+        const game = getPhaserGame();
+        const setKb = (enabled: boolean) => {
+            if (!game) return;
+            game.scene.scenes.forEach((s) => {
+                const kb = s.input?.keyboard;
+                if (kb) kb.enabled = enabled;
+            });
+        };
+        const swallow = (e: KeyboardEvent) => {
+            const t = e.target as HTMLElement | null;
+            if (!t) return;
+            if (
+                t.tagName === 'INPUT' ||
+                t.tagName === 'TEXTAREA' ||
+                t.isContentEditable
+            ) {
+                // Stop bubble phase so Phaser's window-level listener
+                // (registered on bubble) never sees the keydown. The
+                // capture phase stops BEFORE target phase, so the
+                // input's own listeners + default action (character
+                // insertion) still fire normally. stopPropagation is
+                // sufficient here — we don't want
+                // stopImmediatePropagation, which would also block the
+                // input's listeners.
+                e.stopPropagation();
+                return;
+            }
+            e.stopImmediatePropagation();
+        };
+        if (open) {
+            setKb(false);
+            window.addEventListener('keydown', swallow, true);
+        }
+        return () => {
+            setKb(true);
+            window.removeEventListener('keydown', swallow, true);
+        };
+    }, [open]);
     const [sceneId, setSceneId] = useState<string | null>(null);
     const [level, setLevel] = useState<Level | null>(null);
     const [topTab, setTopTab] = useState<TopTab>('scenes');

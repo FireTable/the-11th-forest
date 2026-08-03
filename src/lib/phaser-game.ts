@@ -49,6 +49,21 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
         throw new Error('Phaser game not initialised — setPhaserGame never called');
     }
 
+    // Wipe the per-run entity snapshots BEFORE the new scene's
+    // loadCharacter() reads them. Without this, the character spawns
+    // at the last position the player had in the previous scene
+    // (saved by tickSaveState every 1s and persisted to localStorage
+    // via zustand), not at the new scene's characterSpawn. Symptom:
+    // switching scenes via Jump shows the new background + air walls
+    // but the character is at a stale position from the prior scene
+    // — looks like "the scene didn't refresh".
+    //
+    // Can't use `setEntitySnapshots({ player: undefined })` here —
+    // that helper does `snapshots.player ?? state.playerSnapshot`,
+    // so passing `undefined` is a no-op. `resetLevelProgress` is the
+    // existing action that actually clears these fields.
+    useGameStore.getState().resetLevelProgress(resolved.id);
+
     // Drop every registered scene, not just `LoadScene:${resolved.id}`:
     // a teleport starts the next level under a different key, so keying
     // off the caller's id would leave the previous scene alive, ticking
