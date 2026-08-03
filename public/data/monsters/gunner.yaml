@@ -86,7 +86,7 @@ moveSpeed: 3
 body:
   halfW: 32
   halfH: 20
-weaponId: assault-rifle
+weaponId: moss-bark-rifle
 drops:
   - dropId: ammo-cache
     chance: 0.5
@@ -97,7 +97,7 @@ sfx:
   death: monster-death
   aggro: monster-aggro
 sprite:
-  texture: assets/image/monsters/stalker.png
+  texture: assets/image/monsters/gunner.png
   grid:
     rows: 4
     cols: 4

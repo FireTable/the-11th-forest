@@ -5,7 +5,7 @@ moveSpeed: 80
 body:
   halfW: 14
   halfH: 14
-weaponId: monster-default
+weaponId: vine-lash
 drops: []
 sprite:
   texture: assets/image/monsters/stalker.png
