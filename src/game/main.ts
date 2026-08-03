@@ -1,13 +1,10 @@
 import { AUTO, Game, Scale } from 'phaser';
 
 import { LoadingScene } from '@/game/scenes/loading-scene';
-import {
-    cacheResolvedScene,
-    resolveDefaultSceneId,
-    resolveScene,
-} from '@/game/resolve-scene';
+import { cacheResolvedScene, resolveDefaultSceneId, resolveScene } from '@/game/resolve-scene';
 
 import { PixelLightPostFX } from '@/game/pipelines/pixel-light';
+import { installCanvasFit } from '@/game/scale/canvas-fit';
 
 // Re-exported so the editor's restart path can resolve a scene id
 // without going through main.ts's Phaser-side effects.
@@ -21,9 +18,10 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
     // can replay without a second YAML round-trip.
     cacheResolvedScene(scene);
     // World size matches the level's native image dimensions so air-wall
-    // coords (defined in image pixel space) align 1:1. The canvas itself
-    // is scaled down via Scale.FIT to fit the viewport.
-    return new Game({
+    // coords (defined in image pixel space) align 1:1. The canvas is
+    // scaled to the viewport by `installCanvasFit` — Scale.NONE because
+    // Phaser's own FIT/CENTER can't measure the rotated mobile layout.
+    const game = new Game({
         type: AUTO,
         parent,
         backgroundColor: '#000000',
@@ -31,8 +29,8 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
             PixelLightPostFX: PixelLightPostFX,
         },
         scale: {
-            mode: Scale.FIT,
-            autoCenter: Scale.CENTER_BOTH,
+            mode: Scale.NONE,
+            autoCenter: Scale.NO_CENTER,
             width: scene.level.imageSize.width,
             height: scene.level.imageSize.height,
         },
@@ -51,6 +49,9 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
         // constructing it before the asset cache is warm.
         scene: [new LoadingScene()],
     } as any);
+
+    installCanvasFit(game);
+    return game;
 };
 
 export default StartGame;
