@@ -224,13 +224,11 @@ export function spawnMeleeHitbox(
         });
         visualObj = sprite;
     } else {
-        // Procedural arc visual — donut sector hugging the hitbox
-        // geometry. The shape is centered on the HAND so it radiates
-        // around the attacker; rotation aligns the arc centre with the
-        // aim direction. Inner radius = `range - hitWidth` (near edge of
-        // the rectangular hitbox), outer radius = `range` (far edge).
-        // Drawing as a donut (not a solid pie) keeps the body silhouette
-        // visible and matches what the actual hitbox covers.
+        // Procedural arc visual — translucent ripple made of three
+        // concentric rings + a dashed outer trace whose alpha follows a
+        // sine wave along the swing. No solid fill, so the silhouette of
+        // the attacker stays visible through the arc and the effect
+        // reads as a moving wave instead of a static purple wedge.
         const swingAngleDeg = opts.swingAngle ?? 120;
         const halfRad = ((swingAngleDeg / 2) * Math.PI) / 180;
         const innerR = Math.max(0, opts.range - opts.hitWidth);
@@ -241,23 +239,41 @@ export function spawnMeleeHitbox(
         g.setPosition(opts.origin.x, opts.origin.y);
         g.setRotation(opts.angle);
 
-        // Filled donut sector.
-        g.fillStyle(arcColor, 0.55);
-        g.beginPath();
-        g.moveTo(outerR, 0);
-        g.arc(0, 0, outerR, -halfRad, halfRad, false);
-        if (innerR > 0) {
-            g.lineTo(innerR * Math.cos(halfRad), innerR * Math.sin(halfRad));
-            g.arc(0, 0, innerR, halfRad, -halfRad, true);
+        // Inner ring (closest to attacker, faintest).
+        if (innerR > 4) {
+            g.lineStyle(1, arcColor, 0.2);
+            g.beginPath();
+            g.arc(0, 0, innerR, -halfRad, halfRad, false);
+            g.strokePath();
         }
-        g.closePath();
-        g.fillPath();
 
-        // Bright outer rim — the slash edge.
-        g.lineStyle(2, arcColor, 0.95);
+        // Mid ring — half-strength.
+        const midR = (innerR + outerR) / 2;
+        g.lineStyle(1, arcColor, 0.4);
         g.beginPath();
-        g.arc(0, 0, outerR, -halfRad, halfRad, false);
+        g.arc(0, 0, midR, -halfRad, halfRad, false);
         g.strokePath();
+
+        // Outer rim — dashed segments whose alpha follows a sine wave
+        // across the sweep. The peak/trough alternation gives the slash
+        // edge a pulsing, fluctuating feel as it travels through space.
+        const segments = 18;
+        const segSweep = (halfRad * 2) / segments;
+        for (let i = 0; i < segments; i++) {
+            const t = i / segments;
+            const alpha = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(t * Math.PI * 2));
+            g.lineStyle(2, arcColor, alpha);
+            g.beginPath();
+            g.arc(
+                0,
+                0,
+                outerR,
+                -halfRad + i * segSweep,
+                -halfRad + (i + 0.45) * segSweep,
+                false,
+            );
+            g.strokePath();
+        }
 
         const feetY = opts.feetY ?? opts.origin.y + 32;
         const effectDepth = Math.round(feetY) + 5;
