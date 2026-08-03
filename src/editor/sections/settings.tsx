@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Crosshair, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { getPhaserGame } from '@/lib/phaser-game';
 import type { CharacterSpawn, DropSpawn, Level } from '@/lib/levels/types';
 
 interface Props {
@@ -83,6 +84,37 @@ export function SettingsSection({ level, setLevel }: Props) {
 
     function setDropSpawns(next: DropSpawn[]) {
         setLevel({ ...level, dropSpawns: next });
+    }
+
+    function captureFromCharacter() {
+        const game = getPhaserGame();
+        if (!game) return;
+        // Find the active LoadScene — that's the one with the character.
+        // Other scenes may be preloaded or pending but only the active
+        // one has the live CharacterController.
+        const scene = game.scene.scenes.find(
+            (s) => s.sys.settings.active && s.sys.settings.key.startsWith('LoadScene:'),
+        );
+        if (!scene) return;
+        // `character` is the CharacterController instance; it exposes
+        // `body` (Matter body) and the sprite directly on itself — the
+        // `parts` object is private and not reachable from here.
+        const character = (scene as unknown as {
+            character?: {
+                body?: { position?: { x: number; y: number } };
+                parts?: { sprite?: { flipX?: boolean } };
+            };
+        }).character;
+        const pos = character?.body?.position;
+        if (!pos) return;
+        // The sprite's flipX reflects horizontal facing. flipX === true
+        // when the sprite points left.
+        const facing: 'left' | 'right' = character?.parts?.sprite?.flipX ? 'left' : 'right';
+        setSpawn({
+            facing,
+            x: Math.round(pos.x),
+            y: Math.round(pos.y),
+        });
     }
 
     return (
@@ -212,6 +244,18 @@ export function SettingsSection({ level, setLevel }: Props) {
                         className="h-7 text-xs bg-neutral-950 border-neutral-700"
                     />
                 </Field>
+                <div className="col-span-2">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={captureFromCharacter}
+                        className="w-full h-7 text-[10px] gap-1 border-neutral-700 bg-neutral-950 hover:bg-neutral-800 text-neutral-200"
+                        title="Fill spawn x/y/facing from the character on the canvas right now"
+                    >
+                        <Crosshair className="size-3" />
+                        Capture from current character
+                    </Button>
+                </div>
             </Section>
 
             <Section title="Drop spawns (level-level)">
