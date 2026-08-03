@@ -43,7 +43,11 @@ export function loadWeaponAssets(scene: Phaser.Scene, weaponSpecs: Iterable<Weap
 
 export interface BulletRecord {
     body: MatterJS.BodyType;
-    rect: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+    rect:
+        | Phaser.GameObjects.Shape
+        | Phaser.GameObjects.Sprite
+        | Phaser.GameObjects.Image
+        | Phaser.GameObjects.Graphics;
     damage: number;
     color: number;
     originX: number;
@@ -135,6 +139,10 @@ export interface MeleeSpawnOptions {
     texture?: string;
     scale?: number;
     rotationOffset?: number;
+    /** Swing arc sweep in degrees. Used by the procedural arc visual
+     *  when no `texture` is provided; defaults to 120 (the schema
+     *  default for `visual.swingAngle`). */
+    swingAngle?: number;
     feetY?: number;
     /** Matter category. Defaults to CAT.BULLET (player melee). */
     category?: number;
@@ -180,7 +188,11 @@ export function spawnMeleeHitbox(
     });
     scene.matter.world.add(body);
 
-    let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+    let visualObj:
+        | Phaser.GameObjects.Shape
+        | Phaser.GameObjects.Sprite
+        | Phaser.GameObjects.Image
+        | Phaser.GameObjects.Graphics;
 
     const rotOffsetRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
     const visualRotation = isLeft ? -rotOffsetRad : rotOffsetRad;
@@ -212,20 +224,58 @@ export function spawnMeleeHitbox(
         });
         visualObj = sprite;
     } else {
-        const rect = scene.add.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, 0xc084fc, 0.7);
+        // Procedural arc visual — donut sector hugging the hitbox
+        // geometry. The shape is centered on the HAND so it radiates
+        // around the attacker; rotation aligns the arc centre with the
+        // aim direction. Inner radius = `range - hitWidth` (near edge of
+        // the rectangular hitbox), outer radius = `range` (far edge).
+        // Drawing as a donut (not a solid pie) keeps the body silhouette
+        // visible and matches what the actual hitbox covers.
+        const swingAngleDeg = opts.swingAngle ?? 120;
+        const halfRad = ((swingAngleDeg / 2) * Math.PI) / 180;
+        const innerR = Math.max(0, opts.range - opts.hitWidth);
+        const outerR = opts.range;
+        const arcColor = 0xc084fc;
+
+        const g = scene.add.graphics();
+        g.setPosition(opts.origin.x, opts.origin.y);
+        g.setRotation(opts.angle);
+
+        // Filled donut sector.
+        g.fillStyle(arcColor, 0.55);
+        g.beginPath();
+        g.moveTo(outerR, 0);
+        g.arc(0, 0, outerR, -halfRad, halfRad, false);
+        if (innerR > 0) {
+            g.lineTo(innerR * Math.cos(halfRad), innerR * Math.sin(halfRad));
+            g.arc(0, 0, innerR, halfRad, -halfRad, true);
+        }
+        g.closePath();
+        g.fillPath();
+
+        // Bright outer rim — the slash edge.
+        g.lineStyle(2, arcColor, 0.95);
+        g.beginPath();
+        g.arc(0, 0, outerR, -halfRad, halfRad, false);
+        g.strokePath();
+
         const feetY = opts.feetY ?? opts.origin.y + 32;
         const effectDepth = Math.round(feetY) + 5;
-        rect.setDepth(effectDepth);
+        g.setDepth(effectDepth);
+
         scene.tweens.add({
-            targets: rect,
+            targets: g,
             alpha: 0,
+            scaleX: 1.2,
+            scaleY: 1.2,
             duration: 200,
+            ease: 'Cubic.out',
             onComplete: () => {
-                rect.destroy();
+                g.destroy();
                 scene.matter.world.remove(body);
             },
         });
-        visualObj = rect;
+        visualObj = g;
     }
 
     return {

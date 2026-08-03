@@ -337,7 +337,11 @@ export interface MonsterControllerCallbacks {
 /** Snapshot of a monster projectile — owns body + visual + damage. */
 export interface MonsterProjectile {
     body: MatterJS.BodyType;
-    rect: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+    rect:
+        | Phaser.GameObjects.Shape
+        | Phaser.GameObjects.Sprite
+        | Phaser.GameObjects.Image
+        | Phaser.GameObjects.Graphics;
     damage: number;
     monster: Monster;
 }
@@ -947,6 +951,7 @@ export class MonsterController {
                 texture: weapon.bullet?.texture,
                 scale: weapon.bullet?.scale ?? 0.2,
                 rotationOffset: weapon.bullet?.rotationOffset,
+                swingAngle: weapon.visual?.swingAngle,
                 feetY: originY + (m.spec.body.halfH ?? 0),
                 category: CAT.MONSTER_PROJECTILE,
                 mask: PROJECTILE_MONSTER_MASK,
