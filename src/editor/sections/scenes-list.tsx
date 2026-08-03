@@ -60,7 +60,6 @@ export function ScenesListSection({
     const [error, setError] = useState<string | null>(null);
     const [newOpen, setNewOpen] = useState(false);
     const [creating, setCreating] = useState(false);
-    const [jumpingTo, setJumpingTo] = useState<string | null>(null);
     // Uncontrolled inputs — refs read on submit. Bypasses every possible
     // state-vs-DOM fight (Phaser focus theft, browser autofill latching,
     // controlled-input race conditions).
@@ -91,14 +90,11 @@ export function ScenesListSection({
     }
 
     async function jumpTo(id: string) {
-        setJumpingTo(id);
         try {
             await resolveAndRestart(id);
             onSceneChange(id);
         } catch (e) {
             setError(`Failed to jump: ${(e as Error).message ?? e}`);
-        } finally {
-            setJumpingTo(null);
         }
     }
 
@@ -157,7 +153,6 @@ export function ScenesListSection({
             <div className="flex flex-col gap-1">
                 {scenes.map((s) => {
                     const isCurrent = s.id === currentSceneId;
-                    const jumping = jumpingTo === s.id;
                     const isExpanded = expandedSceneId === s.id;
                     return (
                         <div
@@ -184,14 +179,9 @@ export function ScenesListSection({
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => jumpTo(s.id)}
-                                    disabled={isCurrent || jumping}
-                                    className="flex-1 min-w-0 text-left disabled:cursor-default"
-                                    title={
-                                        isCurrent
-                                            ? 'Currently loaded (click to load again)'
-                                            : 'Jump to this scene'
-                                    }
+                                    onClick={() => onToggleExpand(isExpanded ? null : s.id)}
+                                    className="flex-1 min-w-0 text-left"
+                                    title={isExpanded ? 'Collapse this scene' : 'Expand this scene'}
                                 >
                                     <div className="font-medium truncate text-[12px]">
                                         {s.title}
