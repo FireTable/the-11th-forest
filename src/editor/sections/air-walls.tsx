@@ -1,5 +1,5 @@
-import type { Dispatch, SetStateAction } from 'react';
-import { Brush, Plus, X } from 'lucide-react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
+import { Brush, Plus, Route, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { handleWallKindChange, handleWallRemove } from '@/editor/panel';
+import { EventBus } from '@/lib/events/bus';
 import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 interface Props {
@@ -29,6 +30,12 @@ interface Props {
  * kind dropdown + delete.
  */
 export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWall }: Props) {
+    // Default off — the path-debug grid (per-cell red squares for
+    // every A* walkable-cell vs wall-cell) is visually noisy enough
+    // that the canvas stays cleaner without it. The toggle lets the
+    // designer opt in when they actually want to see the grid.
+    const [showPathDebug, setShowPathDebug] = useState(false);
+
     return (
         <div>
             <div className="flex gap-2">
@@ -50,6 +57,23 @@ export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWal
                             Draw on canvas
                         </>
                     )}
+                </Button>
+                <Button
+                    variant={showPathDebug ? 'default' : 'outline'}
+                    className={`gap-2 ${
+                        showPathDebug
+                            ? 'bg-amber-500 hover:bg-amber-400 text-black'
+                            : 'bg-transparent'
+                    }`}
+                    onClick={() => {
+                        const next = !showPathDebug;
+                        setShowPathDebug(next);
+                        EventBus.emit('path-debug-visible', next);
+                    }}
+                    title="Toggle pathfinding grid + per-monster path debug overlay"
+                >
+                    <Route className="size-4" />
+                    {showPathDebug ? 'Hide path debug' : 'Show path debug'}
                 </Button>
                 <Button
                     variant="outline"

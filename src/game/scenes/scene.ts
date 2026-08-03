@@ -195,18 +195,29 @@ export class LoadScene extends Phaser.Scene {
             this.character.debugBodyRect.setVisible(isEditor);
             this.character.debugHitboxRect.setVisible(isEditor);
             this.monsterSystem.setDebugVisible(isEditor);
-            this.pathDebugOverlay.setVisible(isEditor);
         };
         EventBus.on('editor-open', onEditorOpen);
         const unbindEditorOpen = () => EventBus.removeListener('editor-open', onEditorOpen);
         this.events.once('shutdown', unbindEditorOpen);
         this.events.once('destroy', unbindEditorOpen);
 
+        // Path-debug overlay stays hidden until the designer opts in via
+        // the toggle in the Air-walls section — defaulting to off keeps
+        // the canvas readable for the common case of just editing walls.
+        const onPathDebugVisible = (visible: unknown) => {
+            this.pathDebugOverlay.setVisible(visible === true);
+        };
+        EventBus.on('path-debug-visible', onPathDebugVisible);
+        const unbindPathDebug = () => EventBus.removeListener('path-debug-visible', onPathDebugVisible);
+        this.events.once('shutdown', unbindPathDebug);
+        this.events.once('destroy', unbindPathDebug);
+
         // Initialize A* Pathfinding service with level air walls
         const pathfinder = new PathfindingService(this.level.imageSize, this.level.airWalls);
 
         // Editor-only visualisation of the grid + per-monster paths.
-        // Stays hidden in production; toggled by the editor-open event.
+        // Stays hidden in production; toggled via the path-debug-visible
+        // event from the editor's Air-walls section.
         this.pathDebugOverlay = createPathDebugOverlay(this, pathfinder);
 
         // Wire monster controller — self-spawns from level.monsters.
