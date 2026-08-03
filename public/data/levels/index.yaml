@@ -1,11 +1,3 @@
-# Manifest of all levels in render order. Each entry references a
-# data/levels/<id>.yaml by basename (no .yaml extension).
-#
-# Loader enforces: every id listed here must have a corresponding file
-# under data/levels/. Orphan files (file not in this list) are allowed —
-# treat as drafts. Run `pnpm validate-levels` to check.
-#
-# To add a new level: append its id below AND create data/levels/<id>.yaml.
-
 levels:
-    - sacred-forest-sanctuary
+  - sacred-forest-sanctuary
+  - forest-path

@@ -487,6 +487,7 @@ materials:
     depthOffset: 0
 teleporters:
   - id: teleporter-msckzhf5
-    x: 1370
-    'y': 125
+    x: 1406
+    'y': 1428
+    targetScene: forest-path
     radius: 60
