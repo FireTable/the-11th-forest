@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Heart, Volume2, VolumeX, Wrench } from 'lucide-react';
+import { Heart, Volume2, VolumeX, Wrench, Zap } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { applyCheat, DEFAULT_CHEATS, getCheats, isDev, type Cheats } from '@/lib/dev/cheats';
@@ -42,6 +42,12 @@ function CheatPanelInner() {
         applyCheat('infiniteHp', next);
     }, [state.infiniteHp]);
 
+    const toggleOneHitKill = useCallback(() => {
+        const next = !state.oneHitKill;
+        setState((s) => ({ ...s, oneHitKill: next }));
+        applyCheat('oneHitKill', next);
+    }, [state.oneHitKill]);
+
     const toggleMuted = useCallback(() => {
         const next = !state.muted;
         setState((s) => ({ ...s, muted: next }));
@@ -66,6 +72,15 @@ function CheatPanelInner() {
                     shortLabel="HP"
                     label={state.infiniteHp ? 'Infinite HP: ON' : 'Infinite HP: OFF'}
                     hint="999,999,999 HP; ignores damage"
+                />
+                <CheatToggle
+                    active={state.oneHitKill}
+                    onClick={toggleOneHitKill}
+                    onIcon={<Zap className="size-3.5 fill-current" />}
+                    offIcon={<Zap className="size-3.5" />}
+                    shortLabel="1-Hit"
+                    label={state.oneHitKill ? 'One-Hit Kill: ON' : 'One-Hit Kill: OFF'}
+                    hint="Inflict 999,999 damage on monster hits"
                 />
                 <CheatToggle
                     active={state.muted}

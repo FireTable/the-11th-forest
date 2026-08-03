@@ -31,6 +31,10 @@ export const DEPTH = {
     // Y-sorting range for characters, monsters, bullets, and y-sort materials (PROJECTILE_BASE + y-coord + offset)
     FOREGROUND_MATERIAL: 10000,
     MELEE_SLASH: 12000, // Slash arc always above foreground materials
+    TELEPORTER_GLOW: 14005,
+    TELEPORTER_GRAPHICS: 14006,
+    TELEPORTER_PARTICLES: 14007,
+    TELEPORTER_HIT_ZONE: 14010,
     SELECTION_BOX: 15000,
     HUD: 20000,
 } as const;

@@ -23,16 +23,18 @@ import { EventBus } from '@/lib/events/bus';
 
 const STORAGE_KEY = 'dev.cheats';
 
-export type CheatKey = 'infiniteHp' | 'muted';
+export type CheatKey = 'infiniteHp' | 'muted' | 'oneHitKill';
 
 export interface Cheats {
     infiniteHp: boolean;
     muted: boolean;
+    oneHitKill: boolean;
 }
 
 export const DEFAULT_CHEATS: Cheats = {
     infiniteHp: false,
     muted: false,
+    oneHitKill: false,
 };
 
 /** Local hostnames that count as dev — prod hosts never match. */
@@ -71,6 +73,7 @@ export function loadCheats(storage: Storage = localStorage): Cheats {
         return {
             infiniteHp: isBool(partial.infiniteHp) ? partial.infiniteHp : DEFAULT_CHEATS.infiniteHp,
             muted: isBool(partial.muted) ? partial.muted : DEFAULT_CHEATS.muted,
+            oneHitKill: isBool(partial.oneHitKill) ? partial.oneHitKill : DEFAULT_CHEATS.oneHitKill,
         };
     } catch {
         return { ...DEFAULT_CHEATS };

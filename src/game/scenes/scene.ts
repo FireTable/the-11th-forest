@@ -88,6 +88,7 @@ export interface SceneAssets {
  * editor's drawing tools live in the editor panel (Konva overlay), not
  * here. Keeps the scene focused on what gameplay needs.
  */
+import { TeleporterController } from '@/game/scenes/teleporter';
 import { loadWeaponAssets } from '@/game/weapons/weapon';
 
 export class LoadScene extends Phaser.Scene {
@@ -95,13 +96,15 @@ export class LoadScene extends Phaser.Scene {
     private monsterSystem!: MonsterController;
     private dropSystem!: DropController;
     private materialManager!: MaterialManager;
+    private teleporterSystem!: TeleporterController;
     private audio!: AudioController;
     private pathDebugOverlay!: PathDebugOverlayHandles;
     /** `this.time.now` value at the moment create() finished wiring the
      *  level. Subtracted from current `this.time.now` to get elapsed. */
     private levelStartAt = 0;
-    /** Last time we pushed levelElapsedMs to the store. Throttle to ~5Hz. */
-    private lastLevelClockPushAt = 0;
+    /** Last time we wrote the save state (clock + snapshots). Throttled
+     *  to 1Hz — see `tickSaveState`. */
+    private lastSavePushAt = 0;
 
     constructor(
         private readonly id: string,
@@ -191,7 +194,9 @@ export class LoadScene extends Phaser.Scene {
             this.pathDebugOverlay.setVisible(isEditor);
         };
         EventBus.on('editor-open', onEditorOpen);
-        this.events.once('shutdown', () => EventBus.removeListener('editor-open', onEditorOpen));
+        const unbindEditorOpen = () => EventBus.removeListener('editor-open', onEditorOpen);
+        this.events.once('shutdown', unbindEditorOpen);
+        this.events.once('destroy', unbindEditorOpen);
 
         // Initialize A* Pathfinding service with level air walls
         const pathfinder = new PathfindingService(this.level.imageSize, this.level.airWalls);
@@ -350,15 +355,23 @@ export class LoadScene extends Phaser.Scene {
             });
         }
 
-        this.events.on('update', () => {
+        // Wire TeleporterController (code-drawn magic circle & scene transition)
+        this.teleporterSystem = new TeleporterController(
+            this,
+            this.level.teleporters,
+            this.id,
+            () => (this.character?.body?.position ? this.character.body.position : null),
+            () => this.monsterSystem.isAllCleared(),
+        );
+
+        this.events.on('update', (_time: number, delta: number) => {
             this.monsterSystem.update(this.time.now);
             this.pathDebugOverlay.refresh(this.monsterSystem.getDebugMonsters(), this.character.body);
             this.dropSystem.update();
             this.materialManager.update();
-            // Push elapsed time to the UI store. Throttled to ~5Hz so we
-            // don't re-render React 60 times/sec for a 1-second-resolution
-            // display.
-            this.tickLevelClock();
+            this.teleporterSystem.update(delta);
+            // Persist clock + entity snapshots to the UI store (1Hz).
+            this.tickSaveState();
         });
 
         // Tell the editor panel which scene this is. Both the EventBus
@@ -367,30 +380,47 @@ export class LoadScene extends Phaser.Scene {
         // get the payload.
         const payload = { id: this.id, level: this.level };
         setCurrentLevel(payload);
+        useGameStore.getState().setCurrentLevelId(this.id);
         useGameStore.getState().setLevelTitle(this.level.title || this.id);
-        this.levelStartAt = this.time.now;
-        this.lastLevelClockPushAt = this.time.now;
-        useGameStore.getState().setLevelElapsedMs(0);
+        const savedElapsedMs = useGameStore.getState().levelElapsedMs || 0;
+        this.levelStartAt = this.time.now - savedElapsedMs;
+        this.lastSavePushAt = this.time.now;
+        useGameStore.getState().setLevelElapsedMs(savedElapsedMs);
         EventBus.emit('level-loaded', payload);
         EventBus.emit('current-scene-ready', this);
     }
 
     shutdown(): void {
+        this.teleporterSystem?.destroy();
         this.audio?.destroy();
         this.pathDebugOverlay?.destroy();
     }
 
     /**
-     * Push the current elapsed-since-level-start to the UI store. Throttled
-     * to ~5Hz (200ms) so React doesn't re-render 60×/sec for a 1-second
-     * resolution display. The first push always fires immediately so the
-     * HUD shows 00:00 right after create() instead of holding the previous
-     * level's stale time.
+     * Push everything the save file needs — level clock plus player /
+     * monster / drop snapshots — in a single store write, throttled to
+     * 1Hz.
+     *
+     * One write per second is the point, not an accident: the store is
+     * wrapped in zustand's `persist`, which serialises the whole
+     * partialized state and writes localStorage synchronously on every
+     * `set`. At the old 5Hz clock rate that meant JSON.stringify-ing the
+     * live monster list five times a second on the main thread. 1Hz also
+     * matches the HUD clock's own MM:SS resolution, so nothing is lost.
      */
-    private tickLevelClock(): void {
+    private tickSaveState(): void {
         const now = this.time.now;
-        if (now - this.lastLevelClockPushAt < 200) return;
-        this.lastLevelClockPushAt = now;
-        useGameStore.getState().setLevelElapsedMs(now - this.levelStartAt);
+        if (now - this.lastSavePushAt < 1000) return;
+        this.lastSavePushAt = now;
+
+        const playerPos = this.character?.body?.position;
+        useGameStore.getState().setEntitySnapshots({
+            player: playerPos
+                ? { x: Math.round(playerPos.x), y: Math.round(playerPos.y) }
+                : undefined,
+            monsters: this.monsterSystem?.getSnapshot(),
+            drops: this.dropSystem?.getSnapshot(),
+            elapsedMs: now - this.levelStartAt,
+        });
     }
 }

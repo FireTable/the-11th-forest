@@ -40,15 +40,21 @@ EventBus.emit(SFX_EVENT('pickup-hp'));
 
 ## Event naming convention
 
-| Prefix                                        | Producer                                           | Consumer                                 |
-| --------------------------------------------- | -------------------------------------------------- | ---------------------------------------- |
-| `sfx:<id>`                                    | gameplay (weapons / monsters / characters / drops) | `AudioController`                        |
-| `music:<id>`                                  | scenes                                             | `AudioController`                        |
-| `music-stop` / `music-pause` / `music-resume` | scenes (scene lifecycle)                           | `AudioController`                        |
-| `level-loaded`                                | scene                                              | debug panel + others                     |
-| `current-scene-ready`                         | scene                                              | scene consumers (awaiting the scene ref) |
-| `editor-open`                                 | debug panel                                        | scene                                    |
-| `aim-crosshair-update`                        | `CharacterController`                              | React crosshair component                |
+| Prefix                                        | Producer                                           | Consumer                                    |
+| --------------------------------------------- | -------------------------------------------------- | ------------------------------------------- |
+| `sfx:<id>`                                    | gameplay (weapons / monsters / characters / drops) | `AudioController`                           |
+| `music:<id>`                                  | scenes                                             | `AudioController`                           |
+| `music-stop` / `music-pause` / `music-resume` | scenes (scene lifecycle)                           | `AudioController`                           |
+| `level-loaded`                                | scene                                              | debug panel + others                        |
+| `current-scene-ready`                         | scene                                              | scene consumers (awaiting the scene ref)    |
+| `player-died`                                 | `CharacterController`                              | scene (pause) + death overlay               |
+| `editor-open`                                 | debug panel                                        | scene, `MaterialManager`                    |
+| `editor-material-tab-active`                  | editor panel                                       | `MaterialManager` (drag enable)             |
+| `material-*`                                  | editor panel ↔ `MaterialManager`                   | each other (add / update / select / delete) |
+| `teleporter-updated` / `teleporter-changed`   | editor panel ↔ `TeleporterController`              | each other                                  |
+| `dev:cheat:<key>`                             | cheat panel                                        | the system the cheat targets                |
+| `mobile:<action>`                             | `TouchControls` (React)                            | `CharacterController` / `WeaponController`  |
+| `aim-crosshair-update`                        | `CharacterController`                              | React crosshair component                   |
 
 All event names are stable contracts — renaming a published event is a breaking change to every consumer.
 
@@ -56,7 +62,7 @@ All event names are stable contracts — renaming a published event is a breakin
 
 - **Emit via `EventBus.emit`, never via direct method calls across modules.** Two modules that need to talk go through the bus, even if it feels heavier.
 - **One source of truth for event-name construction.** Use the `*_EVENT` helpers in `src/lib/constants.ts` (`SFX_EVENT`, `MUSIC_EVENT`, etc.) instead of building strings inline.
-- **Listeners are cheap to add but must be removable.** Any `on()` call in module init should have a matching `off()` on module teardown — typically in `destroy()` of the controller that registered it.
+- **Listeners are cheap to add but must be removable.** Any `on()` call in module init should have a matching `off()` on module teardown — typically in `destroy()` of the controller that registered it. When the cleanup hangs off a Phaser scene, register it on **both** `shutdown` and `destroy`: stopping a scene emits `shutdown`, but tearing the whole game down (HMR, React unmount) emits only `destroy`. Miss the second and a stale listener survives holding dead game objects.
 - **No payload schema enforcement at runtime.** The `EventNameSchema` in `schema.ts` is documentation-only. Validate payload shape at the consumer if it matters.
 - **Async work in listeners is fine but unbounded.** The bus is sync — if a listener does expensive work it blocks every other listener.
 

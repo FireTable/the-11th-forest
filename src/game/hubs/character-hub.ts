@@ -4,11 +4,16 @@ import type { CharacterSpec } from '@/lib/characters';
 export class CharacterHud {
     constructor(_scene?: unknown, spec?: CharacterSpec) {
         if (spec) {
+            const currentStoreHp = useGameStore.getState().hp;
+            const currentStoreSp = useGameStore.getState().sp;
+            const initialHp = typeof currentStoreHp === 'number' && currentStoreHp > 0 ? currentStoreHp : spec.hp;
+            const initialSp = typeof currentStoreSp === 'number' && currentStoreSp >= 0 && currentStoreHp > 0 ? currentStoreSp : spec.sp;
+
             useGameStore.getState().setCharacterStats({
                 name: spec.name,
-                hp: spec.hp,
+                hp: initialHp,
                 maxHp: spec.hp,
-                sp: spec.sp,
+                sp: initialSp,
                 maxSp: spec.sp,
             });
         }

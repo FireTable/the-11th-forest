@@ -16,8 +16,14 @@
  * us pass a freshly-resolved scene spec bundle.
  */
 
-import { LoadingScene } from '@/game/scenes/loading-scene';
-import { resolveScene, type ResolvedScene } from '@/game/resolve-scene';
+import { LoadScene } from '@/game/scenes/scene';
+import {
+    getCachedResolvedScene,
+    resolveScene,
+    toSceneAssets,
+    type ResolvedScene,
+} from '@/game/resolve-scene';
+import { useGameStore } from '@/store/game-store';
 
 let game: Phaser.Game | null = null;
 
@@ -30,15 +36,9 @@ export function getPhaserGame(): Phaser.Game | null {
 }
 
 /**
- * Stop the dead LoadScene and re-launch LoadingScene, which sees all
- * assets already cached and fires `complete` immediately, then adds a
- * fresh LoadScene with full HP.
- *
- * We deliberately do NOT `scene.remove()` the LoadingScene instance:
- * in production builds removing it appears to evict the texture cache
- * (texture missing → black background + invisible character), even
- * though the docs say the cache is game-scoped. Re-starting the
- * existing LoadingScene avoids touching its lifecycle state.
+ * Swap the running LoadScene for a freshly-constructed one. Every asset
+ * is already in the game-scoped cache, so the new scene's preload()
+ * resolves on the same tick and the level is back up immediately.
  *
  * @param resolved Pre-fetched scene bundle. Caller (the API endpoint)
  *                 computes this so the UI shows a loading state while
@@ -49,26 +49,34 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
         throw new Error('Phaser game not initialised — setPhaserGame never called');
     }
 
-    // Stop + remove only the dead LoadScene (paused). LoadingScene stays
-    // registered so its already-cached texture references survive.
-    const deadKey = `LoadScene:${resolved.id}`;
-    const dead = game.scene.getScene(deadKey);
-    if (dead) {
-        dead.scene.stop();
-        game.scene.remove(deadKey);
+    // Drop every registered scene, not just `LoadScene:${resolved.id}`:
+    // a teleport starts the next level under a different key, so keying
+    // off the caller's id would leave the previous scene alive, ticking
+    // behind the new one. `scenes` is mutated by remove(), hence the copy.
+    //
+    // `remove()` destroys the scene outright. Do NOT call `scene.stop()`
+    // first: ScenePlugin.stop only *queues* an op against the scene KEY,
+    // and we immediately re-register that key — so the queued stop lands
+    // on the fresh scene one frame later and freezes it on arrival.
+    for (const s of [...game.scene.scenes]) {
+        game.scene.remove(s.sys.settings.key);
     }
 
-    // Re-launch the existing LoadingScene. Its queueAssets() re-adds
-    // already-cached assets, the loader fires 'complete' immediately,
-    // and the on-complete handler adds a fresh LoadScene with full HP.
-    const loader = game.scene.getScene('LoadingScene');
-    if (loader) {
-        loader.scene.start();
-    } else {
-        // LoadingScene was somehow never registered — bootstrap a fresh
-        // one. Shouldn't happen on a normal boot path.
-        game.scene.add('LoadingScene', new LoadingScene(), true);
-    }
+    const key = `LoadScene:${resolved.id}`;
+    game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+}
+
+/**
+ * Restart the level the player is currently in, from a clean slate —
+ * the shared path behind both the death overlay's and the settings
+ * panel's Restart button.
+ */
+export function restartCurrentLevel(): void {
+    const resolved = getCachedResolvedScene();
+    if (!resolved) return;
+    useGameStore.getState().setDead(false);
+    useGameStore.getState().resetLevelProgress(resolved.id);
+    void restartSceneWith(resolved);
 }
 
 /**

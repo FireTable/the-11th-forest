@@ -25,6 +25,7 @@ import type {
     MonsterSpawnSchema,
     MonsterTriggerSchema,
     PlacedMaterialSchema,
+    TeleporterSchema,
 } from './schema';
 
 export type AirWallKind = 'tall' | 'short';
@@ -32,6 +33,8 @@ export type AirWallKind = 'tall' | 'short';
 export type AirWallVertex = [number, number];
 
 export type AirWall = z.infer<typeof AirWallSchema>;
+
+export type Teleporter = z.infer<typeof TeleporterSchema>;
 
 export type ImageSize = {
     width: number;

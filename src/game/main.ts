@@ -1,10 +1,17 @@
 import { AUTO, Game, Scale } from 'phaser';
 
-import { LoadingScene } from '@/game/scenes/loading-scene';
-import { cacheResolvedScene, resolveDefaultSceneId, resolveScene } from '@/game/resolve-scene';
+import { LoadScene } from '@/game/scenes/scene';
+import {
+    cacheResolvedScene,
+    resolveDefaultSceneId,
+    resolveScene,
+    toSceneAssets,
+} from '@/game/resolve-scene';
 
 import { PixelLightPostFX } from '@/game/pipelines/pixel-light';
-import { installCanvasFit } from '@/game/scale/canvas-fit';
+import { installCanvasFit } from '@/lib/canvas-fit';
+
+import { useGameStore } from '@/store/game-store';
 
 // Re-exported so the editor's restart path can resolve a scene id
 // without going through main.ts's Phaser-side effects.
@@ -12,10 +19,22 @@ export { resolveScene } from '@/game/resolve-scene';
 export type { ResolvedScene } from '@/game/resolve-scene';
 
 const StartGame = async (parent: string): Promise<Phaser.Game> => {
-    const sceneId = await resolveDefaultSceneId();
-    const scene = await resolveScene(sceneId);
-    // Cache so the death overlay's Restart + LoadingScene's asset queue
-    // can replay without a second YAML round-trip.
+    const savedLevelId = useGameStore.getState().currentLevelId;
+    let scene;
+    if (savedLevelId) {
+        try {
+            scene = await resolveScene(savedLevelId);
+        } catch {
+            const defaultId = await resolveDefaultSceneId();
+            scene = await resolveScene(defaultId);
+        }
+    } else {
+        const defaultId = await resolveDefaultSceneId();
+        scene = await resolveScene(defaultId);
+    }
+    useGameStore.getState().setCurrentLevelId(scene.id);
+    // Cache so the death overlay's Restart can replay without a second
+    // YAML round-trip.
     cacheResolvedScene(scene);
     // World size matches the level's native image dimensions so air-wall
     // coords (defined in image pixel space) align 1:1. The canvas is
@@ -43,11 +62,10 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
                 debug: false,
             },
         },
-        // LoadingScene shows the progress bar, queues every asset, then
-        // dynamically registers a fresh LoadScene when the loader
-        // completes. Keeping LoadScene out of the boot list avoids
-        // constructing it before the asset cache is warm.
-        scene: [new LoadingScene()],
+        // LoadScene queues every asset in its own preload(). The boot
+        // splash in index.html stays up until it emits
+        // `current-scene-ready`, so no in-canvas loading UI is needed.
+        scene: [new LoadScene(scene.id, scene.level, toSceneAssets(scene))],
     } as any);
 
     installCanvasFit(game);

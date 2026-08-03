@@ -1,6 +1,7 @@
 import React from 'react';
 import { CharacterHUDOverlay } from './CharacterHUDOverlay';
 import { DeathOverlay } from './DeathOverlay';
+import { SettingsOverlay } from './SettingsOverlay';
 import { WeaponHUDOverlay } from './WeaponHUDOverlay';
 import { SceneHubOverlay } from './SceneHubOverlay';
 
@@ -41,6 +42,7 @@ export const GameHUDLayer: React.FC = () => {
             <SceneHubOverlay />
             <CharacterHUDOverlay />
             <WeaponHUDOverlay />
+            <SettingsOverlay />
             <DeathOverlay />
         </div>
     );

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface WeaponSlotData {
     id: string;
@@ -8,6 +9,36 @@ export interface WeaponSlotData {
     /** Public-path URL for the weapon thumbnail (e.g. `/assets/image/weapons/arcana-staff.png`).
      *  Undefined for melee weapons or spec.visual entries without a texture. */
     texture?: string;
+}
+
+export interface LevelWaveProgress {
+    currentWaveIndex: number;
+    clearedWaveIds: string[];
+}
+
+export interface PlayerSnapshot {
+    x: number;
+    y: number;
+}
+
+export interface MonsterEntitySnapshot {
+    specId: string;
+    hp: number;
+    x: number;
+    y: number;
+    waveId?: string;
+    spawnIndex?: number;
+}
+
+export interface MonsterSystemSnapshot {
+    activeMonsters: MonsterEntitySnapshot[];
+    pendingSpawnIndices: number[];
+}
+
+export interface DropEntitySnapshot {
+    specId: string;
+    x: number;
+    y: number;
 }
 
 export interface GameUIState {
@@ -27,11 +58,19 @@ export interface GameUIState {
     reloadProgress: number; // 0 to 1
     slots: WeaponSlotData[];
 
-    // Level Status
+    // Level & Save Status
     levelTitle: string;
+    currentLevelId: string;
+    /** Map of levelId -> wave progress, allowing independent per-level wave tracking. */
+    levelProgressMap: Record<string, LevelWaveProgress>;
     /** Elapsed milliseconds since the current level started. Driven by
      *  the scene's update() loop; HUDs read it to display MM:SS. */
     levelElapsedMs: number;
+
+    // Entity Snapshots for Fine-Grained Mid-Combat Save/Restore
+    playerSnapshot?: PlayerSnapshot;
+    activeMonstersSnapshot?: MonsterSystemSnapshot;
+    groundDropsSnapshot?: DropEntitySnapshot[];
 
     // Visibility
     hubsVisible: boolean;
@@ -43,7 +82,16 @@ export interface GameUIState {
 
     // Setters
     setLevelTitle: (title: string) => void;
+    setCurrentLevelId: (levelId: string) => void;
+    setWaveProgress: (levelId: string, progress: Partial<LevelWaveProgress>) => void;
     setLevelElapsedMs: (ms: number) => void;
+    setEntitySnapshots: (snapshots: {
+        player?: PlayerSnapshot;
+        monsters?: MonsterSystemSnapshot;
+        drops?: DropEntitySnapshot[];
+        /** Level clock, piggybacked so a save costs one store write. */
+        elapsedMs?: number;
+    }) => void;
     setCharacterStats: (stats: {
         name?: string;
         hp: number;
@@ -62,9 +110,11 @@ export interface GameUIState {
     }) => void;
     setHubsVisible: (visible: boolean) => void;
     setDead: (dead: boolean) => void;
+    resetLevelProgress: (levelId: string) => void;
+    clearSaveData: () => void;
 }
 
-export const useGameStore = create<GameUIState>((set) => ({
+export const initialGameState = {
     characterName: '',
     hp: 0,
     maxHp: 0,
@@ -77,40 +127,128 @@ export const useGameStore = create<GameUIState>((set) => ({
     activeMaxAmmo: 0,
     isReloading: false,
     reloadProgress: 0,
-    slots: [],
+    slots: [] as WeaponSlotData[],
 
     levelTitle: '',
+    currentLevelId: '',
+    levelProgressMap: {} as Record<string, LevelWaveProgress>,
     levelElapsedMs: 0,
+
+    playerSnapshot: undefined as PlayerSnapshot | undefined,
+    activeMonstersSnapshot: undefined as MonsterSystemSnapshot | undefined,
+    groundDropsSnapshot: undefined as DropEntitySnapshot[] | undefined,
 
     hubsVisible: true,
     isDead: false,
+};
 
-    setLevelTitle: (title) => set({ levelTitle: title }),
-    setLevelElapsedMs: (ms) => set({ levelElapsedMs: ms }),
+export const useGameStore = create<GameUIState>()(
+    persist(
+        (set) => ({
+            ...initialGameState,
 
-    setCharacterStats: (stats) =>
-        set((state) => ({
-            ...state,
-            characterName: stats.name ?? state.characterName,
-            hp: stats.hp,
-            maxHp: stats.maxHp,
-            sp: stats.sp,
-            maxSp: stats.maxSp,
-        })),
+            setLevelTitle: (title) => set({ levelTitle: title }),
 
-    setWeaponStats: (stats) =>
-        set((state) => ({
-            ...state,
-            activeWeaponIndex: stats.activeIndex,
-            activeWeaponName: stats.name,
-            activeAmmo: stats.ammo,
-            activeMaxAmmo: stats.maxAmmo,
-            isReloading: stats.isReloading,
-            reloadProgress: stats.reloadProgress,
-            slots: stats.slots,
-        })),
+            setCurrentLevelId: (levelId) => set({ currentLevelId: levelId }),
 
-    setHubsVisible: (visible) => set({ hubsVisible: visible }),
+            setWaveProgress: (levelId, progress) =>
+                set((state) => {
+                    const targetLevelId = levelId || state.currentLevelId;
+                    if (!targetLevelId) return state;
+                    const existing = state.levelProgressMap[targetLevelId] || {
+                        currentWaveIndex: 0,
+                        clearedWaveIds: [],
+                    };
+                    return {
+                        levelProgressMap: {
+                            ...state.levelProgressMap,
+                            [targetLevelId]: {
+                                currentWaveIndex: progress.currentWaveIndex ?? existing.currentWaveIndex,
+                                clearedWaveIds: progress.clearedWaveIds ?? existing.clearedWaveIds,
+                            },
+                        },
+                    };
+                }),
 
-    setDead: (dead) => set({ isDead: dead }),
-}));
+            setLevelElapsedMs: (ms) => set({ levelElapsedMs: ms }),
+
+            setEntitySnapshots: (snapshots) =>
+                set((state) => ({
+                    ...state,
+                    playerSnapshot: snapshots.player ?? state.playerSnapshot,
+                    activeMonstersSnapshot: snapshots.monsters ?? state.activeMonstersSnapshot,
+                    groundDropsSnapshot: snapshots.drops ?? state.groundDropsSnapshot,
+                    levelElapsedMs: snapshots.elapsedMs ?? state.levelElapsedMs,
+                })),
+
+            setCharacterStats: (stats) =>
+                set((state) => ({
+                    ...state,
+                    characterName: stats.name ?? state.characterName,
+                    hp: stats.hp,
+                    maxHp: stats.maxHp,
+                    sp: stats.sp,
+                    maxSp: stats.maxSp,
+                })),
+
+            setWeaponStats: (stats) =>
+                set((state) => ({
+                    ...state,
+                    activeWeaponIndex: stats.activeIndex,
+                    activeWeaponName: stats.name,
+                    activeAmmo: stats.ammo,
+                    activeMaxAmmo: stats.maxAmmo,
+                    isReloading: stats.isReloading,
+                    reloadProgress: stats.reloadProgress,
+                    slots: stats.slots,
+                })),
+
+            setHubsVisible: (visible) => set({ hubsVisible: visible }),
+
+            setDead: (dead) => set({ isDead: dead }),
+
+            resetLevelProgress: (levelId) =>
+                set((state) => {
+                    const newMap = { ...state.levelProgressMap };
+                    delete newMap[levelId];
+                    return {
+                        levelProgressMap: newMap,
+                        hp: 0,
+                        sp: 0,
+                        slots: [],
+                        playerSnapshot: undefined,
+                        activeMonstersSnapshot: undefined,
+                        groundDropsSnapshot: undefined,
+                        levelElapsedMs: 0,
+                    };
+                }),
+
+            clearSaveData: () => {
+                try {
+                    useGameStore.persist?.clearStorage();
+                } catch {
+                    // Fallback
+                }
+                set(initialGameState);
+            },
+        }),
+        {
+            name: '11th_forest_save_v1',
+            partialize: (state) => ({
+                currentLevelId: state.currentLevelId,
+                levelProgressMap: state.levelProgressMap,
+                characterName: state.characterName,
+                hp: state.hp,
+                maxHp: state.maxHp,
+                sp: state.sp,
+                maxSp: state.maxSp,
+                slots: state.slots,
+                activeWeaponIndex: state.activeWeaponIndex,
+                levelElapsedMs: state.levelElapsedMs,
+                playerSnapshot: state.playerSnapshot,
+                activeMonstersSnapshot: state.activeMonstersSnapshot,
+                groundDropsSnapshot: state.groundDropsSnapshot,
+            }),
+        }
+    )
+);

@@ -17,6 +17,8 @@ import { EventBus } from '@/lib/events/bus';
 import type { DropSpec } from '@/lib/drops';
 import type { DropSpawn } from '@/lib/levels/types';
 
+import { useGameStore } from '@/store/game-store';
+
 import { planDropEffect } from './logic';
 
 // ─── Entity ──────────────────────────────────────────────────────────────
@@ -268,14 +270,36 @@ export class DropController {
         this.character = character;
         this.cb = cb;
 
-        // Self-spawn static drops at scene init.
-        if (spawns) {
+        const dropSnapshots = useGameStore.getState().groundDropsSnapshot;
+        if (dropSnapshots !== undefined && Array.isArray(dropSnapshots)) {
+            // Snapshot exists for this run: restore ground drops if any remain
+            for (const s of dropSnapshots) {
+                try {
+                    this.runtimeDrops.push(new DropInstance(scene, getDrop(s.specId), s.x, s.y, false));
+                } catch {
+                    // Ignore missing specs
+                }
+            }
+        } else if (spawns) {
+            // Fresh start: spawn initial static drops from level config
             for (const s of spawns) {
                 this.staticDrops.push(new DropInstance(scene, getDrop(s.type), s.x, s.y, false));
             }
         }
 
         this.bindCollisions();
+    }
+
+    /** Export fine-grained snapshot of uncollected ground drops. */
+    public getSnapshot(): { specId: string; x: number; y: number }[] {
+        const all = [...this.staticDrops, ...this.runtimeDrops];
+        return all
+            .filter((d) => !d.taken && d.isLanded && d.spec.id)
+            .map((d) => ({
+                specId: d.spec.id!,
+                x: d.body.position.x,
+                y: d.body.position.y,
+            }));
     }
 
     /** Spawn a drop at the given position from monster death rolls. */

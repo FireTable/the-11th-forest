@@ -121,6 +121,19 @@ const SaveLevelSchema = z
                     .strict(),
             )
             .optional(),
+        teleporters: z
+            .array(
+                z
+                    .object({
+                        id: z.string().optional(),
+                        x: z.number(),
+                        y: z.number(),
+                        targetScene: z.string().optional(),
+                        radius: z.number().positive().optional(),
+                    })
+                    .strict(),
+            )
+            .optional(),
     })
     .strict();
 
@@ -533,6 +546,7 @@ function serializeLevelYaml(level) {
         }));
     }
     if (level.materials !== undefined) payload.materials = level.materials;
+    if (level.teleporters !== undefined) payload.teleporters = level.teleporters;
     return stringifyYaml(payload, {
         lineWidth: -1,
         sortKeys: false,
@@ -737,6 +751,7 @@ airWalls: []
 monsters: []
 dropSpawns: []
 materials: []
+teleporters: []
 `;
 
 async function handleCreateScene(req, res) {

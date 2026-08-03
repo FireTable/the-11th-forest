@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Circle, Group, Layer, Line, Stage } from 'react-konva';
 import type Konva from 'konva';
 
+import { EventBus } from '@/lib/events/bus';
 import { movePoint, moveWallPolygon, removePoint } from '@/lib/editor/air-walls';
 import { isMeaningfulPolygon } from '@/lib/editor/polygon';
 import type { AirWall, AirWallVertex, Level } from '@/lib/levels/types';
@@ -93,11 +94,27 @@ export function WallCanvas({
             });
         };
 
-        update();
-        const ro = new ResizeObserver(update);
+        const scheduleUpdate = () => {
+            update();
+            if (typeof window !== 'undefined') {
+                requestAnimationFrame(update);
+                setTimeout(update, 50);
+                setTimeout(update, 150);
+                setTimeout(update, 300);
+            }
+        };
+
+        scheduleUpdate();
+        const ro = new ResizeObserver(scheduleUpdate);
         ro.observe(container);
         ro.observe(phaserCanvas);
-        return () => ro.disconnect();
+
+        EventBus.on('editor-open', scheduleUpdate);
+
+        return () => {
+            ro.disconnect();
+            EventBus.removeListener('editor-open', scheduleUpdate);
+        };
     }, []);
 
     // image → display scale (same math as Phaser Scale.FIT).

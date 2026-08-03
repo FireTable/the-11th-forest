@@ -31,6 +31,8 @@ import {
 } from './weapon';
 import { WeaponVisualController } from './visual';
 
+import { useGameStore } from '@/store/game-store';
+
 import { CAT, DEPTH, PROJECTILE_PLAYER_MASK } from '@/lib/constants';
 
 // ─── Pure helpers ────────────────────────────────────────────────────────
@@ -84,11 +86,18 @@ export class WeaponController {
         this.scene = scene;
         this.matter = matter;
         this.body = body;
-        this.slots = weapons.map((spec) => {
+        const savedActiveIdx = useGameStore.getState().activeWeaponIndex ?? 0;
+        const savedSlots = useGameStore.getState().slots;
+
+        this.currentIndex =
+            savedActiveIdx >= 0 && savedActiveIdx < weapons.length ? savedActiveIdx : 0;
+
+        this.slots = weapons.map((spec, idx) => {
             const clipSize = spec.clipSize ?? 1;
+            const savedSlot = savedSlots?.find((s) => s.id === spec.id) ?? savedSlots?.[idx];
             return {
                 spec,
-                ammo: clipSize,
+                ammo: savedSlot && typeof savedSlot.ammo === 'number' ? Math.min(savedSlot.ammo, clipSize) : clipSize,
                 lastFireAt: 0,
                 reloading: false,
                 reloadStartedAt: 0,

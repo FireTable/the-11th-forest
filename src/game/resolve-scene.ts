@@ -17,6 +17,7 @@ import type { MusicSpec, SfxSpec } from '@/lib/audios';
 import { fetchAudioIndex, fetchAudioMusic, fetchAudioSfx } from '@/lib/audios';
 import type { CharacterSpec } from '@/lib/characters';
 import { fetchCharacter, fetchCharacterIndex } from '@/lib/characters';
+import type { SceneAssets } from '@/game/scenes/scene';
 import { fetchDrop } from '@/lib/drops';
 import type { DropSpec } from '@/lib/drops';
 import { collectDropIds, fetchLevel, fetchLevelIndex } from '@/lib/levels';
@@ -176,5 +177,19 @@ export async function getSpriteCellDims(
     return {
         width: Math.floor(natural.width / character.sprite.grid.cols),
         height: Math.floor(natural.height / character.sprite.grid.rows),
+    };
+}
+
+/** Narrow a ResolvedScene down to what LoadScene's constructor takes. */
+export function toSceneAssets(resolved: ResolvedScene): SceneAssets {
+    return {
+        weapons: resolved.weapons,
+        weaponsById: resolved.weaponsById,
+        character: resolved.character,
+        spriteCell: resolved.spriteCell,
+        monsterSpecs: resolved.monsters,
+        dropSpecs: resolved.drops,
+        sfxSpecs: resolved.sfx,
+        musicSpecs: resolved.music,
     };
 }

@@ -115,6 +115,8 @@ function registerAnim(
     });
 }
 
+import { useGameStore } from '@/store/game-store';
+
 /**
  * Spawn a player Character at the level center. Returns the runtime API;
  * the controller's per-frame tick is wired up in the constructor.
@@ -125,10 +127,10 @@ export function loadCharacter(
     spec: CharacterSpec,
     weapons: WeaponSpec[],
 ): CharacterRuntime {
-    // Per-level override (characterSpawn) takes priority over the image-center
-    // default. Levels without a spawn entry still default to center / right.
-    const spawnX = level.characterSpawn?.x ?? level.imageSize.width / 2;
-    const spawnY = level.characterSpawn?.y ?? level.imageSize.height / 2;
+    const savedPlayer = useGameStore.getState().playerSnapshot;
+    // Saved position takes highest priority, then level characterSpawn, then image center
+    const spawnX = savedPlayer?.x ?? level.characterSpawn?.x ?? level.imageSize.width / 2;
+    const spawnY = savedPlayer?.y ?? level.characterSpawn?.y ?? level.imageSize.height / 2;
 
     const body = scene.matter.add.rectangle(
         // Body center sits halfH above the spawn point so the body's

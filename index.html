@@ -11,9 +11,97 @@
             href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap"
             rel="stylesheet"
         />
+        <!-- Boot splash. Inline (not index.css) so it paints on the first
+             HTML chunk — the main bundle carries Phaser and takes far
+             longer than the app shell. PhaserGame removes #boot once the
+             Game instance exists and Phaser's own progress bar takes over.
+             ponytail: no rotation for portrait phones, it's centred text. -->
+        <style>
+            #boot {
+                position: fixed;
+                inset: 0;
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 22px;
+                background: radial-gradient(ellipse at 50% 45%, #0f1b1c 0%, #05070a 70%);
+                font-family: 'Press Start 2P', monospace;
+                transition: opacity 0.4s ease;
+            }
+            #boot.boot-done {
+                opacity: 0;
+                pointer-events: none;
+            }
+            #boot h1 {
+                margin: 0;
+                font-size: clamp(13px, 3.2vw, 26px);
+                letter-spacing: 0.14em;
+                color: #06b6d4;
+                text-shadow: 0 0 12px rgba(6, 182, 212, 0.55);
+            }
+            #boot .boot-bar {
+                position: relative;
+                width: min(66vw, 420px);
+                height: 16px;
+                overflow: hidden;
+                background: #090d16;
+                border: 2px solid #1e3a3f;
+                box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.9);
+            }
+            #boot .boot-bar::after {
+                content: '';
+                position: absolute;
+                inset: 3px;
+                background: #06b6d4;
+                box-shadow: 0 0 10px rgba(6, 182, 212, 0.8);
+                transform-origin: left center;
+                transform: scaleX(0);
+                /* scaleX, not width: this runs on the compositor, so the bar
+                   keeps gliding while the main thread is busy parsing the
+                   bundle — which is most of what we're waiting for.
+                   Fake progress: quick at first, easing to a 92% hold until
+                   the world is actually ready; no real byte count exists
+                   this early, the loader itself is still downloading. */
+                animation: boot-fill 10s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+            }
+            #boot.boot-done .boot-bar::after {
+                animation: none;
+                transform: scaleX(1);
+                transition: transform 0.3s ease-out;
+            }
+            #boot p {
+                margin: 0;
+                font-size: clamp(7px, 1.5vw, 11px);
+                letter-spacing: 0.18em;
+                color: #4b6668;
+                animation: boot-blink 2.4s ease-in-out infinite alternate;
+            }
+            @keyframes boot-fill {
+                to {
+                    transform: scaleX(0.92);
+                }
+            }
+            @keyframes boot-blink {
+                to {
+                    opacity: 0.35;
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                #boot p {
+                    animation: none;
+                }
+            }
+        </style>
     </head>
 
     <body>
+        <div id="boot">
+            <h1>THE 11TH FOREST</h1>
+            <div class="boot-bar"></div>
+            <p>LOADING THE FOREST…</p>
+        </div>
         <div id="root"></div>
         <script type="module" src="/src/main.tsx"></script>
     </body>

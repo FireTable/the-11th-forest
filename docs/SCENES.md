@@ -38,7 +38,7 @@ src/
       loader.ts                             # fetchLevel / fetchLevelIndex via handle-fetch
       index.ts                              # public barrel
       current-level.ts                      # module-level cache (Editor panel late-mount)
-  store/game-store.ts                       # levelTitle + levelElapsedMs HUD state
+  store/game-store.ts                       # HUD state + the save file (see PERSIST.md)
 ```
 
 ## Runtime flow
@@ -82,11 +82,14 @@ src/game/main.ts:resolveScene()
       9. emit MUSIC_EVENT(level.music)   ← cross-fade into the level's music
      10. Camera center + MaterialManager + optional PointLight + Pixelate/Quantize FX
      11. per-frame: monsterSystem.update / dropSystem.update / material.update /
-                    tickLevelClock (5 Hz push to levelElapsedMs)
-     12. setCurrentLevel + setLevelTitle + setLevelElapsedMs(0)
+                    teleporterSystem.update / tickSaveState (1 Hz — clock + snapshots)
+     12. setCurrentLevel + setCurrentLevelId + setLevelTitle + resume saved clock
      13. EventBus.emit('level-loaded', { id, level })
-     14. EventBus.emit('current-scene-ready', this)
+     14. EventBus.emit('current-scene-ready', this)   ← index.html boot splash fades out
 ```
+
+Systems that find a saved snapshot in the store restore from it instead of
+from the level YAML — see [`PERSIST.md`](./PERSIST.md).
 
 ## handle-fetch: the bridge
 
@@ -107,12 +110,15 @@ This is the **only** approved way to read project resources in shared code (`src
 
 ## Scene id resolution
 
-`src/game/main.ts:resolveScene` reads the scene id in this order:
+`src/game/main.ts` reads the scene id in this order:
 
-1. **URL query** — `?scene=<id>` (debug-only, overrides everything)
-2. **`index.yaml[0]`** — first entry in `public/data/levels/index.yaml`
+1. **Saved `currentLevelId`** — the persisted level from the last session (see [`PERSIST.md`](./PERSIST.md)). Falls through to the next step if the id no longer resolves.
+2. **URL query** — `?scene=<id>` (debug-only)
+3. **`index.yaml[0]`** — first entry in `public/data/levels/index.yaml`
 
-URL override is for testing without editing the index. Default game launch picks the first listed scene.
+Note the consequence: once a save exists, `?scene=` no longer takes effect —
+clear the save (`useGameStore.getState().clearSaveData()`) or use the editor's
+jump-to-scene. On a first visit the URL override behaves as before.
 
 ## Level YAML schema — `public/data/levels/<id>.yaml`
 
@@ -174,6 +180,15 @@ materials: # optional — decorative props (trees, rocks, …)
       flipY: boolean # optional
       mode: background | y-sort | foreground # optional
       depthOffset: number # optional
+
+teleporters: # optional — walk-in portals to another level
+    - id: string # optional
+      x: number
+      y: number
+      radius: number # >0, default 40 — trigger radius in pixels
+      targetScene:
+          string # optional id from index.yaml. Omitted → the next
+          # entry in index.yaml, wrapping to the first at the end.
 ```
 
 The parser strictly validates (Zod) and transforms:
