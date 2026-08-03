@@ -241,24 +241,32 @@ export function spawnMeleeHitbox(
 
         // Inner ring — barely-there hint of the attack's near edge.
         if (innerR > 4) {
-            g.lineStyle(1, arcColor, 0.08);
+            g.lineStyle(1, arcColor, 0.05);
             g.beginPath();
             g.arc(0, 0, innerR, -halfRad, halfRad, false);
             g.strokePath();
         }
 
+        // Mid ring — single faint line so the arc reads as a layer of
+        // ripples instead of one line at the outer rim.
+        const midR = (innerR + outerR) / 2;
+        g.lineStyle(1, arcColor, 0.12);
+        g.beginPath();
+        g.arc(0, 0, midR, -halfRad, halfRad, false);
+        g.strokePath();
+
         // Outer rim — 32 short dashes whose alpha follows a 3-cycle
-        // sine wave across the sweep. Base alpha is near-zero so the
-        // troughs disappear entirely; the peak alpha (0.45) gives a
-        // clear pulse moving along the attack edge. Reads as a
-        // fluctuating wave traveling through the slash zone rather
-        // than a static arc.
+        // sine wave across the sweep. Peak alpha cut roughly in half
+        // (0.45 → 0.22) so the brightest pulse is still a soft white
+        // glint rather than a hard line; base alpha near zero so the
+        // troughs disappear entirely. Three peaks travel along the
+        // edge as the slash plays out.
         const segments = 32;
         const segSweep = (halfRad * 2) / segments;
         for (let i = 0; i < segments; i++) {
             const t = i / segments;
             const wave = 0.5 + 0.5 * Math.sin(t * Math.PI * 6);
-            const alpha = 0.03 + 0.42 * wave;
+            const alpha = 0.015 + 0.21 * wave;
             g.lineStyle(1.5, arcColor, alpha);
             g.beginPath();
             g.arc(
