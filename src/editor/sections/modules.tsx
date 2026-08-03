@@ -7,7 +7,7 @@
  * validation happens server-side on save.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,13 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Field, NumberField, Section } from './fields';
+import {
+    AnimsEditor,
+    SpriteUploader,
+    type SpriteSpec,
+    type AnimSpec,
+} from './sprite-editor';
 
 type ModuleSlug = 'drops' | 'monsters' | 'weapons' | 'audios-sfx' | 'audios-music';
 
@@ -499,6 +506,18 @@ export function MonstersSectionEditor({
                 body: { halfW: 14, halfH: 14 },
                 weaponId: 'monster-default',
                 drops: [],
+                sprite: {
+                    texture: `assets/image/monsters/${id}.png`,
+                    grid: { rows: 4, cols: 4 },
+                    scale: 1.0,
+                    offset: { left: 0, bottom: 0 },
+                },
+                anims: {
+                    idle: { frames: [0, 1], frameRate: 6, repeat: -1 },
+                    move: { frames: [2, 3], frameRate: 10, repeat: -1 },
+                    hit: { frames: [4, 5], frameRate: 12, repeat: 0 },
+                    death: { frames: [6, 6], frameRate: 10, repeat: 0 },
+                },
             })}
             renderForm={(spec, patch) => <MonsterForm spec={spec} patch={patch} />}
         />
@@ -506,6 +525,39 @@ export function MonstersSectionEditor({
 }
 
 function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
+    // Backfill sprite + anims on the fly so older YAMLs (created before
+    // these were added to newTemplate) keep saving without a Zod error.
+    // The patch only fires once when the field is absent — subsequent
+    // edits stay user-controlled.
+    const defaultedRef = useRef(false);
+    useEffect(() => {
+        if (defaultedRef.current) return;
+        if (!spec?.id) return;
+        const needsSprite = !spec.sprite || typeof spec.sprite.texture !== 'string';
+        const needsAnims = !spec.anims;
+        if (!needsSprite && !needsAnims) return;
+        defaultedRef.current = true;
+        const id = spec.id;
+        patch({
+            ...(needsSprite && {
+                sprite: {
+                    texture: `assets/image/monsters/${id}.png`,
+                    grid: { rows: 4, cols: 4 },
+                    scale: 1.0,
+                    offset: { left: 0, bottom: 0 },
+                },
+            }),
+            ...(needsAnims && {
+                anims: {
+                    idle: { frames: [0, 1], frameRate: 6, repeat: -1 },
+                    move: { frames: [2, 3], frameRate: 10, repeat: -1 },
+                    hit: { frames: [4, 5], frameRate: 12, repeat: 0 },
+                    death: { frames: [6, 7], frameRate: 10, repeat: 0 },
+                },
+            }),
+        });
+    }, [spec, patch]);
+
     return (
         <div className="flex flex-col gap-2">
             <Section title="Identity">
@@ -577,6 +629,29 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
             <Section title="Drops">
                 <DropsEditor drops={spec.drops ?? []} onChange={(d) => patch({ drops: d })} />
             </Section>
+            <Section title="Sprite">
+                <SpriteUploader
+                    id={spec.id}
+                    sprite={spec.sprite as SpriteSpec | undefined}
+                    onSpriteChange={(s) => patch({ sprite: s })}
+                    uploadEndpoint="/api/editor/upload-monster-sprite"
+                    defaults={{
+                        grid: { rows: 4, cols: 4 },
+                        scale: 1.0,
+                        offset: { left: 0, bottom: 0 },
+                    }}
+                    spriteFolder="monsters"
+                    altLabel="monster"
+                />
+            </Section>
+
+            <Section title="Anims">
+                <AnimsEditor
+                    anims={(spec.anims ?? {}) as Record<string, AnimSpec>}
+                    onChange={(a) => patch({ anims: a })}
+                    sprite={spec.sprite as SpriteSpec | undefined}
+                />
+            </Section>
             <Section title="AI prompt (regen)">
                 <Textarea
                     value={spec.prompt ?? ''}
@@ -589,6 +664,7 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
         </div>
     );
 }
+
 
 function DropsEditor({
     drops,
@@ -1418,54 +1494,3 @@ function AudioForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
 
 // ─── Shared bits (duplicated from character.tsx for module-level reuse) ──
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div className="bg-neutral-900 border border-neutral-800 rounded p-2.5 flex flex-col gap-2">
-            <div className="font-semibold text-neutral-300 text-[11px] uppercase tracking-wider">
-                {title}
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">{children}</div>
-        </div>
-    );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div>
-            <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
-                {label}
-            </Label>
-            {children}
-        </div>
-    );
-}
-
-function NumberField({
-    label,
-    value,
-    onChange,
-    step,
-    min,
-    max,
-}: {
-    label: string;
-    value: number;
-    onChange: (v: number) => void;
-    step?: number;
-    min?: number;
-    max?: number;
-}) {
-    return (
-        <Field label={label}>
-            <Input
-                type="number"
-                value={value}
-                step={step}
-                min={min}
-                max={max}
-                onChange={(e) => onChange(Number(e.target.value))}
-                className="h-7 text-xs bg-neutral-950 border-neutral-700"
-            />
-        </Field>
-    );
-}

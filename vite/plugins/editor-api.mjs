@@ -833,6 +833,75 @@ async function handleUploadSceneImage(req, res) {
 }
 
 /**
+ * Run scripts/split-sheet.ts against an uploaded monster sprite.
+ * Stash the raw PNG in tmp/editor-uploads, shell out to split-sheet.ts
+ * with --in-place (which copies the source to monsters/raws/<id>.png
+ * and writes the processed sheet to monsters/<id>.png, then cleans
+ * up frame-*.png + recomposed.png). Return the processed PNG's
+ * natural size so the editor can back-fill sprite.texture.
+ *
+ * `options` (all optional, passed through to split-sheet.ts):
+ *   { downsample: 4, colors: 32, pad: 2, outline: 2, dither: false }
+ */
+async function handleUploadMonsterSprite(req, res) {
+    const { id, fileData, options = {} } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    if (typeof fileData !== 'string' || !fileData.startsWith('data:image/')) {
+        return sendJson(res, 400, { error: 'invalid fileData (expected base64 data-URL)' });
+    }
+
+    const base64 = fileData.split(',', 2)[1];
+    const buffer = Buffer.from(base64, 'base64');
+
+    // Save upload to a temp location for split-sheet.ts.
+    const tmpDir = path.resolve(__dirname, '../../tmp/editor-uploads');
+    await mkdir(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, `${id}-${Date.now()}.png`);
+    await writeFile(tmpPath, buffer);
+
+    // Build the split-sheet.ts flags. Defaults match the wanderer
+    // production tuning so a fresh upload "just works".
+    const flags = [
+        '--in-place',
+        `--id=${id}`,
+        `--downsample=${options.downsample ?? 4}`,
+        `--colors=${options.colors ?? 32}`,
+        `--pad=${options.pad ?? 2}`,
+        `--outline=${options.outline ?? 2}`,
+    ];
+    if (options.dither) flags.push('--dither');
+
+    const projectRoot = path.resolve(__dirname, '../..');
+    const cmd = `pnpm tsx scripts/split-sheet.ts "${tmpPath}" "${path.join(PUBLIC_DIR, 'assets/image/monsters')}" ${flags.join(' ')}`;
+
+    const { exec } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execAsync = promisify(exec);
+
+    try {
+        await execAsync(cmd, { cwd: projectRoot, timeout: 120_000 });
+    } catch (e) {
+        // Clean up temp even on failure.
+        await import('node:fs/promises').then((fs) => fs.rm(tmpPath, { force: true }));
+        return sendJson(res, 500, { error: `split-sheet failed: ${String(e?.message ?? e)}` });
+    }
+    await import('node:fs/promises').then((fs) => fs.rm(tmpPath, { force: true }));
+
+    // Read the processed PNG for natural size.
+    const outPath = path.join(PUBLIC_DIR, 'assets/image/monsters', `${id}.png`);
+    const { PNG } = await import('pngjs');
+    const processed = PNG.sync.read(await readFile(outPath));
+
+    return sendJson(res, 200, {
+        ok: true,
+        path: `assets/image/monsters/${id}.png`,
+        naturalSize: { width: processed.width, height: processed.height },
+    });
+}
+
+/**
  * Replace just the `monsters:` array in a level yaml. Cheaper than the
  * full save-level round-trip — monster waves change often during level
  * design while the rest of the level is stable.
@@ -1210,6 +1279,14 @@ export function editorApiPlugin() {
                 if (req.method !== 'POST') return next();
                 try {
                     await handleUploadSceneImage(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/upload-monster-sprite', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleUploadMonsterSprite(req, res);
                 } catch (e) {
                     sendJson(res, 500, { error: String(e?.message ?? e) });
                 }

@@ -64,7 +64,7 @@
  *   └────────────────────────────────────────────────────────┘
  */
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, copyFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 
 import { PNG } from 'pngjs';
@@ -842,20 +842,32 @@ function main(): void {
         recompose(outDir, src, grid.rows, grid.cols, outFile, workPng);
 
         // --in-place: copy source to raws/<id>.png and processed to
-        // <id>.png under public/assets/image/characters/. Requires
-        // --id=<character_id>. Runs the project, not /tmp, so the
-        // Phaser asset pipeline picks up the new sprite immediately.
+        // <id>.png under the caller's `outDir`. Requires --id=<id>.
+        // The caller picks `outDir` (e.g. characters/, monsters/, drops/)
+        // so the script doesn't bake the asset folder into the tool.
         if (inPlace) {
             const id = flags.find((f) => f.startsWith('--id='))?.slice(5);
             if (!id) {
-                throw new Error('--in-place requires --id=<character_id>');
+                throw new Error('--in-place requires --id=<id>');
             }
-            const projectRoot = resolve(__dirname, '..');
-            const processedPath = join(projectRoot, 'public/assets/image/characters', `${id}.png`);
-            const rawsPath = join(projectRoot, 'public/assets/image/characters/raws', `${id}.png`);
+            const processedPath = join(outDir, `${id}.png`);
+            const rawsPath = join(outDir, 'raws', `${id}.png`);
             mkdirSync(dirname(rawsPath), { recursive: true });
             copyFileSync(src, rawsPath);
             copyFileSync(outFile, processedPath);
+            // --in-place consumers expect a clean asset folder: frame-*
+            // and recomposed.png are intermediate artifacts that don't
+            // ship. Wipe them so the asset directory only holds the
+            // final PNG + raws/.
+            for (const f of readdirSync(outDir)) {
+                if (/^(frame-\d+|hash-[a-f0-9]+)\.png$/.test(f)) rmSync(join(outDir, f));
+            }
+            const recomposed = join(outDir, 'recomposed.png');
+            try {
+                rmSync(recomposed, { force: true });
+            } catch {
+                // may not exist (--no-recompose); ignore
+            }
             console.log(`in-place: ${id}.png ← raws/${id}.png (source archived)`);
         }
     }

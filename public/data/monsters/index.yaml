@@ -1,3 +1,4 @@
 monsters:
-    - drone
-    - gunner
+  - drone
+  - gunner
+  - stalker
