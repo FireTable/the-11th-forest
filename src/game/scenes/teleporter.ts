@@ -15,7 +15,7 @@
 
 import * as Phaser from 'phaser';
 
-import { DEPTH } from '@/lib/constants';
+import { DEPTH, SFX_EVENT } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { fetchLevelIndex } from '@/lib/levels/loader';
 import type { Teleporter } from '@/lib/levels/types';
@@ -26,6 +26,8 @@ interface SingleTeleporterView {
     spec: Teleporter;
     graphics: Phaser.GameObjects.Graphics;
     glow: Phaser.GameObjects.Graphics;
+    /** Drawn beneath the static glow + main rings; redrawn every frame. */
+    waveGlow: Phaser.GameObjects.Graphics;
     hitZone: Phaser.GameObjects.Zone;
     particles?: Phaser.GameObjects.Particles.ParticleEmitter;
     rotationAngle: number;
@@ -33,6 +35,12 @@ interface SingleTeleporterView {
     appearAlpha: number;
     hasAppeared: boolean;
     isActive: boolean;
+    /** Outward-shockwave rings, in ms since spawn. Capped to MAX_WAVES. */
+    waves: number[];
+    /** ms-since-scene-start when the next wave should spawn. */
+    nextWaveAt: number;
+    /** Lerped display colors — start at idle targets, drift toward active. */
+    colors: { primary: number; secondary: number; rune: number };
 }
 
 export class TeleporterController {
@@ -63,6 +71,12 @@ export class TeleporterController {
         const glow = this.scene.add.graphics();
         glow.setPosition(spec.x, spec.y);
         glow.setDepth(DEPTH.TELEPORTER_GLOW);
+
+        // Outward shockwave rings — separate Graphics, drawn every frame,
+        // sits behind the static glow so the magic-circle stays crisp.
+        const waveGlow = this.scene.add.graphics();
+        waveGlow.setPosition(spec.x, spec.y);
+        waveGlow.setDepth(DEPTH.TELEPORTER_GLOW - 1);
 
         const graphics = this.scene.add.graphics();
         graphics.setPosition(spec.x, spec.y);
@@ -111,6 +125,7 @@ export class TeleporterController {
             spec,
             graphics,
             glow,
+            waveGlow,
             hitZone,
             particles,
             rotationAngle: 0,
@@ -118,6 +133,13 @@ export class TeleporterController {
             appearAlpha: initiallyCleared ? 1 : 0,
             hasAppeared: initiallyCleared,
             isActive: false,
+            waves: [],
+            // Stagger the first wave per-view so multiple teleporters
+            // don't all pulse on the same frame.
+            nextWaveAt: this.scene.time.now + 600 + Math.random() * 600,
+            // Idle palette on creation so the very first frame already
+            // matches the pre-lerp baseline.
+            colors: { primary: 0x38bdf8, secondary: 0x818cf8, rune: 0xe0e7ff },
         };
 
         hitZone.on('drag', (_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
@@ -127,6 +149,7 @@ export class TeleporterController {
             hitZone.setPosition(newX, newY);
             glow.setPosition(newX, newY);
             graphics.setPosition(newX, newY);
+            waveGlow.setPosition(newX, newY);
             particles?.setPosition(newX, newY);
             spec.x = newX;
             spec.y = newY;
@@ -219,6 +242,7 @@ export class TeleporterController {
                 existing.glow.setPosition(spec.x, spec.y);
                 existing.graphics.setPosition(spec.x, spec.y);
                 existing.particles?.setPosition(spec.x, spec.y);
+                existing.waveGlow.setPosition(spec.x, spec.y);
             } else {
                 this.createTeleporterView(spec, true);
                 if (this.activeEditor) {
@@ -255,6 +279,7 @@ export class TeleporterController {
     }
 
     public update(deltaMs: number): void {
+        const now = this.scene.time.now;
         const playerPos = this.getPlayerPos();
         const cleared = this.isClearedGetter();
 
@@ -276,18 +301,30 @@ export class TeleporterController {
             // Continuous rotation of inner runes
             view.rotationAngle += (deltaMs / 1000) * 1.2;
 
+            // Outward shockwave rings — spawn at idle/active cadence,
+            // age out by lifetime. Each wave is just a timestamp; the
+            // radius + alpha are derived in drawWaves() from how long
+            // it's been alive.
+            this.advanceWaves(view, now);
+            // Color drift toward the active palette when the player
+            // steps into the trigger. Done before draw so the rings,
+            // runes and waves render the same frame in the new hue.
+            this.advanceColors(view, deltaMs, view.isActive);
+
             // Sync visual positions & radius with spec in case updated externally from editor panel
             if (this.activeEditor) {
                 const r = view.spec.radius ?? 40;
                 view.hitZone.setPosition(view.spec.x, view.spec.y);
                 view.hitZone.setSize(r * 2, r * 2);
                 view.glow.setPosition(view.spec.x, view.spec.y);
+                view.waveGlow.setPosition(view.spec.x, view.spec.y);
                 view.graphics.setPosition(view.spec.x, view.spec.y);
                 view.particles?.setPosition(view.spec.x, view.spec.y);
             }
 
             // Draw procedural magic circle
             this.drawMagicCircle(view);
+            this.drawWaves(view);
 
             // Proximity check — only active when teleporter has faded in and editor is not active
             if (
@@ -318,17 +355,20 @@ export class TeleporterController {
     }
 
     private drawMagicCircle(view: SingleTeleporterView): void {
-        const { graphics, glow, spec, rotationAngle, pulseFactor, appearAlpha, isActive } = view;
+        const { graphics, glow, spec, rotationAngle, pulseFactor, appearAlpha } = view;
         graphics.clear();
         glow.clear();
 
         if (appearAlpha <= 0.01) return;
 
         const r = spec.radius ?? 40;
-        // Vibrant Arcana Palette: Electric Cyan (0x38bdf8), Arcana Violet (0x818cf8), Emerald Active (0x34d399), Pure White (0xffffff)
-        const primaryColor = isActive ? 0x34d399 : 0x38bdf8;
-        const secondaryColor = isActive ? 0x6ee7b7 : 0x818cf8;
-        const runeColor = isActive ? 0xa7f3d0 : 0xe0e7ff;
+        // Colors drift between the idle and active palette each frame —
+        // see `advanceColors` in update(). Reading from `view.colors`
+        // here, not picking fresh hex from `isActive`, is what makes
+        // the transition a gradient instead of a hard cut.
+        const primaryColor = view.colors.primary;
+        const secondaryColor = view.colors.secondary;
+        const runeColor = view.colors.rune;
         const alpha = (0.7 + pulseFactor * 0.3) * appearAlpha;
 
         // 1. Dual Soft Radial Glow Aura Matrix
@@ -470,6 +510,13 @@ export class TeleporterController {
         useGameStore.getState().setCurrentLevelId(nextSceneId);
         useGameStore.getState().setEntitySnapshots({ player: undefined, monsters: undefined, drops: undefined });
 
+        // AudioController subscribes to `sfx:*` globally — emit the new
+        // id and the portal-ignition chime plays under the fade. We
+        // emit here, before fadeOut, so the SFX instance is spawned
+        // while the old scene is still the active one (sound objects
+        // are bound to the scene that creates them).
+        EventBus.emit(SFX_EVENT('teleporter-activate'));
+
         // Camera fade out and restart scene
         this.scene.cameras.main.fadeOut(400, 0, 0, 0);
 
@@ -482,9 +529,100 @@ export class TeleporterController {
         for (const view of this.teleporters) {
             view.graphics.destroy();
             view.glow.destroy();
+            view.waveGlow.destroy();
             view.hitZone.destroy();
             view.particles?.destroy();
         }
         this.teleporters = [];
+    }
+
+    // ─── Outward shockwave rings ─────────────────────────────────────────
+    // Each wave is a timestamp; radius / alpha / line width are derived
+    // from `now - spawnedAt` in drawWaves(). Idle: spawn every 1600ms.
+    // Active (player inside the trigger radius): 700ms, so the ring
+    // cadence signals "ready to use".
+    private static readonly WAVE_LIFETIME_MS = 1400;
+    private static readonly WAVE_INTERVAL_IDLE_MS = 1600;
+    private static readonly WAVE_INTERVAL_ACTIVE_MS = 700;
+    private static readonly WAVE_MAX = 3;
+    private static readonly WAVE_RADIUS_MAX_MULT = 1.7;
+    /** Color lerp rate (per second). 4 → ~600ms to traverse the gap. */
+    private static readonly COLOR_LERP_PER_SEC = 4;
+    private static readonly COLORS_IDLE = {
+        primary: 0x38bdf8,
+        secondary: 0x818cf8,
+        rune: 0xe0e7ff,
+    } as const;
+    private static readonly COLORS_ACTIVE = {
+        primary: 0x34d399,
+        secondary: 0x6ee7b7,
+        rune: 0xa7f3d0,
+    } as const;
+
+    /** Linear interpolation of 24-bit RGB at rate `r` per second. */
+    private static lerpRgb(from: number, to: number, dtMs: number): number {
+        const t = 1 - Math.exp(-TeleporterController.COLOR_LERP_PER_SEC * (dtMs / 1000));
+        const a = (from >> 16) & 0xff, b = (to >> 16) & 0xff;
+        const g = (from >> 8) & 0xff, h = (to >> 8) & 0xff;
+        const bl = from & 0xff, br = to & 0xff;
+        return (
+            (Math.round(a + (b - a) * t) << 16) |
+            (Math.round(g + (h - g) * t) << 8) |
+            Math.round(bl + (br - bl) * t)
+        );
+    }
+
+    private advanceColors(view: SingleTeleporterView, dtMs: number, isActive: boolean): void {
+        const target = isActive
+            ? TeleporterController.COLORS_ACTIVE
+            : TeleporterController.COLORS_IDLE;
+        view.colors = {
+            primary: TeleporterController.lerpRgb(view.colors.primary, target.primary, dtMs),
+            secondary: TeleporterController.lerpRgb(view.colors.secondary, target.secondary, dtMs),
+            rune: TeleporterController.lerpRgb(view.colors.rune, target.rune, dtMs),
+        };
+    }
+
+    private advanceWaves(view: SingleTeleporterView, now: number): void {
+        // Drop expired waves
+        view.waves = view.waves.filter(
+            (t) => now - t < TeleporterController.WAVE_LIFETIME_MS,
+        );
+        // Spawn?
+        const interval = view.isActive
+            ? TeleporterController.WAVE_INTERVAL_ACTIVE_MS
+            : TeleporterController.WAVE_INTERVAL_IDLE_MS;
+        if (now >= view.nextWaveAt && view.waves.length < TeleporterController.WAVE_MAX) {
+            view.waves.push(now);
+            // Stagger by interval, not lifetime, so the cadence stays
+            // steady rather than waiting until the last wave dies.
+            view.nextWaveAt = now + interval;
+        }
+    }
+
+    private drawWaves(view: SingleTeleporterView): void {
+        const g = view.waveGlow;
+        g.clear();
+        if (view.appearAlpha <= 0.01) return;
+        const r = view.spec.radius ?? 40;
+        const maxR = r * TeleporterController.WAVE_RADIUS_MAX_MULT;
+        const lifetime = TeleporterController.WAVE_LIFETIME_MS;
+        const now = this.scene.time.now;
+        const primaryColor = view.colors.primary;
+        const secondaryColor = view.colors.secondary;
+        for (const t of view.waves) {
+            const age = now - t;
+            const u = Math.min(1, age / lifetime);
+            // Ease-out cubic so waves start fast, slow toward the edge
+            const eased = 1 - Math.pow(1 - u, 3);
+            const radius = r + (maxR - r) * eased;
+            // Alpha dies fast; line thins as it spreads
+            const alpha = (0.6 * (1 - u * u)) * view.appearAlpha;
+            const width = 2.5 * (1 - u * 0.7);
+            g.lineStyle(width, primaryColor, alpha);
+            g.strokeCircle(0, 0, radius);
+            g.lineStyle(width * 0.6, secondaryColor, alpha * 0.5);
+            g.strokeCircle(0, 0, radius + 2);
+        }
     }
 }

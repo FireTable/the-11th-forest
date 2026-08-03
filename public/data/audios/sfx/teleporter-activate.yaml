@@ -1,0 +1,15 @@
+kind: sfx
+id: teleporter-activate
+name: Teleporter Activate
+source: assets/audio/sfx/teleporter-activate.wav
+volume: 0.85
+# Anime-style magical portal ignition: rising crystalline shimmer that
+# blooms into a soft chime, suggesting the rifts are stable and the
+# passage is opening. ~1s, single hit, no tail — should layer cleanly
+# under the existing music without ducking.
+#
+# Note: `duration` is an input for the ElevenLabs regen script only
+# (scripts/elevenlabs-sfx.ts → defaultDuration), not a runtime spec
+# field. The schema is .strict() and would reject it.
+prompt: MMORPG waypoint activation sound, like activating a hearthstone or portal anchor in World of Warcraft, deep resonant magical hum that builds and stabilizes into a low ethereal glow, layered fantasy synth pads with shimmering high-frequency tinkles on top, satisfying magical confirmation chime, about one second, no voice, no music, no impact hit
+

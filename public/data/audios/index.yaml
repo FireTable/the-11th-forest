@@ -35,6 +35,7 @@ sfx:
     - dodge
     - footstep
     - low-hp-heartbeat
+    - teleporter-activate
 
 music:
     - forest-ambient
