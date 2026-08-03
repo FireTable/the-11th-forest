@@ -239,37 +239,34 @@ export function spawnMeleeHitbox(
         g.setPosition(opts.origin.x, opts.origin.y);
         g.setRotation(opts.angle);
 
-        // Inner ring (closest to attacker, faintest).
+        // Inner ring — barely-there hint of the attack's near edge.
         if (innerR > 4) {
-            g.lineStyle(1, arcColor, 0.2);
+            g.lineStyle(1, arcColor, 0.08);
             g.beginPath();
             g.arc(0, 0, innerR, -halfRad, halfRad, false);
             g.strokePath();
         }
 
-        // Mid ring — half-strength.
-        const midR = (innerR + outerR) / 2;
-        g.lineStyle(1, arcColor, 0.4);
-        g.beginPath();
-        g.arc(0, 0, midR, -halfRad, halfRad, false);
-        g.strokePath();
-
-        // Outer rim — dashed segments whose alpha follows a sine wave
-        // across the sweep. The peak/trough alternation gives the slash
-        // edge a pulsing, fluctuating feel as it travels through space.
-        const segments = 18;
+        // Outer rim — 32 short dashes whose alpha follows a 3-cycle
+        // sine wave across the sweep. Base alpha is near-zero so the
+        // troughs disappear entirely; the peak alpha (0.45) gives a
+        // clear pulse moving along the attack edge. Reads as a
+        // fluctuating wave traveling through the slash zone rather
+        // than a static arc.
+        const segments = 32;
         const segSweep = (halfRad * 2) / segments;
         for (let i = 0; i < segments; i++) {
             const t = i / segments;
-            const alpha = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(t * Math.PI * 2));
-            g.lineStyle(2, arcColor, alpha);
+            const wave = 0.5 + 0.5 * Math.sin(t * Math.PI * 6);
+            const alpha = 0.03 + 0.42 * wave;
+            g.lineStyle(1.5, arcColor, alpha);
             g.beginPath();
             g.arc(
                 0,
                 0,
                 outerR,
                 -halfRad + i * segSweep,
-                -halfRad + (i + 0.45) * segSweep,
+                -halfRad + (i + 0.4) * segSweep,
                 false,
             );
             g.strokePath();
