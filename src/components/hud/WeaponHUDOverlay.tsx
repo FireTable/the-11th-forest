@@ -4,6 +4,8 @@ import { useGameStore } from '@/store/game-store';
 import { EventBus } from '@/lib/events/bus';
 import { useIsMobile } from '@/lib/use-is-mobile';
 
+import { CornerPixels } from './retro-box';
+
 /**
  * Weapon HUD.
  *
@@ -61,6 +63,7 @@ export const WeaponHUDOverlay: React.FC = () => {
                                 }`}
                             style={{ width: SLOT_PX, height: SLOT_PX }}
                         >
+                            <CornerPixels />
                             {slot.texture ? (
                                 <img
                                     src={slot.texture}
@@ -91,7 +94,8 @@ export const WeaponHUDOverlay: React.FC = () => {
                                         : 'bg-black/70 text-stone-400 border-stone-700'
                                         }`}
                                 >
-                                    {String(slot.ammo).padStart(2, '0')}/{String(slot.clipSize).padStart(2, '0')}
+                                    {String(slot.ammo).padStart(2, '0')}/
+                                    {String(slot.clipSize).padStart(2, '0')}
                                 </span>
                             )}
                             {/* Reload progress overlay (active slot only) */}
@@ -137,7 +141,7 @@ export const WeaponHUDOverlay: React.FC = () => {
                             : 100;
                     const offset = index - activeWeaponIndex;
                     const angle = offset * 12;
-                    const yShift = isActive ? -20 : Math.abs(offset) * 3;
+                    const yShift = isActive ? -20 : Math.abs(offset) * 4;
                     const z = isActive ? 50 : 40 - Math.abs(offset);
                     return (
                         <button
@@ -157,16 +161,12 @@ export const WeaponHUDOverlay: React.FC = () => {
                                 left: '50%',
                                 marginLeft: -45,
                             }}
-                            className={`absolute w-[90px] h-[150px] border-2 transition-all duration-200 ease-out pointer-events-auto cursor-pointer backdrop-blur-sm overflow-hidden ${isActive
+                            className={`absolute w-[90px] h-[150px] border-2 transition-all duration-200 ease-out pointer-events-auto cursor-pointer backdrop-blur-sm ${isActive
                                 ? 'bg-amber-950/85 border-amber-400 shadow-[0_4px_12px_rgba(0,0,0,0.45),inset_0_0_8px_rgba(245,158,11,0.4)]'
                                 : 'bg-black/70 border-stone-800 text-stone-400 shadow-[0_2px_8px_rgba(0,0,0,0.45)] hover:border-amber-400 hover:text-amber-200'
                                 }`}
                         >
-                            {/* 4 Retro Corner Pixels */}
-                            <span className="absolute -top-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
-                            <span className="absolute -top-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
-                            <span className="absolute -bottom-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
-                            <span className="absolute -bottom-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400 pointer-events-none z-10" />
+                            <CornerPixels />
 
                             {/* Hotkey rank — uniform size across active
                              *  and inactive so cards look identical. */}
@@ -183,62 +183,46 @@ export const WeaponHUDOverlay: React.FC = () => {
                              *  name + ammo in the middle, vertical
                              *  reload bar on the bottom. Identical
                              *  layout for every card. */}
-                            {/* Ammo battery fill — rises from the bottom of the card and
-                             *  drains downward as ammo depletes. Layered
-                             *  behind the texture so the weapon image
-                             *  stays visible; the fill colour (amber for
-                             *  active, stone for inactive) reads through
-                             *  the translucent texture. Replaces the old
-                             *  horizontal progress strip with a battery-
-                             *  style indicator. */}
-                            <div
-                                className={`absolute inset-x-0 bottom-0 pointer-events-none transition-[height] duration-500 ease-out ${isActive ? 'bg-amber-400/40' : 'bg-stone-500/25'}`}
-                                style={{ height: `${ammoFrac}%` }}
-                            />
-                            {/* Weapon texture — fills the card as a translucent
-                             *  background element (cover-fit, ~30%
-                             *  opacity). Sits behind the stats text
-                             *  via z-0; cards without a texture fall
-                             *  back to a tiny name placeholder. */}
-                            {slot.texture && (
-                                /* Rendered as a sideways (90° rotated)
-                                 *  translucent background — like a gun
-                                 *  laid on its side filling the card.
-                                 *  Width is sized to the card's WIDTH
-                                 *  (70px) so the rotated texture fits
-                                 *  inside the 80px card without being
-                                 *  clipped. After -90° rotation the
-                                 *  texture's horizontal axis becomes
-                                 *  the card's vertical axis, so the
-                                 *  image fills the long dimension
-                                 *  (height) while staying within the
-                                 *  card's narrow width. object-contain
-                                 *  + max-height cap keeps the full
-                                 *  texture visible without overflow. */
-                                <img
-                                    src={slot.texture}
-                                    alt={slot.name}
-                                    draggable={false}
-                                    className={`absolute pointer-events-none object-contain ${isActive ? 'opacity-80' : 'opacity-50'}`}
-                                    style={{
-                                        imageRendering: 'pixelated',
-                                        top: '50%',
-                                        left: '50%',
-                                        // Width 75px (after rotate this
-                                        // becomes the card's vertical
-                                        // axis) gives a 5px padding on
-                                        // each side of the 80px card
-                                        // width. No height cap so the
-                                        // texture fills the full 150px
-                                        // card length when its aspect
-                                        // allows.
-                                        width: '90px',
-                                        height: 'auto',
-                                        maxHeight: '150px',
-                                        transform: 'translate(-50%, -50%) rotate(-90deg)',
-                                    }}
+                            {/* Only the fill + texture need clipping; keeping
+                             *  `overflow-hidden` off the card itself is what
+                             *  lets the corner pixels sit outside the border. */}
+                            <div className="absolute inset-0 overflow-hidden">
+                                {/* Ammo battery fill — rises from the bottom of the card and
+                                 *  drains downward as ammo depletes. Layered
+                                 *  behind the texture so the weapon image
+                                 *  stays visible; the fill colour (amber for
+                                 *  active, stone for inactive) reads through
+                                 *  the translucent texture. */}
+                                <div
+                                    className={`absolute inset-x-0 bottom-0 pointer-events-none transition-[height] duration-500 ease-out ${isActive ? 'bg-amber-400/40' : 'bg-stone-500/25'}`}
+                                    style={{ height: `${ammoFrac}%` }}
                                 />
-                            )}
+                                {slot.texture && (
+                                    /* Rendered as a sideways (90° rotated)
+                                     *  translucent background — like a gun
+                                     *  laid on its side filling the card.
+                                     *  After -90° rotation the texture's
+                                     *  horizontal axis becomes the card's
+                                     *  vertical axis, so the image fills the
+                                     *  long dimension while staying within
+                                     *  the card's narrow width. */
+                                    <img
+                                        src={slot.texture}
+                                        alt={slot.name}
+                                        draggable={false}
+                                        className={`absolute pointer-events-none object-contain ${isActive ? 'opacity-80' : 'opacity-50'}`}
+                                        style={{
+                                            imageRendering: 'pixelated',
+                                            top: '50%',
+                                            left: '50%',
+                                            width: '90px',
+                                            height: 'auto',
+                                            maxHeight: '150px',
+                                            transform: 'translate(-50%, -50%) rotate(-90deg)',
+                                        }}
+                                    />
+                                )}
+                            </div>
                             {/* Foreground stats column — sits on top of
                              *  the translucent texture. Vertically
                              *  distributed: hotkey rank, then name +
@@ -246,7 +230,9 @@ export const WeaponHUDOverlay: React.FC = () => {
                              *  horizontal ammo bar pinned at the bottom. */}
                             <div className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-2 pb-2 px-1.5 gap-1 pointer-events-none">
                                 {!slot.texture && (
-                                    <span className={`w-14 h-14 flex items-center justify-center text-[8px] font-bold text-center leading-tight px-1 ${isActive ? 'text-amber-200/70' : 'text-stone-400/70'}`}>
+                                    <span
+                                        className={`w-14 h-14 flex items-center justify-center text-[8px] font-bold text-center leading-tight px-1 ${isActive ? 'text-amber-200/70' : 'text-stone-400/70'}`}
+                                    >
                                         {slot.name}
                                     </span>
                                 )}
@@ -258,7 +244,9 @@ export const WeaponHUDOverlay: React.FC = () => {
                                     >
                                         {slot.name}
                                     </span>
-                                    <span className={`text-[10px] font-mono leading-none tabular-nums drop-shadow-[1px_1px_0px_#000] ${isActive ? 'text-amber-300' : 'text-stone-500'}`}>
+                                    <span
+                                        className={`text-[10px] font-mono leading-none tabular-nums drop-shadow-[1px_1px_0px_#000] ${isActive ? 'text-amber-300' : 'text-stone-500'}`}
+                                    >
                                         {String(slot.ammo).padStart(2, '0')}
                                         <span className="text-stone-500"> / </span>
                                         {String(slot.clipSize).padStart(2, '0')}

@@ -3,6 +3,8 @@ import { Heart, Zap } from 'lucide-react';
 import { useGameStore } from '@/store/game-store';
 import { useIsMobile } from '@/lib/use-is-mobile';
 
+import { CornerPixels, RETRO_BOX } from './retro-box';
+
 export const CharacterHUDOverlay: React.FC = () => {
     const { characterName, hp, maxHp, sp, maxSp, hubsVisible } = useGameStore();
     const mobile = useIsMobile();
@@ -55,12 +57,8 @@ export const CharacterHUDOverlay: React.FC = () => {
     return (
         <div className="absolute bottom-6 left-6 z-20 pointer-events-none select-none flex flex-col gap-2 font-['Silkscreen',monospace]">
             {/* Retro Pixel Box - Dark Outer Border + Amber Accent Corners */}
-            <div className="bg-stone-950/40 p-3.5 min-w-[260px] border-2 border-stone-900/80 shadow-[0_4px_16px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(245,158,11,0.25)] backdrop-blur-sm relative">
-                {/* 4 Corner Pixels */}
-                <div className="absolute -top-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400" />
-                <div className="absolute -top-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400" />
-                <div className="absolute -bottom-[3px] -left-[3px] w-[3px] h-[3px] bg-amber-400" />
-                <div className="absolute -bottom-[3px] -right-[3px] w-[3px] h-[3px] bg-amber-400" />
+            <div className={`${RETRO_BOX} relative p-3.5 min-w-[260px]`}>
+                <CornerPixels />
 
                 {/* Character Name & Icon Header */}
                 <div className="flex items-center gap-2 mb-2 pb-1 border-b-2 border-amber-900/60">

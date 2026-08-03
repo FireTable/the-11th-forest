@@ -17,7 +17,13 @@
  */
 
 import { LoadScene } from '@/game/scenes/scene';
-import { resolveScene, toSceneAssets, type ResolvedScene } from '@/game/resolve-scene';
+import {
+    getCachedResolvedScene,
+    resolveScene,
+    toSceneAssets,
+    type ResolvedScene,
+} from '@/game/resolve-scene';
+import { useGameStore } from '@/store/game-store';
 
 let game: Phaser.Game | null = null;
 
@@ -43,14 +49,34 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
         throw new Error('Phaser game not initialised — setPhaserGame never called');
     }
 
-    const key = `LoadScene:${resolved.id}`;
-    const dead = game.scene.getScene(key);
-    if (dead) {
-        dead.scene.stop();
-        game.scene.remove(key);
+    // Drop every registered scene, not just `LoadScene:${resolved.id}`:
+    // a teleport starts the next level under a different key, so keying
+    // off the caller's id would leave the previous scene alive, ticking
+    // behind the new one. `scenes` is mutated by remove(), hence the copy.
+    //
+    // `remove()` destroys the scene outright. Do NOT call `scene.stop()`
+    // first: ScenePlugin.stop only *queues* an op against the scene KEY,
+    // and we immediately re-register that key — so the queued stop lands
+    // on the fresh scene one frame later and freezes it on arrival.
+    for (const s of [...game.scene.scenes]) {
+        game.scene.remove(s.sys.settings.key);
     }
 
+    const key = `LoadScene:${resolved.id}`;
     game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+}
+
+/**
+ * Restart the level the player is currently in, from a clean slate —
+ * the shared path behind both the death overlay's and the settings
+ * panel's Restart button.
+ */
+export function restartCurrentLevel(): void {
+    const resolved = getCachedResolvedScene();
+    if (!resolved) return;
+    useGameStore.getState().setDead(false);
+    useGameStore.getState().resetLevelProgress(resolved.id);
+    void restartSceneWith(resolved);
 }
 
 /**

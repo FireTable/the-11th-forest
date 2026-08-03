@@ -41,18 +41,20 @@ pnpm build        # 生产构建,产物输出到 dist/
 
 ## 项目结构
 
-| 路径                   | 说明                                 |
-| ---------------------- | ------------------------------------ |
-| `index.html`           | HTML 外壳                            |
-| `src/main.tsx`         | React 入口                           |
-| `src/App.tsx`          | 顶层 React 组件                      |
-| `src/PhaserGame.tsx`   | Phaser 与 React 之间的桥接           |
-| `src/game/`            | 游戏源码                             |
-| `src/game/main.ts`     | Phaser 游戏配置与启动                |
-| `src/game/scenes/`     | Phaser 场景目录(MainMenu / Game / …) |
-| `src/game/EventBus.ts` | 跨边界事件总线                       |
-| `public/assets/`       | 静态资源(贴图、音频)                 |
-| `public/style.css`     | 页面级 CSS                           |
+| 路径                      | 说明                                           |
+| ------------------------- | ---------------------------------------------- |
+| `index.html`              | HTML 外壳 + 启动画面                           |
+| `src/main.tsx`            | React 入口                                     |
+| `src/App.tsx`             | 顶层 React 组件                                |
+| `src/PhaserGame.tsx`      | Phaser 与 React 之间的桥接                     |
+| `src/game/`               | 游戏源码,每个模块一个目录                      |
+| `src/game/main.ts`        | Phaser 游戏配置与启动                          |
+| `src/game/scenes/`        | `LoadScene` —— 所有关卡共用的通用场景          |
+| `src/lib/events/bus.ts`   | 跨边界事件总线                                 |
+| `src/store/game-store.ts` | HUD 状态 + 持久化存档                          |
+| `public/data/`            | 关卡 / 怪物 / 武器 / … 的 YAML                 |
+| `public/assets/`          | 静态资源(贴图、音频)                           |
+| `docs/`                   | 长文档,见 [`docs/README.md`](./docs/README.md) |
 
 ## AI 生成音乐
 
@@ -77,25 +79,9 @@ VITE_GEMINI_MODEL=gemini-3-pro-image
 
 直接编辑 `src/` 下任何文件,Vite 会自动热更新。
 
-新增一个 Phaser 场景:
-
-1. 在 `src/game/scenes/MyScene.ts` 创建场景类。
-2. 在 `src/game/main.ts` 的 `scene` 数组里注册。
-3. 在场景的 `create()` 中通过 `EventBus.emit('current-scene-ready', this)` 通知 React,以便外部获取场景句柄:
-
-```ts
-class MyScene extends Phaser.Scene {
-    constructor() {
-        super('MyScene');
-    }
-
-    create() {
-        // … 你的游戏对象
-
-        EventBus.emit('current-scene-ready', this);
-    }
-}
-```
+没有"每个关卡一个场景类"这回事 —— `LoadScene` 按 YAML 渲染所有关卡。新增关卡只需写
+`public/data/levels/<id>.yaml` 并把 id 加进 `index.yaml`,完整流程见
+[`docs/SCENES.md`](./docs/SCENES.md)。
 
 ## 文档
 
@@ -108,7 +94,7 @@ class MyScene extends Phaser.Scene {
 
 各模块参考:
 
-- [`docs/WEAPONS.md`](./docs/WEAPONS.md) · [`docs/MONSTERS.md`](./docs/MONSTERS.md) · [`docs/CHARACTERS.md`](./docs/CHARACTERS.md) · [`docs/DROPS.md`](./docs/DROPS.md) · [`docs/AUDIOS.md`](./docs/AUDIOS.md) · [`docs/EVENTS.md`](./docs/EVENTS.md)
+- [`docs/WEAPONS.md`](./docs/WEAPONS.md) · [`docs/MONSTERS.md`](./docs/MONSTERS.md) · [`docs/CHARACTERS.md`](./docs/CHARACTERS.md) · [`docs/DROPS.md`](./docs/DROPS.md) · [`docs/AUDIOS.md`](./docs/AUDIOS.md) · [`docs/EVENTS.md`](./docs/EVENTS.md) · [`docs/PERSIST.md`](./docs/PERSIST.md) · [`docs/EDITOR.md`](./docs/EDITOR.md)
 
 ## 许可证
 

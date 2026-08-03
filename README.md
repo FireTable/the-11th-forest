@@ -41,18 +41,20 @@ Dev server defaults to `http://localhost:8080`.
 
 ## Project Structure
 
-| Path                   | Description                       |
-| ---------------------- | --------------------------------- |
-| `index.html`           | HTML shell                        |
-| `src/main.tsx`         | React entry point                 |
-| `src/App.tsx`          | Top-level React component         |
-| `src/PhaserGame.tsx`   | Phaser ↔ React bridge             |
-| `src/game/`            | Game source                       |
-| `src/game/main.ts`     | Phaser game config & boot         |
-| `src/game/scenes/`     | Phaser Scenes (MainMenu, Game, …) |
-| `src/game/EventBus.ts` | Cross-boundary event bus          |
-| `public/assets/`       | Static assets (sprites, audio)    |
-| `public/style.css`     | Page-level CSS                    |
+| Path                      | Description                                               |
+| ------------------------- | --------------------------------------------------------- |
+| `index.html`              | HTML shell + boot splash                                  |
+| `src/main.tsx`            | React entry point                                         |
+| `src/App.tsx`             | Top-level React component                                 |
+| `src/PhaserGame.tsx`      | Phaser ↔ React bridge                                     |
+| `src/game/`               | Game source, one directory per module                     |
+| `src/game/main.ts`        | Phaser game config & boot                                 |
+| `src/game/scenes/`        | `LoadScene` — one generic scene for all levels            |
+| `src/lib/events/bus.ts`   | Cross-boundary event bus                                  |
+| `src/store/game-store.ts` | HUD state + persisted save file                           |
+| `public/data/`            | Level / monster / weapon / … YAML                         |
+| `public/assets/`          | Static assets (sprites, audio)                            |
+| `docs/`                   | Long-form docs — see [`docs/README.md`](./docs/README.md) |
 
 ## AI-Generated Music
 
@@ -77,25 +79,9 @@ VITE_GEMINI_MODEL=gemini-3-pro-image
 
 Edit anything under `src/`. Vite hot-reloads on save.
 
-To add a new Phaser Scene:
-
-1. Create `src/game/scenes/MyScene.ts`.
-2. Register it in the `scene` array inside `src/game/main.ts`.
-3. Emit `current-scene-ready` from the Scene's `create()` so React can grab a handle:
-
-```ts
-class MyScene extends Phaser.Scene {
-    constructor() {
-        super('MyScene');
-    }
-
-    create() {
-        // … your game objects
-
-        EventBus.emit('current-scene-ready', this);
-    }
-}
-```
+There is no per-level scene class — `LoadScene` renders every level from its
+YAML. To add a level, write `public/data/levels/<id>.yaml` and list the id in
+`index.yaml`; see [`docs/SCENES.md`](./docs/SCENES.md) for the full walkthrough.
 
 ## Documentation
 
@@ -108,7 +94,7 @@ Start with:
 
 Per-module references:
 
-- [`docs/WEAPONS.md`](./docs/WEAPONS.md) · [`docs/MONSTERS.md`](./docs/MONSTERS.md) · [`docs/CHARACTERS.md`](./docs/CHARACTERS.md) · [`docs/DROPS.md`](./docs/DROPS.md) · [`docs/AUDIOS.md`](./docs/AUDIOS.md) · [`docs/EVENTS.md`](./docs/EVENTS.md)
+- [`docs/WEAPONS.md`](./docs/WEAPONS.md) · [`docs/MONSTERS.md`](./docs/MONSTERS.md) · [`docs/CHARACTERS.md`](./docs/CHARACTERS.md) · [`docs/DROPS.md`](./docs/DROPS.md) · [`docs/AUDIOS.md`](./docs/AUDIOS.md) · [`docs/EVENTS.md`](./docs/EVENTS.md) · [`docs/PERSIST.md`](./docs/PERSIST.md) · [`docs/EDITOR.md`](./docs/EDITOR.md)
 
 ## License
 
