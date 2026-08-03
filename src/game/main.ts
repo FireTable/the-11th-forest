@@ -11,14 +11,28 @@ import {
 import { PixelLightPostFX } from '@/game/pipelines/pixel-light';
 import { installCanvasFit } from '@/lib/canvas-fit';
 
+import { useGameStore } from '@/store/game-store';
+
 // Re-exported so the editor's restart path can resolve a scene id
 // without going through main.ts's Phaser-side effects.
 export { resolveScene } from '@/game/resolve-scene';
 export type { ResolvedScene } from '@/game/resolve-scene';
 
 const StartGame = async (parent: string): Promise<Phaser.Game> => {
-    const sceneId = await resolveDefaultSceneId();
-    const scene = await resolveScene(sceneId);
+    const savedLevelId = useGameStore.getState().currentLevelId;
+    let scene;
+    if (savedLevelId) {
+        try {
+            scene = await resolveScene(savedLevelId);
+        } catch {
+            const defaultId = await resolveDefaultSceneId();
+            scene = await resolveScene(defaultId);
+        }
+    } else {
+        const defaultId = await resolveDefaultSceneId();
+        scene = await resolveScene(defaultId);
+    }
+    useGameStore.getState().setCurrentLevelId(scene.id);
     // Cache so the death overlay's Restart can replay without a second
     // YAML round-trip.
     cacheResolvedScene(scene);

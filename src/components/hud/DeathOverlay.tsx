@@ -26,6 +26,7 @@ export function DeathOverlay() {
         const resolved = getCachedResolvedScene();
         if (!resolved) return;
         useGameStore.getState().setDead(false);
+        useGameStore.getState().resetLevelProgress(resolved.id);
         void restartSceneWith(resolved);
     }
 

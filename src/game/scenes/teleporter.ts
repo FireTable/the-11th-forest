@@ -20,6 +20,7 @@ import { EventBus } from '@/lib/events/bus';
 import { fetchLevelIndex } from '@/lib/levels/loader';
 import type { Teleporter } from '@/lib/levels/types';
 import { resolveAndRestart } from '@/lib/phaser-game';
+import { useGameStore } from '@/store/game-store';
 
 interface SingleTeleporterView {
     spec: Teleporter;
@@ -464,6 +465,10 @@ export class TeleporterController {
         if (!nextSceneId) {
             nextSceneId = this.currentSceneId; // Fallback to current scene if none found
         }
+
+        // Update persistent level store to next scene ID and reset level entity snapshots
+        useGameStore.getState().setCurrentLevelId(nextSceneId);
+        useGameStore.getState().setEntitySnapshots({ player: undefined, monsters: undefined, drops: undefined });
 
         // Camera fade out and restart scene
         this.scene.cameras.main.fadeOut(400, 0, 0, 0);

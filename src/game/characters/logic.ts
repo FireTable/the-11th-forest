@@ -282,8 +282,11 @@ export class CharacterController {
         this.scene = scene;
         this.spec = spec;
         this.parts = parts;
-        this.hp = spec.hp;
-        this.sp = spec.sp;
+
+        const savedHp = useGameStore.getState().hp;
+        const savedSp = useGameStore.getState().sp;
+        this.hp = typeof savedHp === 'number' && savedHp > 0 ? Math.min(savedHp, spec.hp) : spec.hp;
+        this.sp = typeof savedSp === 'number' && savedSp >= 0 ? Math.min(savedSp, spec.sp) : spec.sp;
 
         // Honor a pre-existing dev "Infinite HP" toggle (e.g. user
         // toggled it, then refreshed the page). The cheat panel only

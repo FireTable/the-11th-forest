@@ -40,6 +40,7 @@ import {
 import type { MonsterTrigger } from '@/lib/levels';
 import type { DropRef, MonsterSpec } from '@/lib/monsters';
 import { StatusHud } from '@/game/hubs/status-hud';
+import { useGameStore, type MonsterSystemSnapshot } from '@/store/game-store';
 
 import {
     chaseVelocity,
@@ -382,13 +383,44 @@ export class MonsterController {
         this.cb = cb;
         this.matter = (Phaser as any).Physics.Matter.Matter;
         this.pathfinder = pathfinder;
+        const monsterSnapshot = useGameStore.getState().activeMonstersSnapshot;
+        const activeMonsters = Array.isArray(monsterSnapshot?.activeMonsters)
+            ? monsterSnapshot!.activeMonsters
+            : Array.isArray(monsterSnapshot)
+                ? (monsterSnapshot as any)
+                : undefined;
 
-        // Self-spawn monsters from the spawn list (replaces the old
-        // spawnMonsters helper — controller owns its own construction).
-        // Spawns without a `trigger` (or with `kind: 'time', delayMs: 0`)
-        // fire immediately; everything else lands in the pending queue and
-        // gets checked each frame via `advanceSpawnQueue`.
-        if (spawns) {
+        if (activeMonsters) {
+            // Restore active monster entities from snapshot
+            for (const snap of activeMonsters) {
+                const match = spawns?.find((s) => s.spec.id === snap.specId);
+                if (match) {
+                    const monster = new Monster(scene, match.spec, match.weapon, snap.x, snap.y, snap.waveId);
+                    monster.hp = snap.hp;
+                    this.monsters.push(monster);
+                }
+            }
+            // Restore pending spawns queue using saved pendingSpawnIndices
+            if (spawns && Array.isArray(monsterSnapshot?.pendingSpawnIndices)) {
+                const pendingSet = new Set(monsterSnapshot!.pendingSpawnIndices);
+                spawns.forEach((s, index) => {
+                    if (pendingSet.has(index) && s.trigger) {
+                        this.pendingSpawns.push({
+                            pending: {
+                                index,
+                                type: s.spec.id!,
+                                x: s.x,
+                                y: s.y,
+                                trigger: s.trigger,
+                                waveId: s.waveId,
+                            },
+                            spec: s.spec,
+                            weapon: s.weapon,
+                        });
+                    }
+                });
+            }
+        } else if (spawns) {
             spawns.forEach((s, index) => {
                 const trigger = s.trigger;
                 // Immediate: no trigger at all, OR `kind: 'time', delayMs: 0`.
@@ -414,6 +446,24 @@ export class MonsterController {
         }
 
         this.bindCollisions();
+    }
+
+    /** Export fine-grained snapshot of active monsters and remaining pending spawn queue. */
+    public getSnapshot(): MonsterSystemSnapshot {
+        const activeMonsters = this.monsters
+            .filter((m) => !m.dead && m.state !== 'dying')
+            .map((m) => ({
+                specId: m.spec.id!,
+                hp: m.hp,
+                x: m.body.position.x,
+                y: m.body.position.y,
+                waveId: m.waveId,
+            }));
+        const pendingSpawnIndices = this.pendingSpawns.map((p) => p.pending.index);
+        return {
+            activeMonsters,
+            pendingSpawnIndices,
+        };
     }
 
     /** Get active alive monsters positions (hitbox center) for aim assist magnet. */
@@ -939,6 +989,7 @@ export class MonsterController {
     private kill(m: Monster): void {
         m.state = 'dying';
         EventBus.emit(SFX_EVENT(m.spec.sfx?.death ?? 'monster-death'));
+        this.updateWaveProgressSave();
 
         // Hide the held weapon during the death animation so it doesn't
         // float in mid-air beside the corpse.
@@ -1051,6 +1102,46 @@ export class MonsterController {
             if (refreshed) q.pending.clearReadyAt = refreshed.clearReadyAt;
             return true;
         });
+
+        this.updateWaveProgressSave();
+    }
+
+    private updateWaveProgressSave(): void {
+        const levelId = (this.scene as any).id;
+        if (!levelId) return;
+
+        // Active waves still alive or pending
+        const activeWaveIds = new Set<string>();
+        for (const m of this.monsters) {
+            if (!m.dead && m.state !== 'dying' && m.waveId) {
+                activeWaveIds.add(m.waveId);
+            }
+        }
+        for (const p of this.pendingSpawns) {
+            if (p.pending.waveId) {
+                activeWaveIds.add(p.pending.waveId);
+            }
+        }
+
+        const existing = useGameStore.getState().levelProgressMap[levelId];
+        const cleared = new Set<string>(existing?.clearedWaveIds ?? []);
+        let changed = false;
+
+        // Check if any wave previously spawned has now completely cleared
+        for (const m of this.monsters) {
+            if (m.waveId && !activeWaveIds.has(m.waveId) && !cleared.has(m.waveId)) {
+                cleared.add(m.waveId);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            const clearedList = Array.from(cleared);
+            useGameStore.getState().setWaveProgress(levelId, {
+                clearedWaveIds: clearedList,
+                currentWaveIndex: clearedList.length,
+            });
+        }
     }
 
     private bindCollisions(): void {
