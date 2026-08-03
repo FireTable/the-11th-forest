@@ -15,8 +15,15 @@ visual:
 bullet:
     texture: assets/image/weapons/laser-beam-segment.png
     type: beam
-    speed: 900
-    scale: 0.16
+    speed: 800
+    # The laser-beam-segment PNG is 882px wide — at scale 0.16 the
+    # rendered sprite is ~140px, longer than the bullet body's
+    # radius. With a long sprite anchored on the body, half the beam
+    # visibly sticks past the wall on the last frame before the body
+    # is destroyed. Pin scale tight so the sprite matches the head
+    # (≈ body radius) and the trail renderer carries the long-bar
+    # look. Collision still happens at the body — that's the head.
+    scale: 0.08
     anchor: [0.5, 0.5]
 projectile:
     speed: 30
