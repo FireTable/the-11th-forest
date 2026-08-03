@@ -1,18 +1,18 @@
 name: Moss Bark Rifle
 damage: 5
 cooldownMs: 900
-range: 380
+range: 450
 bulletsPerShot: 1
 bullet:
     texture: assets/image/weapons/bark-missile.png
     type: projectile
-    scale: 0.5
-    anchor: [0.5, 0.5]
+    scale: 0.35
+    anchor: [0.5, 0.35]
 visual:
     texture: assets/image/weapons/moss-bark-rifle.png
-    scale: 0.18
-    orbitRadius: 22
-    anchor: [0.55, 0.5]
+    scale: 0.6
+    orbitRadius: 40
+    anchor: [0.65, 0.5]
     recoilDistance: 4
     recoilDuration: 100
 projectile:

@@ -2,13 +2,13 @@ name: Thorn Scythe Claws
 damage: 14
 cooldownMs: 600
 range: 60
-hitWidth: 80
-hitHeight: 80
+hitWidth: 120
+hitHeight: 120
 visual:
     texture: assets/image/weapons/thorn-scythe-claws.png
-    scale: 0.18
-    orbitRadius: 14
-    anchor: [0.2, 0.5]
+    scale: 0.8
+    orbitRadius: 24
+    anchor: [0.3, 0.6]
     swingAngle: 200
 sfx:
     shoot: plasma-sword-shoot

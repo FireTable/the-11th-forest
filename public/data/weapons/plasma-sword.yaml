@@ -2,14 +2,14 @@ name: Plasma Sword
 damage: 22
 cooldownMs: 400
 range: 180
-hitWidth: 80
-hitHeight: 80
+hitWidth: 120
+hitHeight: 120
 visual:
     texture: assets/image/weapons/plasma-sword.png
     scale: 0.16
     orbitRadius: 10
     anchor: [0.1, 0.5]
-    swingAngle: 180
+    swingAngle: 200
     rotationOffset: 0
 bullet:
     texture: assets/image/weapons/plasma-slash-arc.png
