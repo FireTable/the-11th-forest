@@ -11,7 +11,6 @@ import { isMobileLike } from '@/lib/mobile';
 import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 import { AirWallsSection } from './sections/air-walls';
-import { BackgroundSection } from './sections/background';
 import { CharacterSection, type CharacterSaveState } from './sections/character';
 import { CheatPanel } from './cheat-panel';
 import { MaterialsSection } from './sections/materials';
@@ -24,7 +23,6 @@ import {
 } from './sections/modules';
 import { MonstersSection } from './sections/monsters';
 import { ScenesListSection } from './sections/scenes-list';
-import { SettingsSection } from './sections/settings';
 import { WallCanvas } from './wall-canvas';
 
 interface ScenePayload {
@@ -33,7 +31,7 @@ interface ScenePayload {
 }
 
 type TopTab = 'scenes' | 'characters' | 'drops' | 'monsters' | 'weapons' | 'audios';
-type SceneSubTab = 'scenes' | 'background' | 'settings' | 'monsters' | 'air-walls' | 'materials';
+type SceneSubTab = 'scenes' | 'monsters' | 'air-walls' | 'materials';
 
 const TOP_TABS: { id: TopTab; label: string }[] = [
     { id: 'scenes', label: 'Scenes' },
@@ -46,8 +44,6 @@ const TOP_TABS: { id: TopTab; label: string }[] = [
 
 const SCENE_SUB_TABS: { id: SceneSubTab; label: string }[] = [
     { id: 'scenes', label: 'Scenes' },
-    { id: 'background', label: 'Background' },
-    { id: 'settings', label: 'Settings' },
     { id: 'monsters', label: 'Monsters' },
     { id: 'air-walls', label: 'Air walls' },
     { id: 'materials', label: 'Materials' },
@@ -67,6 +63,14 @@ export function EditorPanel() {
     const [level, setLevel] = useState<Level | null>(null);
     const [topTab, setTopTab] = useState<TopTab>('scenes');
     const [sceneSubTab, setSceneSubTab] = useState<SceneSubTab>('scenes');
+    /**
+     * Which scene row is expanded inline to show its Background + Settings.
+     * Lives in the panel rather than the scene list because the
+     * expansion should follow the *current* scene: jump to a scene
+     * also expands it. Click the same row again to collapse; switching
+     * entities via the sub-tab does not collapse.
+     */
+    const [expandedSceneId, setExpandedSceneId] = useState<string | null>(null);
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -274,23 +278,15 @@ export function EditorPanel() {
                             onSceneChange={handleSceneChange}
                             level={level}
                             setLevel={handleLevelChange}
+                            expandedSceneId={expandedSceneId}
+                            onToggleExpand={setExpandedSceneId}
+                            onAfterBackgroundSave={handleBackgroundSave}
                         />
                     )}
-                    {!level && topTab === 'scenes' && sceneSubTab !== 'scenes' && (
+                    {topTab === 'scenes' && sceneSubTab !== 'scenes' && !level && (
                         <div className="text-neutral-500 italic text-center py-4">
                             Waiting for scene…
                         </div>
-                    )}
-                    {level && topTab === 'scenes' && sceneSubTab === 'background' && (
-                        <BackgroundSection
-                            sceneId={sceneId!}
-                            level={level}
-                            setLevel={handleLevelChange}
-                            onAfterSave={handleBackgroundSave}
-                        />
-                    )}
-                    {level && topTab === 'scenes' && sceneSubTab === 'settings' && (
-                        <SettingsSection level={level} setLevel={handleLevelChange} />
                     )}
                     {level && topTab === 'scenes' && sceneSubTab === 'monsters' && (
                         <MonstersSection

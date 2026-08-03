@@ -32,7 +32,7 @@ interface Props {
     sceneId: string;
     level: Level;
     setLevel: (next: Level) => void;
-    onAfterSave: () => void;
+    onAfterSave?: () => void | Promise<void>;
 }
 
 export function BackgroundSection({ sceneId, level, setLevel, onAfterSave }: Props) {
@@ -87,7 +87,7 @@ export function BackgroundSection({ sceneId, level, setLevel, onAfterSave }: Pro
             imageSize: { width: size.width, height: size.height },
         };
         setLevel(next);
-        onAfterSave();
+        void onAfterSave?.();
     }
 
     return (

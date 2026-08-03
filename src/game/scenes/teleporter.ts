@@ -15,7 +15,7 @@
 
 import * as Phaser from 'phaser';
 
-import { DEPTH, SFX_EVENT } from '@/lib/constants';
+import { SFX_EVENT } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { fetchLevelIndex } from '@/lib/levels/loader';
 import type { Teleporter } from '@/lib/levels/types';
@@ -41,12 +41,38 @@ interface SingleTeleporterView {
     nextWaveAt: number;
     /** Lerped display colors — start at idle targets, drift toward active. */
     colors: { primary: number; secondary: number; rune: number };
+    /**
+     * No next scene to jump to. The teleporter renders grey, never
+     * triggers — there's no point letting the player walk into it.
+     */
+    disabled: boolean;
+}
+
+/**
+ * Module-level handoff for the just-teleported-from spec id. Written
+ * synchronously by `triggerSceneTransition` BEFORE `restartSceneWith`
+ * adds the new scene, then read once by the new controller's
+ * constructor. Cleared on read. The window is short (microseconds in
+ * practice) but the value is intentionally not on the game store — it
+ * would persist across page reloads and block teleporters forever.
+ */
+let lastTriggeredFromId: string | null = null;
+export function setLastTriggeredFromId(id: string | null): void {
+    lastTriggeredFromId = id;
 }
 
 export class TeleporterController {
     private teleporters: SingleTeleporterView[] = [];
     private isTransitioning = false;
     private activeEditor = false;
+    /**
+     * Spec ids the player just arrived through — these are ignored for
+     * the trigger check until the player physically walks out of their
+     * radius. Prevents the "step off the portal, immediately re-enter
+     * the same portal" loop when the new scene's spawn lands on top
+     * of the same teleporter (or its reverse).
+     */
+    private readonly cooldownIds: Set<string> = new Set();
 
     constructor(
         private readonly scene: Phaser.Scene,
@@ -55,13 +81,57 @@ export class TeleporterController {
         private readonly getPlayerPos: () => { x: number; y: number } | null,
         private readonly isClearedGetter: () => boolean = () => true,
     ) {
+        if (lastTriggeredFromId !== null) {
+            this.cooldownIds.add(lastTriggeredFromId);
+            lastTriggeredFromId = null;
+        }
         const initiallyCleared = this.isClearedGetter();
         if (teleporterSpecs && teleporterSpecs.length > 0) {
             for (const spec of teleporterSpecs) {
                 this.createTeleporterView(spec, initiallyCleared);
+                // Disabled flag is set async after the index resolves —
+                // until then the view defaults to enabled (false), which
+                // matches the no-end-of-list case and is what we want
+                // for the rare network-failure case anyway.
+                void TeleporterController.resolveNextScene(spec, this.currentSceneId).then(
+                    (next) => {
+                        const view = this.teleporters[this.teleporters.length - 1];
+                        if (!view) return;
+                        view.disabled = next === null;
+                        if (view.disabled) {
+                            // Stop the energy sparkles so the portal
+                            // visibly goes dormant when there's no
+                            // destination to send the player to.
+                            view.particles?.stop();
+                        }
+                    },
+                );
             }
         }
         this.bindEvents();
+    }
+
+    /**
+     * Resolve the destination scene id, with the same fallback rules as
+     * `triggerSceneTransition`. Returns null at end-of-list — meaning
+     * "this teleporter has nowhere to send the player", which the view
+     * layer reads as `disabled: true` (grey, no trigger).
+     */
+    private static async resolveNextScene(
+        spec: Teleporter,
+        currentSceneId: string,
+    ): Promise<string | null> {
+        if (spec.targetScene) return spec.targetScene;
+        try {
+            const index = await fetchLevelIndex();
+            const currentIdx = index.levels.indexOf(currentSceneId);
+            if (currentIdx !== -1 && currentIdx + 1 < index.levels.length) {
+                return index.levels[currentIdx + 1];
+            }
+        } catch (e) {
+            console.error('Failed to resolve next scene from index:', e);
+        }
+        return null;
     }
 
     private createTeleporterView(spec: Teleporter, initiallyCleared: boolean): void {
@@ -69,24 +139,31 @@ export class TeleporterController {
 
         // Container for glow and main graphics — placed at top foreground depth
         const glow = this.scene.add.graphics();
+        // Y-sort the whole teleporter so the player can walk in front
+        // of the lower half and behind the upper half, like a real
+        // ground decal. Depth = spec.y (the portal's center y in image
+        // pixel space), which lives in the same range characters use
+        // for their feetY-based depth.
+        const teleporterDepth = Math.round(spec.y);
+
         glow.setPosition(spec.x, spec.y);
-        glow.setDepth(DEPTH.TELEPORTER_GLOW);
+        glow.setDepth(teleporterDepth - 1);
 
         // Outward shockwave rings — separate Graphics, drawn every frame,
         // sits behind the static glow so the magic-circle stays crisp.
         const waveGlow = this.scene.add.graphics();
         waveGlow.setPosition(spec.x, spec.y);
-        waveGlow.setDepth(DEPTH.TELEPORTER_GLOW - 1);
+        waveGlow.setDepth(teleporterDepth - 2);
 
         const graphics = this.scene.add.graphics();
         graphics.setPosition(spec.x, spec.y);
-        graphics.setDepth(DEPTH.TELEPORTER_GRAPHICS);
+        graphics.setDepth(teleporterDepth);
 
         // Hit zone for Phaser drag interactivity
         const hitZone = this.scene.add.zone(spec.x, spec.y, r * 2, r * 2);
         hitZone.setSize(r * 2, r * 2);
         hitZone.setOrigin(0.5, 0.5);
-        hitZone.setDepth(DEPTH.TELEPORTER_HIT_ZONE);
+        hitZone.setDepth(teleporterDepth);
 
         // Particle emitter for upward energy sparkles
         let particles: Phaser.GameObjects.Particles.ParticleEmitter | undefined;
@@ -116,7 +193,7 @@ export class TeleporterController {
                 frequency: 150,
                 emitting: initiallyCleared,
             });
-            particles.setDepth(DEPTH.TELEPORTER_PARTICLES);
+            particles.setDepth(teleporterDepth + 1);
         } catch {
             // Fallback gracefully if particles unavailable
         }
@@ -131,6 +208,7 @@ export class TeleporterController {
             rotationAngle: 0,
             pulseFactor: 0,
             appearAlpha: initiallyCleared ? 1 : 0,
+            disabled: false,
             hasAppeared: initiallyCleared,
             isActive: false,
             waves: [],
@@ -153,6 +231,7 @@ export class TeleporterController {
             particles?.setPosition(newX, newY);
             spec.x = newX;
             spec.y = newY;
+            this.applyYsortDepth(view);
             EventBus.emit('teleporter-updated', {
                 id: spec.id,
                 x: newX,
@@ -243,6 +322,7 @@ export class TeleporterController {
                 existing.graphics.setPosition(spec.x, spec.y);
                 existing.particles?.setPosition(spec.x, spec.y);
                 existing.waveGlow.setPosition(spec.x, spec.y);
+                this.applyYsortDepth(existing);
             } else {
                 this.createTeleporterView(spec, true);
                 if (this.activeEditor) {
@@ -320,6 +400,7 @@ export class TeleporterController {
                 view.waveGlow.setPosition(view.spec.x, view.spec.y);
                 view.graphics.setPosition(view.spec.x, view.spec.y);
                 view.particles?.setPosition(view.spec.x, view.spec.y);
+                this.applyYsortDepth(view);
             }
 
             // Draw procedural magic circle
@@ -337,6 +418,12 @@ export class TeleporterController {
                 continue;
             }
 
+            // Disabled (no next scene) — never triggers, just sits grey.
+            if (view.disabled) {
+                view.isActive = false;
+                continue;
+            }
+
             const dist = Phaser.Math.Distance.Between(
                 playerPos.x,
                 playerPos.y,
@@ -345,7 +432,21 @@ export class TeleporterController {
             );
 
             const triggerRadius = view.spec.radius ?? 40;
-            if (dist <= triggerRadius) {
+
+            // Cooldown: the spec id the player just arrived through is
+            // ignored while the player stays inside its radius. As soon
+            // as they walk out, the cooldown releases and a future
+            // re-entry can re-trigger normally.
+            const isInRadius = dist <= triggerRadius;
+            if (view.spec.id && this.cooldownIds.has(view.spec.id)) {
+                if (!isInRadius) {
+                    this.cooldownIds.delete(view.spec.id);
+                }
+                view.isActive = false;
+                continue;
+            }
+
+            if (isInRadius) {
                 view.isActive = true;
                 this.triggerSceneTransition(view.spec);
             } else {
@@ -365,10 +466,12 @@ export class TeleporterController {
         // Colors drift between the idle and active palette each frame —
         // see `advanceColors` in update(). Reading from `view.colors`
         // here, not picking fresh hex from `isActive`, is what makes
-        // the transition a gradient instead of a hard cut.
-        const primaryColor = view.colors.primary;
-        const secondaryColor = view.colors.secondary;
-        const runeColor = view.colors.rune;
+        // the transition a gradient instead of a hard cut. A disabled
+        // teleporter (no next scene) overrides the palette to grey so
+        // the player can tell at a glance it's not wired up.
+        const primaryColor = view.disabled ? 0x6b7280 : view.colors.primary;
+        const secondaryColor = view.disabled ? 0x9ca3af : view.colors.secondary;
+        const runeColor = view.disabled ? 0xd1d5db : view.colors.rune;
         const alpha = (0.7 + pulseFactor * 0.3) * appearAlpha;
 
         // 1. Dual Soft Radial Glow Aura Matrix
@@ -485,17 +588,25 @@ export class TeleporterController {
         if (this.isTransitioning) return;
         this.isTransitioning = true;
 
+        // Handoff BEFORE the scene swap — the next TeleporterController's
+        // constructor reads this and adds the id to its cooldown set.
+        // The id is the *source* teleporter's id, not the destination's.
+        if (spec.id) {
+            setLastTriggeredFromId(spec.id);
+        }
+
         let nextSceneId = spec.targetScene;
 
-        // If targetScene is omitted, resolve next scene from level index manifest
+        // If targetScene is omitted, resolve next scene from level index manifest.
+        // No loop-back at the end — null means "no next scene" and the
+        // teleporter is rendered grey (see `resolveNextScene` for the
+        // version called at view-creation time).
         if (!nextSceneId) {
             try {
                 const index = await fetchLevelIndex();
                 const currentIdx = index.levels.indexOf(this.currentSceneId);
                 if (currentIdx !== -1 && currentIdx + 1 < index.levels.length) {
                     nextSceneId = index.levels[currentIdx + 1];
-                } else if (index.levels.length > 0) {
-                    nextSceneId = index.levels[0]; // Loop back to first scene if at the end
                 }
             } catch (e) {
                 console.error('Failed to resolve next scene from index:', e);
@@ -572,6 +683,20 @@ export class TeleporterController {
         );
     }
 
+    /**
+     * Re-derive every layered depth on the view from `spec.y` so the
+     * teleporter stays Y-sorted after the editor drags it. Caller must
+     * have updated `spec.x` / `spec.y` first.
+     */
+    private applyYsortDepth(view: SingleTeleporterView): void {
+        const d = Math.round(view.spec.y);
+        view.waveGlow.setDepth(d - 2);
+        view.glow.setDepth(d - 1);
+        view.graphics.setDepth(d);
+        view.hitZone.setDepth(d);
+        view.particles?.setDepth(d + 1);
+    }
+
     private advanceColors(view: SingleTeleporterView, dtMs: number, isActive: boolean): void {
         const target = isActive
             ? TeleporterController.COLORS_ACTIVE
@@ -608,8 +733,8 @@ export class TeleporterController {
         const maxR = r * TeleporterController.WAVE_RADIUS_MAX_MULT;
         const lifetime = TeleporterController.WAVE_LIFETIME_MS;
         const now = this.scene.time.now;
-        const primaryColor = view.colors.primary;
-        const secondaryColor = view.colors.secondary;
+        const primaryColor = view.disabled ? 0x6b7280 : view.colors.primary;
+        const secondaryColor = view.disabled ? 0x9ca3af : view.colors.secondary;
         for (const t of view.waves) {
             const age = now - t;
             const u = Math.min(1, age / lifetime);

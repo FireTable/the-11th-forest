@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, Plus } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +22,8 @@ import { Label } from '@/components/ui/label';
 import type { Level } from '@/lib/levels/types';
 import { resolveAndRestart } from '@/lib/phaser-game';
 
+import { BackgroundSection } from './background';
+import { SettingsSection } from './settings';
 import { TeleportersSection } from './teleporters';
 
 interface SceneRow {
@@ -34,9 +36,25 @@ interface Props {
     onSceneChange: (id: string) => void;
     level?: Level | null;
     setLevel?: (next: Level) => void;
+    /**
+     * Scene id of the row currently expanded inline to show its
+     * Background + Settings. Click the same row to collapse.
+     */
+    expandedSceneId: string | null;
+    onToggleExpand: (id: string | null) => void;
+    /** Forwarded to BackgroundSection so the level gets re-loaded. */
+    onAfterBackgroundSave?: () => void | Promise<void>;
 }
 
-export function ScenesListSection({ currentSceneId, onSceneChange, level, setLevel }: Props) {
+export function ScenesListSection({
+    currentSceneId,
+    onSceneChange,
+    level,
+    setLevel,
+    expandedSceneId,
+    onToggleExpand,
+    onAfterBackgroundSave,
+}: Props) {
     const [scenes, setScenes] = useState<SceneRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -130,46 +148,86 @@ export function ScenesListSection({ currentSceneId, onSceneChange, level, setLev
                 {scenes.map((s) => {
                     const isCurrent = s.id === currentSceneId;
                     const jumping = jumpingTo === s.id;
+                    const isExpanded = expandedSceneId === s.id;
                     return (
                         <div
                             key={s.id}
-                            className={`flex items-center gap-2 border rounded px-2 py-1.5 ${
+                            className={`border rounded ${
                                 isCurrent
                                     ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200'
                                     : 'bg-neutral-900 border-neutral-800 text-neutral-300'
                             }`}
                         >
-                            <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate text-[12px]">{s.title}</div>
-                                <div className="text-[10px] font-mono text-neutral-500 truncate">
-                                    {s.id}
-                                </div>
+                            <div className="flex items-center gap-2 px-2 py-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        onToggleExpand(isExpanded ? null : s.id)
+                                    }
+                                    className="text-neutral-400 hover:text-neutral-100"
+                                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                                >
+                                    {isExpanded ? (
+                                        <ChevronDown className="size-3" />
+                                    ) : (
+                                        <ChevronRight className="size-3" />
+                                    )}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => jumpTo(s.id)}
+                                    disabled={isCurrent || jumping}
+                                    className="flex-1 min-w-0 text-left disabled:cursor-default"
+                                    title={
+                                        isCurrent
+                                            ? 'Currently loaded (click to load again)'
+                                            : 'Jump to this scene'
+                                    }
+                                >
+                                    <div className="font-medium truncate text-[12px]">
+                                        {s.title}
+                                    </div>
+                                    <div className="text-[10px] font-mono text-neutral-500 truncate">
+                                        {s.id}
+                                    </div>
+                                </button>
+                                {isCurrent ? (
+                                    <span className="text-[10px] font-semibold text-cyan-400 px-1.5">
+                                        Active
+                                    </span>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => jumpTo(s.id)}
+                                        className="h-6 text-[10px] gap-1 px-2 bg-transparent border-neutral-700"
+                                    >
+                                        Jump
+                                        <ArrowRight className="size-3" />
+                                    </Button>
+                                )}
                             </div>
-                            <Button
-                                size="sm"
-                                variant={isCurrent ? 'default' : 'outline'}
-                                disabled={isCurrent || jumping}
-                                onClick={() => jumpTo(s.id)}
-                                className={`h-6 text-[10px] gap-1 px-2 ${
-                                    isCurrent
-                                        ? 'bg-cyan-500 text-black font-semibold'
-                                        : 'bg-transparent border-neutral-700'
-                                }`}
-                                title={isCurrent ? 'Currently loaded' : 'Jump to this scene'}
-                            >
-                                {jumping ? 'Loading…' : isCurrent ? 'Active' : 'Jump'}
-                                {!isCurrent && !jumping && <ArrowRight className="size-3" />}
-                            </Button>
+                            {isExpanded && isCurrent && level && setLevel && (
+                                <div className="border-t border-neutral-800 p-2 flex flex-col gap-3">
+                                    <BackgroundSection
+                                        sceneId={s.id}
+                                        level={level}
+                                        setLevel={setLevel}
+                                        onAfterSave={onAfterBackgroundSave}
+                                    />
+                                    <SettingsSection level={level} setLevel={setLevel} />
+                                    <TeleportersSection level={level} setLevel={setLevel} />
+                                </div>
+                            )}
+                            {isExpanded && !isCurrent && (
+                                <div className="border-t border-neutral-800 px-2 py-2 text-[10px] text-neutral-500 italic">
+                                    Jump to this scene to edit its background, settings &amp; teleporters.
+                                </div>
+                            )}
                         </div>
                     );
                 })}
             </div>
-
-            {level && setLevel && (
-                <div className="border-t border-neutral-800 pt-3 mt-1">
-                    <TeleportersSection level={level} setLevel={setLevel} />
-                </div>
-            )}
 
             <Dialog open={newOpen} onOpenChange={setNewOpen}>
                 <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
