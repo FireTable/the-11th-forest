@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import { EventBus } from '@/lib/events/bus';
-import { isMobileLike } from '@/lib/mobile';
+import { appRect, isMobileLike, toAppPoint } from '@/lib/mobile';
+import { useHudScale } from '@/lib/use-hud-scale';
 
 /**
  * src/components/hud/TouchControls.tsx
@@ -46,6 +47,7 @@ export const TouchControls: React.FC = () => {
     const joystickRef = useRef<JoystickState | null>(null);
     const firingRef = useRef<boolean>(false);
     const dodgeRef = useRef<boolean>(false);
+    const { scale, width, height } = useHudScale();
 
     useEffect(() => {
         const evaluate = (): void => setVisible(isMobileLike());
@@ -65,7 +67,10 @@ export const TouchControls: React.FC = () => {
     };
 
     const handleJoystickStart = (e: React.PointerEvent<HTMLDivElement>): void => {
-        const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+        // App space, not client space: the layer may be rotated 90° and
+        // is scaled, so both the centre and the pointer have to be read
+        // through the same transform for the delta to mean anything.
+        const rect = appRect(e.currentTarget as HTMLDivElement);
         joystickRef.current = {
             pointerId: e.pointerId,
             centerX: rect.left + rect.width / 2,
@@ -76,8 +81,11 @@ export const TouchControls: React.FC = () => {
     const handleJoystickMove = (e: React.PointerEvent<HTMLDivElement>): void => {
         const js = joystickRef.current;
         if (!js || js.pointerId !== e.pointerId) return;
-        const dx = e.clientX - js.centerX;
-        const dy = e.clientY - js.centerY;
+        const p = toAppPoint(e.clientX, e.clientY);
+        // ÷ scale: the delta is in on-screen px, the knob is positioned
+        // in the layer's pre-scale px.
+        const dx = (p.x - js.centerX) / scale;
+        const dy = (p.y - js.centerY) / scale;
         const clamped = clampOffset(dx, dy);
         setKnobOffset(clamped);
         const rawLen = Math.hypot(clamped.x, clamped.y);
@@ -136,7 +144,15 @@ export const TouchControls: React.FC = () => {
     });
 
     return (
-        <div className="fixed inset-0 z-30 pointer-events-none select-none touch-none">
+        <div
+            className="fixed left-0 top-0 z-30 pointer-events-none select-none touch-none"
+            style={{
+                width: `${width / scale}px`,
+                height: `${height / scale}px`,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+            }}
+        >
             {/* Joystick — bottom-left */}
             <div
                 className="absolute pointer-events-auto"

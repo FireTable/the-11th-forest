@@ -38,6 +38,7 @@ import {
 } from '@/lib/constants';
 import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
+import { appRect, toAppPoint } from '@/lib/mobile';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 import { useGameStore } from '@/store/game-store';
@@ -740,7 +741,7 @@ export class CharacterController {
         const canvas = (this.scene as any).game?.canvas as HTMLCanvasElement | undefined;
         if (!canvas) return;
 
-        const rectEl = canvas.getBoundingClientRect();
+        const rectEl = appRect(canvas);
         const camera = this.scene.cameras.main;
         if (!rectEl || !camera) return;
 
@@ -831,11 +832,14 @@ export class CharacterController {
 
         const onPointerEvent = (e: PointerEvent) => {
             const now = performance.now();
+            // App space — on mobile the whole app is rotated 90°, so raw
+            // clientX/Y would aim at right angles to the cursor.
+            const p = toAppPoint(e.clientX, e.clientY);
             if (!this.hasPointerMoved) {
-                this.lastClientX = e.clientX;
-                this.lastClientY = e.clientY;
-                this.rawClientX = e.clientX;
-                this.rawClientY = e.clientY;
+                this.lastClientX = p.x;
+                this.lastClientY = p.y;
+                this.rawClientX = p.x;
+                this.rawClientY = p.y;
                 this.hasPointerMoved = true;
                 this.lastMouseTime = now;
                 this.updateAimTarget(now);
@@ -843,12 +847,12 @@ export class CharacterController {
             }
 
             const dt = Math.max(1, now - this.lastMouseTime);
-            const dx = e.clientX - this.lastClientX;
-            const dy = e.clientY - this.lastClientY;
+            const dx = p.x - this.lastClientX;
+            const dy = p.y - this.lastClientY;
             const mouseSpeed = Math.hypot(dx, dy) / dt; // px/ms
 
-            this.lastClientX = e.clientX;
-            this.lastClientY = e.clientY;
+            this.lastClientX = p.x;
+            this.lastClientY = p.y;
             this.lastMouseTime = now;
 
             // Accumulate relative delta onto rawClientX/Y so breakout starts directly from monster anchor
@@ -897,14 +901,12 @@ export class CharacterController {
         // inside `#app`), so a contains() check would reject them. We
         // accept the event whenever the cursor sits inside the canvas's
         // visible rect — which naturally includes all canvas-stacked
-        // HUD chrome and naturally excludes the editor panel / rotate
-        // overlay (fixed, full-screen, only during portrait).
+        // HUD chrome and naturally excludes the editor panel.
         const onWindowMove = (e: PointerEvent): void => {
-            const r = canvas.getBoundingClientRect();
+            const r = appRect(canvas);
             if (r.width <= 0 || r.height <= 0) return;
-            const cx = e.clientX;
-            const cy = e.clientY;
-            if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return;
+            const { x: cx, y: cy } = toAppPoint(e.clientX, e.clientY);
+            if (cx < r.left || cx > r.left + r.width || cy < r.top || cy > r.top + r.height) return;
             onPointerEvent(e);
         };
         window.addEventListener('pointermove', onWindowMove);

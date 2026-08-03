@@ -7,6 +7,7 @@ import { isDev } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import { addWall, removeWall, setWallKind } from '@/lib/editor/air-walls';
 import { getCurrentLevel } from '@/lib/levels/current-level';
+import { isMobileLike } from '@/lib/mobile';
 import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 import { AirWallsSection } from './sections/air-walls';
@@ -57,7 +58,9 @@ export function EditorPanel() {
     // sidebar — to dev builds. The /api/editor/* endpoints live in a
     // Vite plugin that only exists in `vite dev`, so exposing the UI
     // in prod would surface a broken UI (read endpoints 404, saves 404).
-    if (!isDev()) return null;
+    // Mobile is excluded too: a 360px sidebar doesn't fit a phone and
+    // the toggle button lands right on top of the joystick.
+    if (!isDev() || isMobileLike()) return null;
 
     const [open, setOpen] = useState(false);
     const [sceneId, setSceneId] = useState<string | null>(null);
@@ -89,8 +92,7 @@ export function EditorPanel() {
     // the Materials tab — picking Walls or Monsters must not let the
     // user accidentally move material art around the canvas.
     useEffect(() => {
-        const isMaterialTab =
-            open && topTab === 'scenes' && sceneSubTab === 'materials';
+        const isMaterialTab = open && topTab === 'scenes' && sceneSubTab === 'materials';
         EventBus.emit('editor-material-tab-active', isMaterialTab);
     }, [open, topTab, sceneSubTab]);
 

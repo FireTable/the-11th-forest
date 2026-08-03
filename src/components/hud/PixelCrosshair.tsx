@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import { EventBus } from '@/lib/events/bus';
+import { appRect } from '@/lib/mobile';
 
 /**
  * Native canvas size the aim logic emits coordinates in. Matches
@@ -78,22 +79,25 @@ export const PixelCrosshair: React.FC = () => {
     }, [rect]);
 
     // Track the canvas's bounding rect. Phaser game creation is async:
-// `StartGame()` first awaits `resolveDefaultSceneId` + `resolveScene`
-// (HTTP round-trips) and only then constructs the `Phaser.Game` that
-// appends the canvas. In production those fetches can outlast a short
-// poll, leaving `rect` null forever — the crosshair then renders at the
-// 0,0 fallback and looks "missing" because it's pinned to the top-left
-// corner instead of the cursor. We use a MutationObserver on
-// `#game-container` so the wait is event-driven (zero polling) and has
-// no timeout — the canvas WILL appear eventually, even on cold prod
-// cache.
+    // `StartGame()` first awaits `resolveDefaultSceneId` + `resolveScene`
+    // (HTTP round-trips) and only then constructs the `Phaser.Game` that
+    // appends the canvas. In production those fetches can outlast a short
+    // poll, leaving `rect` null forever — the crosshair then renders at the
+    // 0,0 fallback and looks "missing" because it's pinned to the top-left
+    // corner instead of the cursor. We use a MutationObserver on
+    // `#game-container` so the wait is event-driven (zero polling) and has
+    // no timeout — the canvas WILL appear eventually, even on cold prod
+    // cache.
     useEffect(() => {
         let ro: ResizeObserver | null = null;
         let canvas: HTMLCanvasElement | null = null;
         let observer: MutationObserver | null = null;
         const update = (): void => {
             if (!canvas) return;
-            const r = canvas.getBoundingClientRect();
+            // App space: the crosshair is `position: fixed` inside `#app`,
+            // which is the containing block once the mobile rotation
+            // transform is applied.
+            const r = appRect(canvas);
             setRect({ left: r.left, top: r.top, width: r.width, height: r.height });
         };
         const install = (): boolean => {

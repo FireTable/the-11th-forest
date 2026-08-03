@@ -3,7 +3,6 @@ import { Suspense, lazy } from 'react';
 import { PhaserGame } from '@/PhaserGame';
 import { GameHUDLayer } from '@/components/hud/GameHUDLayer';
 import { PixelCrosshair } from '@/components/hud/PixelCrosshair';
-import { RotateOverlay } from '@/components/hud/RotateOverlay';
 import { TouchControls } from '@/components/hud/TouchControls';
 
 /**
@@ -27,14 +26,15 @@ const EditorPanel = lazy(() => import('@/editor/panel').then((m) => ({ default: 
 
 function App() {
     return (
-        <div id="app" className="relative w-full h-full overflow-hidden">
+        // Layout lives in index.css (#app). No Tailwind utilities here:
+        // they would out-rank the forced-landscape media query.
+        <div id="app">
             <PhaserGame />
             <GameHUDLayer />
             <Suspense fallback={null}>
                 <EditorPanel />
             </Suspense>
             <PixelCrosshair />
-            <RotateOverlay />
             <TouchControls />
         </div>
     );
