@@ -233,7 +233,7 @@ export function spawnMeleeHitbox(
         const halfRad = ((swingAngleDeg / 2) * Math.PI) / 180;
         const innerR = Math.max(0, opts.range - opts.hitWidth);
         const outerR = opts.range;
-        const arcColor = 0xc084fc;
+        const arcColor = 0xffffff;
 
         const g = scene.add.graphics();
         g.setPosition(opts.origin.x, opts.origin.y);
