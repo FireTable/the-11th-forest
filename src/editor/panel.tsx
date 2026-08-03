@@ -8,7 +8,6 @@ import { EventBus } from '@/lib/events/bus';
 import { addWall, removeWall, setWallKind } from '@/lib/editor/air-walls';
 import { getCurrentLevel } from '@/lib/levels/current-level';
 import { isMobileLike } from '@/lib/mobile';
-import { getPhaserGame } from '@/lib/phaser-game';
 import type { AirWallKind, AirWallVertex, Level } from '@/lib/levels/types';
 
 import { AirWallsSection } from './sections/air-walls';
@@ -61,32 +60,19 @@ export function EditorPanel() {
 
     const [open, setOpen] = useState(false);
 
-    // While the editor is open, Phaser would otherwise eat keystrokes
-    // (W/A/S/D, arrows, space, etc. — keys the game uses for player
-    // input). Two-pronged defence:
-    //   1. Flip the keyboard plugin's `enabled` flag on every scene.
-    //   2. Register a capture-phase window listener that swallows
-    //      keydown for any target that isn't a DOM input — even if
-    //      Phaser's listeners are still attached, they never see the
-    //      event after our capture handler stops propagation. The
-    //      skip-inputs branch keeps every <input> / <textarea> /
-    //      contenteditable working normally.
+    // Phaser's keyboard plugin attaches a bubble-phase window listener
+    // that calls preventDefault on game keys (W/A/S/D, arrows, R, H,
+    // S, space, etc.) before the browser's default action runs. When an
+    // editor input is focused and the user types one of those letters,
+    // the character never gets inserted. Register a capture-phase
+    // window keydown listener for the duration the editor is open and
+    // stopPropagation on the input case — capture phase fires before
+    // the input's own listeners and before the default action, so the
+    // input still receives the key (target phase is unaffected) but
+    // Phaser's bubble listener never sees it. For non-input targets
+    // we leave the event alone so browser shortcuts (Cmd+Tab, F12)
+    // still work.
     useEffect(() => {
-        const game = getPhaserGame();
-        const setKb = (enabled: boolean) => {
-            if (!game) return;
-            game.scene.scenes.forEach((s) => {
-                const kb = s.input?.keyboard;
-                if (kb) kb.enabled = enabled;
-            });
-        };
-        // Only intercept keydown when the target is an editor input —
-        // otherwise let the event flow through. Phaser's keyboard plugin
-        // is already disabled via setKb(false) above, so the character
-        // won't move even though game keys reach Phaser. The capture
-        // listener exists solely to stop Phaser's window-level listener
-        // (registered on bubble) from calling preventDefault on game
-        // keys before the input's default action runs.
         const swallow = (e: KeyboardEvent) => {
             const t = e.target as HTMLElement | null;
             if (!t) return;
@@ -95,21 +81,13 @@ export function EditorPanel() {
                 t.tagName === 'TEXTAREA' ||
                 t.isContentEditable
             ) {
-                // Capture phase fires before target phase, so the
-                // input's own listeners + the default character
-                // insertion still run. stopPropagation (NOT
-                // stopImmediatePropagation — the latter would also
-                // block the input's listeners) just stops the bubble
-                // phase so Phaser never sees the key.
                 e.stopPropagation();
             }
         };
         if (open) {
-            setKb(false);
             window.addEventListener('keydown', swallow, true);
         }
         return () => {
-            setKb(true);
             window.removeEventListener('keydown', swallow, true);
         };
     }, [open]);
@@ -297,11 +275,10 @@ export function EditorPanel() {
                             key={t.id}
                             variant="ghost"
                             onClick={() => setTopTab(t.id)}
-                            className={`flex-1 rounded-none border-b-2 ${
-                                topTab === t.id
-                                    ? 'border-cyan-400 text-cyan-400'
-                                    : 'border-transparent text-neutral-500 hover:text-neutral-300'
-                            }`}
+                            className={`flex-1 rounded-none border-b-2 ${topTab === t.id
+                                ? 'border-cyan-400 text-cyan-400'
+                                : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                                }`}
                         >
                             {t.label}
                         </Button>
@@ -314,11 +291,10 @@ export function EditorPanel() {
                                 key={t.id}
                                 variant="ghost"
                                 onClick={() => setSceneSubTab(t.id)}
-                                className={`flex-shrink-0 rounded-none border-b-2 px-3 ${
-                                    sceneSubTab === t.id
-                                        ? 'border-cyan-400 text-cyan-400'
-                                        : 'border-transparent text-neutral-500 hover:text-neutral-300'
-                                }`}
+                                className={`flex-shrink-0 rounded-none border-b-2 px-3 ${sceneSubTab === t.id
+                                    ? 'border-cyan-400 text-cyan-400'
+                                    : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                                    }`}
                             >
                                 {t.label}
                             </Button>
