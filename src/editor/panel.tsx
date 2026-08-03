@@ -80,6 +80,13 @@ export function EditorPanel() {
                 if (kb) kb.enabled = enabled;
             });
         };
+        // Only intercept keydown when the target is an editor input —
+        // otherwise let the event flow through. Phaser's keyboard plugin
+        // is already disabled via setKb(false) above, so the character
+        // won't move even though game keys reach Phaser. The capture
+        // listener exists solely to stop Phaser's window-level listener
+        // (registered on bubble) from calling preventDefault on game
+        // keys before the input's default action runs.
         const swallow = (e: KeyboardEvent) => {
             const t = e.target as HTMLElement | null;
             if (!t) return;
@@ -88,18 +95,14 @@ export function EditorPanel() {
                 t.tagName === 'TEXTAREA' ||
                 t.isContentEditable
             ) {
-                // Stop bubble phase so Phaser's window-level listener
-                // (registered on bubble) never sees the keydown. The
-                // capture phase stops BEFORE target phase, so the
-                // input's own listeners + default action (character
-                // insertion) still fire normally. stopPropagation is
-                // sufficient here — we don't want
-                // stopImmediatePropagation, which would also block the
-                // input's listeners.
+                // Capture phase fires before target phase, so the
+                // input's own listeners + the default character
+                // insertion still run. stopPropagation (NOT
+                // stopImmediatePropagation — the latter would also
+                // block the input's listeners) just stops the bubble
+                // phase so Phaser never sees the key.
                 e.stopPropagation();
-                return;
             }
-            e.stopImmediatePropagation();
         };
         if (open) {
             setKb(false);
