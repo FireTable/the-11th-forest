@@ -200,6 +200,7 @@ export const TavernHud: React.FC = () => {
                 height: `${height / scale}px`,
                 transform: `scale(${scale})`,
                 transformOrigin: 'top left',
+                cursor: 'none'
             }
             : { position: 'absolute', inset: 0 };
 
@@ -211,7 +212,7 @@ export const TavernHud: React.FC = () => {
         <div style={outerStyle}>
             <div
                 ref={wrapRef}
-                className="absolute z-20 flex flex-col items-center pointer-events-none select-none"
+                className="absolute z-20 flex flex-col items-center pointer-events-none [&>*]:pointer-events-none select-none"
                 style={{
                     fontFamily: "'Silkscreen', monospace",
                     right: '24px',
@@ -223,84 +224,84 @@ export const TavernHud: React.FC = () => {
                     outer `wrapRef` only receives a transform write on
                     selection change. */}
                 <div className="tavern-hud-bob flex flex-col items-center">
-                <div className={`${RETRO_BOX} relative p-4 w-[280px]`}>
-                    <CornerPixels hideBottom={isSelection} />
+                    <div className={`${RETRO_BOX} relative p-4 w-[280px]`}>
+                        <CornerPixels hideBottom={isSelection} />
 
-                    {/* Phase label */}
-                    <div className="flex items-center gap-2 mb-3 pb-1.5 border-b-2 border-amber-900/60">
-                        <div className="w-2 h-2 bg-amber-400 border border-black animate-pulse shrink-0" />
-                        <span className="text-[9px] text-amber-500 uppercase tracking-widest">
-                            {isSelection ? 'Select Character' : 'Pick Up Weapons'}
-                        </span>
-                    </div>
+                        {/* Phase label */}
+                        <div className="flex items-center gap-2 mb-3 pb-1.5 border-b-2 border-amber-900/60">
+                            <div className="w-2 h-2 bg-amber-400 border border-black animate-pulse shrink-0" />
+                            <span className="text-[9px] text-amber-500 uppercase tracking-widest">
+                                {isSelection ? 'Select Character' : 'Pick Up Weapons'}
+                            </span>
+                        </div>
 
-                    {isSelection ? (
-                        /* ── Phase 1: Character info ── */
-                        <>
-                            {/* Name */}
-                            <div className="text-sm font-bold text-amber-200 uppercase tracking-wider mb-3 drop-shadow-[1px_1px_0px_#000]">
-                                {focus.name}
-                            </div>
+                        {isSelection ? (
+                            /* ── Phase 1: Character info ── */
+                            <>
+                                {/* Name */}
+                                <div className="text-sm font-bold text-amber-200 uppercase tracking-wider mb-3 drop-shadow-[1px_1px_0px_#000]">
+                                    {focus.name}
+                                </div>
 
-                            {/* HP / SP */}
-                            <div className="flex flex-col gap-1.5 mb-3">
-                                <MiniBar
-                                    icon={<Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />}
-                                    value={focus.hp}
-                                    fillClass="bg-red-600"
-                                    label="HP"
-                                />
-                                <MiniBar
-                                    icon={<Zap className="w-3.5 h-3.5 fill-sky-400 text-sky-300" />}
-                                    value={focus.sp}
-                                    fillClass="bg-sky-500"
-                                    label="SP"
-                                />
-                            </div>
-
-                            {/* Stats */}
-                            {focus.stats && (
-                                <div className="flex flex-col gap-1.5 mb-4">
-                                    <StatBar
-                                        icon={<Swords className="w-3.5 h-3.5" />}
-                                        label="STR"
-                                        value={focus.stats.strength}
-                                        color="text-red-400"
+                                {/* HP / SP */}
+                                <div className="flex flex-col gap-1.5 mb-3">
+                                    <MiniBar
+                                        icon={<Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />}
+                                        value={focus.hp}
+                                        fillClass="bg-red-600"
+                                        label="HP"
                                     />
-                                    <StatBar
-                                        icon={<Wind className="w-3.5 h-3.5" />}
-                                        label="AGI"
-                                        value={focus.stats.agility}
-                                        color="text-emerald-400"
-                                    />
-                                    <StatBar
-                                        icon={<Shield className="w-3.5 h-3.5" />}
-                                        label="VIT"
-                                        value={focus.stats.vitality}
-                                        color="text-amber-400"
-                                    />
-                                    <StatBar
-                                        icon={<Sparkles className="w-3.5 h-3.5" />}
-                                        label="SPI"
-                                        value={focus.stats.spirit}
-                                        color="text-purple-400"
+                                    <MiniBar
+                                        icon={<Zap className="w-3.5 h-3.5 fill-sky-400 text-sky-300" />}
+                                        value={focus.sp}
+                                        fillClass="bg-sky-500"
+                                        label="SP"
                                     />
                                 </div>
-                            )}
 
-                            {/* Keyboard hints */}
-                            <div className="flex flex-col gap-1 pt-2 border-t border-stone-800">
-                                <div className="flex items-center gap-2 text-[9px] text-stone-500">
-                                    <span className="px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">A</span>
-                                    <span>/</span>
-                                    <span className="px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">D</span>
-                                    <span>Cycle</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-[9px] text-amber-400">
-                                    <span className="relative inline-flex">
-                                        <span className="relative px-1 py-0.5 bg-amber-900/40 border border-amber-700 text-amber-300">
-                                            F
-                                            {/* Hold-progress overlay: amber-400
+                                {/* Stats */}
+                                {focus.stats && (
+                                    <div className="flex flex-col gap-1.5 mb-4">
+                                        <StatBar
+                                            icon={<Swords className="w-3.5 h-3.5" />}
+                                            label="STR"
+                                            value={focus.stats.strength}
+                                            color="text-red-400"
+                                        />
+                                        <StatBar
+                                            icon={<Wind className="w-3.5 h-3.5" />}
+                                            label="AGI"
+                                            value={focus.stats.agility}
+                                            color="text-emerald-400"
+                                        />
+                                        <StatBar
+                                            icon={<Shield className="w-3.5 h-3.5" />}
+                                            label="VIT"
+                                            value={focus.stats.vitality}
+                                            color="text-amber-400"
+                                        />
+                                        <StatBar
+                                            icon={<Sparkles className="w-3.5 h-3.5" />}
+                                            label="SPI"
+                                            value={focus.stats.spirit}
+                                            color="text-purple-400"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Keyboard hints */}
+                                <div className="flex flex-col gap-1 pt-2 border-t border-stone-800">
+                                    <div className="flex items-center gap-2 text-[9px] text-stone-500">
+                                        <span className="px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">A</span>
+                                        <span>/</span>
+                                        <span className="px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">D</span>
+                                        <span>Cycle</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[9px] text-amber-400">
+                                        <span className="relative inline-flex">
+                                            <span className="relative px-1 py-0.5 bg-amber-900/40 border border-amber-700 text-amber-300">
+                                                F
+                                                {/* Hold-progress overlay: amber-400
                                                 stroke that traces the cap's
                                                 perimeter clockwise (top →
                                                 right → bottom → left) as F is
@@ -308,13 +309,13 @@ export const TavernHud: React.FC = () => {
                                                 normalises the perimeter; the
                                                 controller writes `strokeDashoffset`
                                                 per frame (100 - progress·100). */}
-                                            <svg
-                                                className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
-                                                viewBox="0 0 100 100"
-                                                preserveAspectRatio="none"
-                                                aria-hidden="true"
-                                            >
-                                                {/* Clockwise trace around the cap:
+                                                <svg
+                                                    className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
+                                                    viewBox="0 0 100 100"
+                                                    preserveAspectRatio="none"
+                                                    aria-hidden="true"
+                                                >
+                                                    {/* Clockwise trace around the cap:
                                                    (1,1) → (99,1) → (99,99) → (1,99).
                                                    Perimeter = 98·4 = 392 viewBox
                                                    units; the controller writes
@@ -323,80 +324,80 @@ export const TavernHud: React.FC = () => {
                                                    amber stroke fills the cap's
                                                    border clockwise from the
                                                    top-left corner. */}
-                                                <path
-                                                    ref={holdProgressRef}
-                                                    d="M 1 1 L 99 1 L 99 99 L 1 99 Z"
-                                                    fill="none"
-                                                    stroke="#fbbf24"
-                                                    strokeWidth="3"
-                                                    strokeDasharray="392"
-                                                    strokeDashoffset="392"
-                                                    vectorEffect="non-scaling-stroke"
-                                                />
-                                            </svg>
+                                                    <path
+                                                        ref={holdProgressRef}
+                                                        d="M 1 1 L 99 1 L 99 99 L 1 99 Z"
+                                                        fill="none"
+                                                        stroke="#fbbf24"
+                                                        strokeWidth="3"
+                                                        strokeDasharray="392"
+                                                        strokeDashoffset="392"
+                                                        vectorEffect="non-scaling-stroke"
+                                                    />
+                                                </svg>
+                                            </span>
                                         </span>
-                                    </span>
-                                    <span>Confirm (1.5s)</span>
+                                        <span>Confirm (1.5s)</span>
+                                    </div>
                                 </div>
-                            </div>
-                        </>
-                    ) : (
-                        /* ── Phase 2: Weapon pickup ── */
-                        <>
-                            <div className="text-xs font-bold text-amber-200 mb-3">
-                                Selected: <span className="text-amber-400">{focus.name}</span>
-                            </div>
+                            </>
+                        ) : (
+                            /* ── Phase 2: Weapon pickup ── */
+                            <>
+                                <div className="text-xs font-bold text-amber-200 mb-3">
+                                    Selected: <span className="text-amber-400">{focus.name}</span>
+                                </div>
 
-                            {/* Weapon count */}
-                            <div className="mb-3">
-                                <div className="text-[9px] text-stone-400 mb-1.5">Weapon Slots</div>
-                                <div className="flex gap-2">
-                                    {Array.from({ length: focus.weaponMax }, (_, i) => (
-                                        <div
-                                            key={i}
-                                            className={`w-10 h-10 border-2 flex items-center justify-center ${i < focus.weaponCount
-                                                ? 'border-amber-500 bg-amber-900/40'
-                                                : 'border-stone-700 bg-stone-900/40'
-                                                }`}
-                                        >
-                                            {i < focus.weaponCount && (
-                                                <Swords className="w-4 h-4 text-amber-400" />
-                                            )}
-                                        </div>
-                                    ))}
+                                {/* Weapon count */}
+                                <div className="mb-3">
+                                    <div className="text-[9px] text-stone-400 mb-1.5">Weapon Slots</div>
+                                    <div className="flex gap-2">
+                                        {Array.from({ length: focus.weaponMax }, (_, i) => (
+                                            <div
+                                                key={i}
+                                                className={`w-10 h-10 border-2 flex items-center justify-center ${i < focus.weaponCount
+                                                    ? 'border-amber-500 bg-amber-900/40'
+                                                    : 'border-stone-700 bg-stone-900/40'
+                                                    }`}
+                                            >
+                                                {i < focus.weaponCount && (
+                                                    <Swords className="w-4 h-4 text-amber-400" />
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="text-[9px] text-stone-500 mt-1">
+                                        {focus.weaponCount}/{focus.weaponMax} · max {focus.weaponMax} weapons
+                                    </div>
                                 </div>
-                                <div className="text-[9px] text-stone-500 mt-1">
-                                    {focus.weaponCount}/{focus.weaponMax} · max {focus.weaponMax} weapons
-                                </div>
-                            </div>
 
-                            {/* Exit hint */}
-                            <div className="pt-2 border-t border-stone-800 text-[9px] text-emerald-400">
-                                ↑ Walk to the teleporter to enter Stage 1
-                            </div>
-                        </>
+                                {/* Exit hint */}
+                                <div className="pt-2 border-t border-stone-800 text-[9px] text-emerald-400">
+                                    ↑ Walk to the teleporter to enter Stage 1
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    {isSelection && (
+                        /* Pixel-art downward triangle. Matches the box's amber/dark
+                           chrome: 1px stone-900 outline + amber-400 fill, with
+                           crispEdges so the sloped sides stay pixelated (no
+                           anti-alias smoothing). Rides the HUD's `arrowOffsetY`
+                           bob via the container's transform. */
+                        <svg
+                            width="14"
+                            height="9"
+                            viewBox="0 0 14 9"
+                            shapeRendering="crispEdges"
+                            className="drop-shadow-[1px_1px_0px_#000] -mt-px"
+                            aria-hidden="true"
+                        >
+                            {/* Stone-900 outline (full triangle). */}
+                            <polygon points="0,0 14,0 7,9" fill="#1c1917" />
+                            {/* Amber-400 fill inset 1px on each side. */}
+                            <polygon points="1,1 13,1 7,8" fill="#fbbf24" />
+                        </svg>
                     )}
-                </div>
-                {isSelection && (
-                    /* Pixel-art downward triangle. Matches the box's amber/dark
-                       chrome: 1px stone-900 outline + amber-400 fill, with
-                       crispEdges so the sloped sides stay pixelated (no
-                       anti-alias smoothing). Rides the HUD's `arrowOffsetY`
-                       bob via the container's transform. */
-                    <svg
-                        width="14"
-                        height="9"
-                        viewBox="0 0 14 9"
-                        shapeRendering="crispEdges"
-                        className="drop-shadow-[1px_1px_0px_#000] -mt-px"
-                        aria-hidden="true"
-                    >
-                        {/* Stone-900 outline (full triangle). */}
-                        <polygon points="0,0 14,0 7,9" fill="#1c1917" />
-                        {/* Amber-400 fill inset 1px on each side. */}
-                        <polygon points="1,1 13,1 7,8" fill="#fbbf24" />
-                    </svg>
-                )}
                 </div>
             </div>
         </div>
