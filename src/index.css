@@ -188,6 +188,7 @@
    rule (e.g. editor buttons `cursor: pointer`) override this. */
 #game-container {
     cursor: none;
+    overflow: hidden;
 }
 
 /* Tavern HUD bob — runs on the GPU compositor, no JS / layout
