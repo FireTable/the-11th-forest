@@ -88,8 +88,18 @@ export class TavernController {
 
     /** True while F is currently held down (used to detect release). */
     private fHolding = false;
-    /** Phaser time at which the current F-hold started. */
-    private fHoldStart = 0;
+    /** NPC index whose sprite is currently being held with the mouse.
+     *  `undefined` when no mouse hold is active. Sharing the hold
+     *  pipeline with the F key means the F cap border fills for
+     *  either input. */
+    private mouseHoldingIdx: number | undefined;
+    /** Hold elapsed time, accumulated per frame from `delta`. Reset
+     *  on every (re)press and on release. Drives `holdProgress` 0..1. */
+    private holdElapsed = 0;
+
+    /** Disposer for the window pointermove listener that feeds the
+     *  pixel crosshair. Set in `bindCursor`, called from `destroy`. */
+    private cursorCleanup: (() => void) | undefined;
 
     private weaponCount = 0;
 
@@ -108,11 +118,13 @@ export class TavernController {
             onWeaponPickup: (weaponId: string, weaponSpec: WeaponSpec) => boolean,
         ) => void,
     ) {
-        // Tavern is a menu, not gameplay — restore the system arrow on the
-        // canvas (CSS hides it globally; the pixel crosshair only shows
-        // during play). Phaser's input system will still swap to 'pointer'
-        // over interactive sprites.
-        this.scene.input.setDefaultCursor('default');
+        // Pixel-crosshair + TavernHud inline `cursor: none` together
+        // replace the default system arrow — see TavernHud's outer wrap
+        // for the cursor rule. Phaser's input still flips to 'pointer'
+        // over interactive sprites, but NPC sprites here use `setInteractive`
+        // without `useHandCursor`, so the canvas cursor stays at
+        // whatever Phaser's default is (empty in v4, so CSS rules win).
+        this.bindCursor();
 
         this.setupKeys();
         this.spawnNpcs();
@@ -173,19 +185,38 @@ export class TavernController {
             const idleKey = animKey(spec, 'idle');
             if (this.scene.anims.exists(idleKey)) sprite.play(idleKey, true);
 
-            // Click to select — single click selects, second click confirms
-            sprite.setInteractive({ useHandCursor: true });
+            // Long-press to confirm (HOLD_MS). Single click selects
+            // (or just resets the hold timer if already selected); the
+            // hold timer runs in `update()` and the same `holdProgress`
+            // drives both keyboard-F and mouse long-press, so the F
+            // cap border fills for either input.
+            //
+            // No `useHandCursor` — the canvas already hides the system
+            // cursor via CSS (`#game-container canvas { cursor: none }`),
+            // and the pixel crosshair is the only on-screen pointer.
+            // Letting Phaser set `cursor: pointer` here would stack a
+            // second cursor on top of the crosshair over interactive
+            // sprites.
+            sprite.setInteractive();
             const idx = i;
             sprite.on('pointerdown', () => {
-                if (this.selectedIndex === idx) {
-                    // Already selected → confirm
-                    this.confirmSelection();
-                } else {
+                if (this.selectedIndex !== idx) {
                     this.selectedIndex = idx;
                     this.updateHighlight();
                     this.emitFocusEvent();
                 }
+                this.mouseHoldingIdx = idx;
+                this.holdElapsed = 0;
+                this.fHolding = false;
             });
+            const cancelHold = (): void => {
+                if (this.mouseHoldingIdx === idx) {
+                    this.mouseHoldingIdx = undefined;
+                    this.holdElapsed = 0;
+                }
+            };
+            sprite.on('pointerup', cancelHold);
+            sprite.on('pointerout', cancelHold);
 
             this.npcs.push({ spec, sprite, shadow, x, y });
         });
@@ -311,7 +342,7 @@ export class TavernController {
 
     // ─── Per-frame ───────────────────────────────────────────────────────
 
-    update(time: number, delta: number): void {
+    update(_time: number, delta: number): void {
         if (this.phase === 'selection') {
             // A / D navigation
             if (Phaser.Input.Keyboard.JustDown(this.keyLeft)) {
@@ -325,24 +356,33 @@ export class TavernController {
                 this.emitFocusEvent();
             }
 
-            // F long-press → confirm. isDown stays true across frames so we
-            // can drive a holdProgress (0..1) toward HOLD_MS.
+            // Hold to confirm (1.5s). Either keyboard F or mouse hold on the
+            // currently selected NPC drives the same `holdProgress`,
+            // so the F cap border in the HUD fills for either input.
+            // We accumulate per-frame `delta` (ms) rather than reading
+            // Phaser's `time` so the bar fills at exactly HOLD_MS
+            // regardless of any future time-scaling or pause.
             let holdProgress: number | undefined;
-            if (this.keyConfirm.isDown) {
+            const holding =
+                this.keyConfirm.isDown || this.mouseHoldingIdx !== undefined;
+            if (holding) {
                 if (!this.fHolding) {
                     this.fHolding = true;
-                    this.fHoldStart = time;
+                    this.holdElapsed = 0;
                 }
-                const elapsed = time - this.fHoldStart;
-                holdProgress = Math.min(1, elapsed / HOLD_MS);
+                this.holdElapsed += delta;
+                holdProgress = Math.min(1, this.holdElapsed / HOLD_MS);
                 if (holdProgress >= 1) {
                     this.fHolding = false;
+                    this.mouseHoldingIdx = undefined;
+                    this.holdElapsed = 0;
                     this.confirmSelection();
                     return;
                 }
             } else if (this.fHolding) {
                 // Released before reaching HOLD_MS — cancel.
                 this.fHolding = false;
+                this.holdElapsed = 0;
             }
 
             // Animate floating arrow (the arrow is rendered by the React HUD; we
@@ -362,13 +402,76 @@ export class TavernController {
 
     destroy(): void {
         this.scene.events.off('update', this.update, this);
-        // Hand the cursor back to gameplay (CSS `cursor: none` + pixel crosshair).
-        this.scene.input.setDefaultCursor('none');
+        // Stop emitting aim events so the crosshair hides when the
+        // tavern tears down (gameplay re-takes over via the character
+        // aim logic, which also reads these events).
+        this.unbindCursor();
+        EventBus.emit('aim-crosshair-update', {
+            x: -100,
+            y: -100,
+            isLocked: false,
+            visible: false,
+        });
         for (const npc of this.npcs) {
             try { npc.sprite.destroy(); } catch { /* ok */ }
             try { npc.shadow.destroy(); } catch { /* ok */ }
         }
         this.npcs = [];
         EventBus.emit('tavern-focus', null);
+    }
+
+    // ─── Cursor (pixel crosshair) ───────────────────────────────────────
+
+    /** Window-level pointermove handler that feeds the pixel crosshair.
+     *  PixelCrosshair expects coords in the 1536x864 native HUD space,
+     *  same contract as character/logic.ts aim updates. */
+    private bindCursor(): void {
+        const canvas = this.scene.game.canvas as HTMLCanvasElement | null;
+        if (!canvas) return;
+        const camera = this.scene.cameras.main;
+
+        const onMove = (e: PointerEvent): void => {
+            const r = canvas.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) return;
+            if (
+                e.clientX < r.left ||
+                e.clientX > r.left + r.width ||
+                e.clientY < r.top ||
+                e.clientY > r.top + r.height
+            ) {
+                return;
+            }
+            // World coord = camera-relative pixel; then scale to the
+            // 1536x864 HUD space PixelCrosshair expects.
+            const worldX = camera.scrollX + (e.clientX - r.left) * (camera.width / r.width);
+            const worldY = camera.scrollY + (e.clientY - r.top) * (camera.height / r.height);
+            EventBus.emit('aim-crosshair-update', {
+                x: (worldX - camera.scrollX) * (1536 / camera.width),
+                y: (worldY - camera.scrollY) * (864 / camera.height),
+                isLocked: false,
+                visible: true,
+            });
+        };
+
+        const onLeave = (): void => {
+            EventBus.emit('aim-crosshair-update', {
+                x: -100,
+                y: -100,
+                isLocked: false,
+                visible: false,
+            });
+        };
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerleave', onLeave);
+        this.cursorCleanup = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerleave', onLeave);
+        };
+    }
+
+    private unbindCursor(): void {
+        this.cursorCleanup?.();
+        this.cursorCleanup = undefined;
     }
 }

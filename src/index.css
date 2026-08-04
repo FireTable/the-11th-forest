@@ -182,7 +182,11 @@
     font-size: 0.8em;
 }
 
-#game-container canvas {
+/* Hide the system cursor everywhere in the app — TavernHud and
+   other HUDs sit outside `#game-container`, and `PixelCrosshair`
+   draws the only on-screen pointer. Children with their own cursor
+   rule (e.g. editor buttons `cursor: pointer`) override this. */
+#app {
     cursor: none;
 }
 

@@ -49,8 +49,8 @@ const StatBar: React.FC<StatBarProps> = ({ icon, label, value, color }) => (
                 <span
                     key={i}
                     className={`w-2 h-2 border ${i < value
-                            ? `${color.replace('text-', 'bg-')} border-transparent`
-                            : 'bg-stone-800 border-stone-700'
+                        ? `${color.replace('text-', 'bg-')} border-transparent`
+                        : 'bg-stone-800 border-stone-700'
                         }`}
                 />
             ))}
@@ -124,7 +124,7 @@ function applyWrapPosition(
 export const TavernHud: React.FC = () => {
     const [focus, setFocus] = useState<TavernFocusPayload | null>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
-    const holdProgressRef = useRef<HTMLSpanElement>(null);
+    const holdProgressRef = useRef<SVGRectElement>(null);
     const { scale, width, height } = useHudScale();
     const scaleRef = useRef(scale);
 
@@ -148,16 +148,18 @@ export const TavernHud: React.FC = () => {
             const wrap = wrapRef.current;
             if (wrap) applyWrapPosition(wrap, payload, scaleRef.current);
 
-            // ── F-key hold progress: write the clip-path straight to
-            //    the overlay so the border fills left-to-right without
-            //    a React render per frame.
+            // ── F-key hold progress: write the path's stroke-dashoffset so the
+            //    amber border fills clockwise (top → right → bottom → left)
+            //    from the cap's top-left corner. The path perimeter is
+            //    392 viewBox units (98·4), so dashoffset runs 392 → 0.
             const holdEl = holdProgressRef.current;
             if (holdEl) {
                 if (payload && payload.holdProgress !== undefined) {
-                    holdEl.style.display = 'block';
-                    holdEl.style.clipPath = `inset(0 ${(1 - payload.holdProgress) * 100}% 0 0)`;
+                    holdEl.style.strokeDashoffset = String(
+                        392 * (1 - payload.holdProgress),
+                    );
                 } else {
-                    holdEl.style.display = 'none';
+                    holdEl.style.strokeDashoffset = '392';
                 }
             }
 
@@ -190,14 +192,14 @@ export const TavernHud: React.FC = () => {
     const outerStyle: React.CSSProperties =
         width > 0
             ? {
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  width: `${width / scale}px`,
-                  height: `${height / scale}px`,
-                  transform: `scale(${scale})`,
-                  transformOrigin: 'top left',
-              }
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: `${width / scale}px`,
+                height: `${height / scale}px`,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+            }
             : { position: 'absolute', inset: 0 };
 
     if (!focus) return null;
@@ -294,18 +296,42 @@ export const TavernHud: React.FC = () => {
                                         <span className="relative px-1 py-0.5 bg-amber-900/40 border border-amber-700 text-amber-300">
                                             F
                                             {/* Hold-progress overlay: amber-400
-                                                border revealed left-to-right by
-                                                clip-path as F is held. Hidden
-                                                when not holding. */}
-                                            <span
-                                                ref={holdProgressRef}
-                                                className="absolute inset-0 pointer-events-none border-2 border-amber-400"
-                                                style={{ display: 'none' }}
-                                            />
+                                                stroke that traces the cap's
+                                                perimeter clockwise (top →
+                                                right → bottom → left) as F is
+                                                held. `pathLength="100"`
+                                                normalises the perimeter; the
+                                                controller writes `strokeDashoffset`
+                                                per frame (100 - progress·100). */}
+                                            <svg
+                                                className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
+                                                viewBox="0 0 100 100"
+                                                preserveAspectRatio="none"
+                                                aria-hidden="true"
+                                            >
+                                                {/* Clockwise trace around the cap:
+                                                   (1,1) → (99,1) → (99,99) → (1,99).
+                                                   Perimeter = 98·4 = 392 viewBox
+                                                   units; the controller writes
+                                                   `strokeDashoffset` per frame as
+                                                   `392 · (1 - progress)` so the
+                                                   amber stroke fills the cap's
+                                                   border clockwise from the
+                                                   top-left corner. */}
+                                                <path
+                                                    ref={holdProgressRef}
+                                                    d="M 1 1 L 99 1 L 99 99 L 1 99 Z"
+                                                    fill="none"
+                                                    stroke="#fbbf24"
+                                                    strokeWidth="3"
+                                                    strokeDasharray="392"
+                                                    strokeDashoffset="392"
+                                                    vectorEffect="non-scaling-stroke"
+                                                />
+                                            </svg>
                                         </span>
                                     </span>
-                                    <span>Confirm (hold 1.5s)</span>
-                                    <span className="text-stone-600 ml-auto">or click again</span>
+                                    <span>Confirm (1.5s)</span>
                                 </div>
                             </div>
                         </>
@@ -324,8 +350,8 @@ export const TavernHud: React.FC = () => {
                                         <div
                                             key={i}
                                             className={`w-10 h-10 border-2 flex items-center justify-center ${i < focus.weaponCount
-                                                    ? 'border-amber-500 bg-amber-900/40'
-                                                    : 'border-stone-700 bg-stone-900/40'
+                                                ? 'border-amber-500 bg-amber-900/40'
+                                                : 'border-stone-700 bg-stone-900/40'
                                                 }`}
                                         >
                                             {i < focus.weaponCount && (
