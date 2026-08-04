@@ -17,6 +17,8 @@
  */
 
 import { LoadScene } from '@/game/scenes/scene';
+import { MUSIC_STOP } from '@/lib/constants';
+import { EventBus } from '@/lib/events/bus';
 import {
     getCachedResolvedScene,
     resolveScene,
@@ -64,6 +66,15 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
     // character. The snapshot triple is the only thing that should
     // reset per-scene.
     useGameStore.getState().clearSceneSnapshots();
+
+    // Stop every live AudioController's current music before swapping
+    // scenes. Phaser's SceneManager.remove() only fires the 'destroy'
+    // event, not 'shutdown', so the LoadScene.shutdown() method (which
+    // calls audio.destroy() and unsubscribes the music event handlers)
+    // doesn't run on the old scene. Without this, when the new scene's
+    // create() emits MUSIC_EVENT, both the old and new AudioControllers
+    // try to play — resulting in two BGMs stacked over each other.
+    EventBus.emit(MUSIC_STOP);
 
     // Drop every registered scene, not just `LoadScene:${resolved.id}`:
     // a teleport starts the next level under a different key, so keying
