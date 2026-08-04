@@ -4,22 +4,22 @@ imageSize: 2752x1536
 airWalls: []
 tavern: true
 npcSpawns:
-  - characterId: kitty
-    x: 580
-    'y': 860
-  - characterId: bunny-girl
-    x: 900
-    'y': 860
-  - characterId: otaku
-    x: 1220
-    'y': 860
-  - characterId: wanderer
-    x: 1540
-    'y': 860
+    - characterId: kitty
+      x: 800
+      'y': 860
+    - characterId: bunny-girl
+      x: 1000
+      'y': 860
+    - characterId: otaku
+      x: 1200
+      'y': 860
+    - characterId: wanderer
+      x: 1400
+      'y': 860
 dropSpawns: []
 teleporters:
-  - id: tavern-exit
-    x: 121
-    'y': 841
-    targetScene: sacred-forest-sanctuary
-    radius: 60
+    - id: tavern-exit
+      x: 121
+      'y': 841
+      targetScene: sacred-forest-sanctuary
+      radius: 60
