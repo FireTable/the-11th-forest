@@ -39,6 +39,10 @@ export interface DropEntitySnapshot {
     specId: string;
     x: number;
     y: number;
+    /** When this drop is a weapon pickup, the resolved weapon id is
+     *  recorded so the drop's in-hand texture can be restored on
+     *  refresh. Undefined for non-weapon drops (heal / ammo / etc.). */
+    weaponId?: string;
 }
 
 export interface GameUIState {

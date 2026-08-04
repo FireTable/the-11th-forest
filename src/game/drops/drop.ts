@@ -324,25 +324,44 @@ export class DropController {
         this.cb = cb;
         this.getWeapon = getWeapon;
 
+        // Drop restoration is unified across static (dropSpawns) and
+        // runtime (monster-death) drops:
+        //   - First load (no snapshot): spawn the static dropSpawns
+        //     from the level config. Runtime drops can only appear
+        //     later via monster deaths.
+        //   - Subsequent refresh (snapshot has entries): restore
+        //     every drop from the snapshot, including the static
+        //     ones. The level config is NOT re-spawned — drops the
+        //     player picked up last run stay picked up. Player
+        //     progress through the tavern weapon wall is preserved.
+        //
+        // The snapshot carries `weaponId` for weapon pickups so the
+        // drop's in-hand texture (which `weaponSpec.visual.texture`
+        // supplies) survives a refresh.
         const dropSnapshots = useGameStore.getState().groundDropsSnapshot;
         if (dropSnapshots && dropSnapshots.length > 0) {
-            // Snapshot exists for this run with remaining drops: restore
-            // them so the player picks up where they left off after
-            // refresh. An EMPTY snapshot (player consumed every drop
-            // last run) falls through to the level-config branch — the
-            // snapshot is intentionally not rewritten by the snapshot
-            // save path; that's the player's progress state, not a
-            // respawn cue.
             for (const s of dropSnapshots) {
                 try {
-                    this.runtimeDrops.push(new DropInstance(scene, getDrop(s.specId), s.x, s.y, false));
+                    const weaponOverride = s.weaponId
+                        ? this.getWeapon?.(s.weaponId)
+                        : undefined;
+                    this.runtimeDrops.push(
+                        new DropInstance(
+                            scene,
+                            getDrop(s.specId),
+                            s.x,
+                            s.y,
+                            false,
+                            weaponOverride,
+                        ),
+                    );
                 } catch {
                     // Ignore missing specs
                 }
             }
         } else if (spawns) {
-            // Fresh start (no snapshot OR snapshot was empty): spawn
-            // initial static drops from level config.
+            // Fresh start: no snapshot yet. Spawn static drops from
+            // level config so the player has something to walk into.
             for (const s of spawns) {
                 const weaponOverride = s.weaponId ? this.getWeapon?.(s.weaponId) : undefined;
                 this.staticDrops.push(
@@ -371,8 +390,25 @@ export class DropController {
         this.character = character;
     }
 
-    /** Export fine-grained snapshot of uncollected ground drops. */
-    public getSnapshot(): { specId: string; x: number; y: number }[] {
+    /**
+     * Export fine-grained snapshot of every uncollected ground drop
+     * — both static (from `dropSpawns`) and runtime (monster death).
+     *
+     * The snapshot is the source of truth across refreshes: a player
+     * who picked up a static weapon drop stays without it after
+     * refresh. Static drops are seeded from `dropSpawns` only on the
+     * very first load when the snapshot is empty.
+     *
+     * `weaponId` is captured for weapon-pickup drops so the drop's
+     * in-hand texture can be restored on refresh — the snapshot is
+     * the only channel that survives across reloads.
+     */
+    public getSnapshot(): {
+        specId: string;
+        x: number;
+        y: number;
+        weaponId?: string;
+    }[] {
         const all = [...this.staticDrops, ...this.runtimeDrops];
         return all
             .filter((d) => !d.taken && d.isLanded && d.spec.id)
@@ -380,6 +416,7 @@ export class DropController {
                 specId: d.spec.id!,
                 x: d.body.position.x,
                 y: d.body.position.y,
+                ...(d.weaponSpec?.id ? { weaponId: d.weaponSpec.id } : {}),
             }));
     }
 
