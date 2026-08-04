@@ -58,11 +58,12 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
     // but the character is at a stale position from the prior scene
     // — looks like "the scene didn't refresh".
     //
-    // Can't use `setEntitySnapshots({ player: undefined })` here —
-    // that helper does `snapshots.player ?? state.playerSnapshot`,
-    // so passing `undefined` is a no-op. `resetLevelProgress` is the
-    // existing action that actually clears these fields.
-    useGameStore.getState().resetLevelProgress(resolved.id);
+    // Use the snapshot-only clear (NOT resetLevelProgress which also
+    // wipes hp/sp/slots) — scene transitions must preserve the
+    // player's progress: picked-up weapons, current health, selected
+    // character. The snapshot triple is the only thing that should
+    // reset per-scene.
+    useGameStore.getState().clearSceneSnapshots();
 
     // Drop every registered scene, not just `LoadScene:${resolved.id}`:
     // a teleport starts the next level under a different key, so keying

@@ -126,6 +126,13 @@ export interface GameUIState {
     setHubsVisible: (visible: boolean) => void;
     setDead: (dead: boolean) => void;
     resetLevelProgress: (levelId: string) => void;
+    /**
+     * Clear per-scene entity snapshots only (player/monster/drop
+     * positions). Preserves the player's hotbar, HP, SP, and
+     * character choice. Used by scene transitions (teleport, Jump-
+     * to-scene) so picked-up weapons survive the cut.
+     */
+    clearSceneSnapshots: () => void;
     clearSaveData: () => void;
     setSelectedCharacterId: (id: string) => void;
     setTavernCleared: (cleared: boolean) => void;
@@ -244,6 +251,20 @@ export const useGameStore = create<GameUIState>()(
                         levelElapsedMs: 0,
                     };
                 }),
+
+            /**
+             * Clear only the per-scene entity snapshots so the new
+             * scene's loadCharacter() reads a clean slate. Used by
+             * scene transitions (teleport, Jump-to-scene) where the
+             * player's stats / hotbar must survive — only the world
+             * position should reset.
+             */
+            clearSceneSnapshots: () =>
+                set(() => ({
+                    playerSnapshot: undefined,
+                    activeMonstersSnapshot: undefined,
+                    groundDropsSnapshot: undefined,
+                })),
 
             clearSaveData: () => {
                 try {
