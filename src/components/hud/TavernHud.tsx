@@ -28,7 +28,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Heart, Zap, Swords, Wind, Shield, Sparkles, Gauge } from 'lucide-react';
+import { Heart, Zap, Swords, Wind, Shield, Sparkles, Gauge, RotateCcw } from 'lucide-react';
 
 import { EventBus } from '@/lib/events/bus';
 import type { TavernFocusPayload } from '@/game/scenes/tavern-controller';
@@ -36,6 +36,24 @@ import { useHudScale } from '@/lib/use-hud-scale';
 import { CornerPixels, RETRO_BOX } from './retro-box';
 
 // ─── Stat row (icon + label + value) ─────────────────────────────────────
+
+/**
+ * Convert a `CharacterSpec.moveSpeed` (Matter velocity unit — pixels
+ * per 16.67ms step at 60Hz) into a human-readable m/s value.
+ *
+ *   moveSpeed 5  →  5 px/step × 60 step/s  =  300 px/s
+ *   300 px/s ÷ 50 px/m                    =    6 m/s  (sprint)
+ *   moveSpeed 4  →  240 px/s ÷ 50         =  4.8 m/s (jog)
+ *
+ * 50 px ≈ 1 m matches the rendered sprite scale (character halfH
+ * ≈26 px + sprite scale 1.2 → roughly human-scale on the canvas).
+ */
+const PX_PER_METER = 50;
+const STEPS_PER_SEC = 60;
+const moveSpeedToMps = (moveSpeed: number): string =>
+    ((moveSpeed * STEPS_PER_SEC) / PX_PER_METER).toFixed(1);
+/** SP regen time (ms → s, 1 decimal). spRegenMs is "0→max refill time". */
+const spRegenToSec = (spRegenMs: number): string => (spRegenMs / 1000).toFixed(1);
 
 interface StatRowProps {
     icon: React.ReactNode;
@@ -235,6 +253,7 @@ function isSameFocusContent(a: TavernFocusPayload | null, b: TavernFocusPayload 
         a.name !== b.name ||
         a.hp !== b.hp ||
         a.sp !== b.sp ||
+        a.spRegenMs !== b.spRegenMs ||
         a.weaponCount !== b.weaponCount ||
         a.weaponMax !== b.weaponMax ||
         a.description !== b.description
@@ -418,9 +437,23 @@ export const TavernHud: React.FC = () => {
                                         <StatRow
                                             icon={<Gauge className="w-3.5 h-3.5" />}
                                             label="SPD"
-                                            value={focus.moveSpeed}
-                                            suffix="px/s"
+                                            value={moveSpeedToMps(focus.moveSpeed)}
+                                            suffix="m/s"
                                             color="text-emerald-400"
+                                        />
+                                        <StatRow
+                                            icon={<RotateCcw className="w-3.5 h-3.5" />}
+                                            label="SP+"
+                                            value={spRegenToSec(focus.spRegenMs)}
+                                            suffix="s/cd"
+                                            color="text-cyan-300"
+                                        />
+                                        <StatRow
+                                            icon={<Swords className="w-3.5 h-3.5" />}
+                                            label="SLT"
+                                            value={focus.weaponMax}
+                                            suffix="max"
+                                            color="text-orange-300"
                                         />
                                     </div>
 

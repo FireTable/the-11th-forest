@@ -1,5 +1,10 @@
 id: otaku
 name: Otaku
+description: |
+    A bookish shut-in turned reluctant forest-warrior. Lower stamina
+    but a longer dodge cooldown means each roll has to count —
+    favours positional play and tight engagements. Reads the
+    battlefield before charging in.
 imageSize: 2048x2048
 prompt: |
     The 11th Forest — Otaku sprite sheet

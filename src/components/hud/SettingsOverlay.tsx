@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { RotateCcw, Play, Settings, X } from 'lucide-react';
+import { RotateCcw, Play, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { MUSIC_PAUSE, MUSIC_RESUME } from '@/lib/constants';
@@ -96,7 +96,23 @@ export function SettingsOverlay() {
                     className={`${RETRO_BOX} relative flex size-10 items-center justify-center text-amber-500 transition-colors hover:text-amber-300`}
                 >
                     <CornerPixels />
-                    <Settings className="size-5 fill-current" />
+                    {/* Solid gear (lucide's Settings / Cog are stroke-
+                        only by default; the path elements carry their
+                        own stroke attribute so props can't override
+                        it). Inline SVG with fill-rule="evenodd" draws
+                        a fully filled gear with a clean central hole. */}
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="size-5"
+                        aria-hidden="true"
+                    >
+                        <path
+                            fillRule="evenodd"
+                            clipRule="evenodd"
+                            d="M19.5 12c0-.47-.04-.93-.1-1.38l2.13-1.65-2-3.46-2.49.96c-.7-.6-1.5-1.08-2.4-1.38L14.5 2.5h-4l-.14 2.59c-.9.3-1.7.78-2.4 1.38l-2.49-.96-2 3.46 2.13 1.65c-.06.45-.1.91-.1 1.38s.04.93.1 1.38l-2.13 1.65 2 3.46 2.49-.96c.7.6 1.5 1.08 2.4 1.38l.14 2.59h4l.14-2.59c.9-.3 1.7-.78 2.4-1.38l2.49.96 2-3.46-2.13-1.65c.06-.45.1-.91.1-1.38zM12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
+                        />
+                    </svg>
                 </button>
             </div>
 

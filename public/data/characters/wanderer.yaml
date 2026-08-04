@@ -1,5 +1,10 @@
 id: wanderer
 name: Wanderer
+description: |
+    A nomadic sailor-schoolgirl with a casual stride and a stubborn
+    refusal to sit still. Slowest stats on paper, but a spirited
+    attitude — survives by staying mobile, picking fights on her
+    own terms, and walking out of anything that looks like trouble.
 imageSize: 2048x2048
 prompt: |
     The 11th Forest — Wanderer sprite sheet

@@ -43,6 +43,7 @@ export interface TavernFocusPayload {
     hp: number;
     sp: number;
     moveSpeed: number;
+    spRegenMs: number;
     /** Free-form description from the character spec — lore / role.
      *  Shown on the tavern HUD below the name. */
     description?: string;
@@ -335,6 +336,7 @@ export class TavernController {
             hp: s.hp,
             sp: s.sp,
             moveSpeed: s.moveSpeed,
+            spRegenMs: s.spRegenMs,
             description: s.description,
             stats: (s as any).stats,
             maxStats: this.computeMaxStats(),

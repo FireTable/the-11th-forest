@@ -1,5 +1,10 @@
 id: kitty
 name: Kitty
+description: |
+    A calico cat-eared scout who left her forest post to investigate
+    rumours of corrupted energy in the eastern woods. Agile and
+    quick-witted, she relies on mobility and reach over brute
+    strength — outmanoeuvre enemies, then strike.
 imageSize: 2048x2048
 prompt: |
     The 11th Forest — Kitty sprite sheet

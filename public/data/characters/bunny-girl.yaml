@@ -1,5 +1,10 @@
 id: bunny-girl
 name: Bunny
+description: |
+    A silver-haired leporid assassin with sharp reflexes and a longer
+    reach than her frame suggests. Trades raw durability for
+    precision — she slips past guard windows and ends fights
+    before the enemy knows she's there.
 imageSize: 2048x2048
 prompt: |
     The 11th Forest — Bunny Girl sprite sheet
