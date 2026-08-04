@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import { MUSIC_PAUSE, MUSIC_RESUME } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { getPhaserGame, restartCurrentLevel } from '@/lib/phaser-game';
-import { useGameStore } from '@/store/game-store';
 
 import { CornerPixels, RETRO_BOX } from './retro-box';
 
@@ -38,7 +37,6 @@ function GithubMark() {
 
 export function SettingsOverlay() {
     const [open, setOpen] = useState(false);
-    const hubsVisible = useGameStore((s) => s.hubsVisible);
     // The scene we paused, so resume hits the same one even if a
     // teleport registered another in the meantime.
     const paused = useRef<Phaser.Scene | null>(null);
@@ -75,8 +73,6 @@ export function SettingsOverlay() {
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     });
-
-    if (!hubsVisible) return null;
 
     return (
         <>

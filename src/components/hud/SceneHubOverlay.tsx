@@ -12,9 +12,9 @@ const formatElapsed = (ms: number): string => {
 };
 
 export const SceneHubOverlay: React.FC = () => {
-    const { levelTitle, levelElapsedMs, hubsVisible } = useGameStore();
+    const { levelTitle, levelElapsedMs } = useGameStore();
 
-    if (!hubsVisible || !levelTitle) return null;
+    if (!levelTitle) return null;
 
     return (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none select-none flex font-['Silkscreen',monospace]">

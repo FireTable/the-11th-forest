@@ -254,7 +254,7 @@ export interface DropControllerCallbacks {
 
 export class DropController {
     private readonly scene: Phaser.Scene;
-    private readonly character: CharacterRuntime;
+    private character: CharacterRuntime;
     private readonly staticDrops: DropInstance[] = [];
     private readonly runtimeDrops: DropInstance[] = [];
     private readonly cb: DropControllerCallbacks;
@@ -288,6 +288,16 @@ export class DropController {
         }
 
         this.bindCollisions();
+    }
+
+    /**
+     * Swap the character reference. Used by the tavern UI to rewire
+     * magnet / pickup collision to the freshly-spawned character after
+     * the player confirms a selection. The original character is
+     * `character` is otherwise captured once at construction.
+     */
+    public setCharacter(character: CharacterRuntime): void {
+        this.character = character;
     }
 
     /** Export fine-grained snapshot of uncollected ground drops. */

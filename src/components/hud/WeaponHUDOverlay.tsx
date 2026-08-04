@@ -22,11 +22,20 @@ const SLOT_GAP_PX = 6;
 const SLOT_BOTTOM_PX = 124;
 
 export const WeaponHUDOverlay: React.FC = () => {
-    const { activeWeaponIndex, activeWeaponName, isReloading, reloadProgress, slots, hubsVisible } =
-        useGameStore();
+    const {
+        activeWeaponIndex,
+        activeWeaponName,
+        isReloading,
+        reloadProgress,
+        slots,
+        hubsVisible,
+        tavernCleared,
+    } = useGameStore();
     const mobile = useIsMobile();
 
-    if (!hubsVisible || !activeWeaponName || slots.length === 0) return null;
+    // Hide during tavern phase 1 — placeholder has no WeaponHud so this
+    // would otherwise show a stale hotbar from a previous save.
+    if (!tavernCleared || !hubsVisible || !activeWeaponName || slots.length === 0) return null;
 
     if (mobile) {
         const handleSwitch = (index: number): void => {

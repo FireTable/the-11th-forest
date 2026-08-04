@@ -34,17 +34,29 @@ import { animKey, textureKey } from './keys';
 export interface CharacterRuntime {
     body: MatterJS.BodyType;
     sprite: Phaser.GameObjects.Sprite;
-    weapons: WeaponController;
-    hud: CharacterHud;
-    weaponHud: WeaponHud;
-    statusHud: StatusHud;
-    debugBodyRect: Phaser.GameObjects.Rectangle;
-    debugHitboxRect: Phaser.GameObjects.Rectangle;
-    /** Apply HP/SP healing (clamped to [0, max]). Negative values damage. */
+    /**
+     * Null on the tavern placeholder (no weapons module spawned). The
+     * placeholder has no body to attach weapons to and no collision
+     * listener, so this null is a hard guarantee that no fire / hotbar /
+     * collision listener fires during phase 1.
+     */
+    weapons: WeaponController | null;
+    /**
+     * Null on the placeholder (no React HUD writer spawned). Tavern
+     * hides the character / weapon panels through hubsVisible instead.
+     */
+    hud: CharacterHud | null;
+    weaponHud: WeaponHud | null;
+    statusHud: StatusHud | null;
+    debugBodyRect: Phaser.GameObjects.Rectangle | null;
+    debugHitboxRect: Phaser.GameObjects.Rectangle | null;
+    /** Apply HP/SP healing (clamped to [0, max]). Negative values damage.
+     *  No-op on the placeholder (no controller to apply to). */
     heal(hpDelta: number, spDelta: number): void;
     /** Add `fraction * currentWeaponClipSize` bullets to the active weapon. */
     refillAmmo(fraction: number): void;
-    /** Switch to a named weapon if it's in the hotbar. No-op if not present. */
+    /** Switch to a named weapon if it's in the hotbar. No-op if not present.
+     *  Returns false on the placeholder. */
     pickUpWeapon(weaponId: string): boolean;
     update(time: number): void;
     destroy(): void;
@@ -118,19 +130,117 @@ function registerAnim(
 import { useGameStore } from '@/store/game-store';
 
 /**
+ * Options for `loadCharacter`.
+ *
+ * `placeholder: true` skips the gameplay modules: WeaponController
+ * (and therefore fire / hotbar / bullet collision listener), HUD
+ * writers (CharacterHud / WeaponHud / StatusHud), debug rects, and
+ * CharacterController (no keyboard / pointer / mobile input binding).
+ * Used by the tavern selection UI as the default-character placeholder:
+ * the sprite sits at the spawn point behind the selection UI, but no
+ * fire / SFX / hotbar / input can fire. The placeholder is replaced
+ * with a real character on confirm; `monsterSystem.setPlayerBody` and
+ * `dropSystem.setCharacter` rewire to the new body / runtime.
+ */
+export interface LoadCharacterOptions {
+    placeholder?: boolean;
+}
+
+/**
  * Spawn a player Character at the level center. Returns the runtime API;
  * the controller's per-frame tick is wired up in the constructor.
+ *
+ * When `opts.placeholder` is true, only the visual sprite + shadow +
+ * idle animation + a parked Matter body are produced. The body is
+ * parked far off-world so it never collides with anything during phase
+ * 1 (subsystems still hold a non-null body ref they swap on confirm).
+ * The runtime's `weapons`, `hud`, `weaponHud`, `statusHud`, and debug
+ * rects are all null — the API methods (`heal`, `pickUpWeapon`, …) are
+ * no-ops so subsystems holding the placeholder reference don't crash.
  */
 export function loadCharacter(
     scene: Phaser.Scene,
     level: Level,
     spec: CharacterSpec,
     weapons: WeaponSpec[],
+    opts: LoadCharacterOptions = {},
 ): CharacterRuntime {
     const savedPlayer = useGameStore.getState().playerSnapshot;
     // Saved position takes highest priority, then level characterSpawn, then image center
     const spawnX = savedPlayer?.x ?? level.characterSpawn?.x ?? level.imageSize.width / 2;
     const spawnY = savedPlayer?.y ?? level.characterSpawn?.y ?? level.imageSize.height / 2;
+
+    if (opts.placeholder) {
+        // Visual-only placeholder for the tavern selection UI: a sprite
+        // + shadow + idle animation, a hidden body (parked off-world so
+        // it never collides with anything — subsystems still hold a non-
+        // null body reference, which they swap to the real character's
+        // body on confirm), and NO weapons / HUDs / controller. The
+        // "no weapons module" is the whole point — phase 1 must not fire
+        // bullets, play weapon SFX, bind 1/2/3 hotbar, or write to the
+        // React HUD store.
+        const matter = (Phaser as any).Physics.Matter.Matter;
+        const body = scene.matter.add.rectangle(
+            // Park the body far off-world so it can't interact with
+            // anything. TavernController doesn't move the sprite via
+            // the body (the placeholder is stationary); only the sprite
+            // + shadow are visible.
+            -10000,
+            -10000,
+            spec.body.halfW * 2,
+            spec.body.halfH * 2,
+            {
+                label: 'character',
+                collisionFilter: {
+                    category: CAT.CHARACTER,
+                    mask: 0xffff & ~CAT.BULLET,
+                },
+            },
+        );
+        matter.Body.setInertia(body, Infinity);
+
+        const shadow = scene.add.ellipse(
+            spawnX,
+            spawnY,
+            spec.body.halfW * 2,
+            spec.body.halfH * 0.8,
+            0x000000,
+            0.35,
+        );
+        const sprite = scene.add.sprite(spawnX, spawnY, textureKey(spec));
+        sprite.setOrigin(0.5, 1.0);
+        if (spec.sprite) sprite.setScale(spec.sprite.scale);
+        sprite.setFlipX((level.characterSpawn?.facing ?? 'right') === 'left');
+        if (spec.anims) {
+            const idleKey = animKey(spec, 'idle');
+            if (scene.anims.exists(idleKey)) sprite.anims.play(idleKey, true);
+        }
+        return {
+            body,
+            sprite,
+            weapons: null,
+            hud: null,
+            weaponHud: null,
+            statusHud: null,
+            debugBodyRect: null,
+            debugHitboxRect: null,
+            heal: () => {
+                /* placeholder: no controller */
+            },
+            refillAmmo: () => {
+                /* placeholder: no controller */
+            },
+            pickUpWeapon: () => false,
+            update: () => {
+                /* placeholder: no controller */
+            },
+            destroy: () => {
+                scene.matter.world.remove(body);
+                shadow.destroy();
+                sprite.destroy();
+            },
+        };
+    }
 
     const body = scene.matter.add.rectangle(
         // Body center sits halfH above the spawn point so the body's

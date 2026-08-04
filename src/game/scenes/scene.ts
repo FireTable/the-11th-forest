@@ -197,30 +197,39 @@ export class LoadScene extends Phaser.Scene {
         createDropAnims(this, this.assets.dropSpecs.values());
 
         // ── Player character ────────────────────────────────────────────
-        // Always spawn: tavern mode uses a placeholder (hidden behind the
-        // selection UI) that TavernController swaps to the chosen one on
-        // confirm. Reusing the same load path means physics / sprite /
-        // body wiring stays in one place.
+        // Tavern mode spawns a *placeholder*: a visual sprite with a
+        // hidden body but NO weapons, NO HUDs, NO controller. That's
+        // loadCharacter's `placeholder: true` mode — it deliberately
+        // skips every gameplay module so phase 1 (NPC selection) can't
+        // fire bullets, play weapon SFX, or write to the React HUD
+        // store. On confirm, the scene destroys this placeholder and
+        // calls loadCharacter() again with the picked spec; monster /
+        // drop subsystems get rewired to the new body via their
+        // setPlayerBody / setCharacter methods.
+        //
+        // Non-tavern levels spawn the real character directly.
         this.character = loadCharacter(
             this,
             this.level,
             this.assets.character,
             this.assets.weapons,
+            { placeholder: this.level.tavern === true },
         );
 
         // Editor panel hides the on-canvas HUDs so the level / walls are
         // unencumbered for editing. EditorPanel emits via EventBus since
         // it lives in React and can't reach Phaser GameObjects directly.
+        // Tavern placeholder has no HUDs / debug rects — skip silently.
         const setHubsVisible = (visible: boolean) => {
-            this.character.hud.setVisible(visible);
-            this.character.weaponHud.setVisible(visible);
-            this.character.statusHud.setVisible(visible);
+            this.character.hud?.setVisible(visible);
+            this.character.weaponHud?.setVisible(visible);
+            this.character.statusHud?.setVisible(visible);
         };
         const onEditorOpen = (editorOpen: unknown) => {
             const isEditor = editorOpen === true;
             setHubsVisible(!isEditor);
-            this.character.debugBodyRect.setVisible(isEditor);
-            this.character.debugHitboxRect.setVisible(isEditor);
+            this.character.debugBodyRect?.setVisible(isEditor);
+            this.character.debugHitboxRect?.setVisible(isEditor);
             this.monsterSystem.setDebugVisible(isEditor);
         };
         EventBus.on('editor-open', onEditorOpen);
@@ -317,8 +326,10 @@ export class LoadScene extends Phaser.Scene {
                 if (!bullet) continue;
                 const other = bullet === a ? b : a;
                 if (other.label !== 'monster' && other.label !== 'monster-hitbox') continue;
+                const weapon = this.character.weapons;
+                if (!weapon) continue;
                 this.monsterSystem.applyBulletDamage(
-                    this.character.weapons.getActive().damage,
+                    weapon.getActive().damage,
                     other,
                 );
             }
@@ -458,7 +469,17 @@ export class LoadScene extends Phaser.Scene {
                         selectedSpec,
                         this.assets.weapons,
                     );
+                    // Rewire subsystems to the freshly-spawned character's
+                    // body / runtime. monsterSystem tracks the body for
+                    // player-hit detection; dropSystem holds the runtime
+                    // reference for magnet + pickup collision + heal/ ammo
+                    // callbacks. Both were captured against the placeholder.
                     this.monsterSystem.setPlayerBody(this.character.body);
+                    this.dropSystem.setCharacter(this.character);
+                    // Phase 1 hidden the React HUDs (CharacterHud.setVisible
+                    // → setHubsVisible(false)); restore them for phase 2 so
+                    // the new character's weapon/HP/EXP panels come back.
+                    useGameStore.getState().setHubsVisible(true);
                     useGameStore.getState().setTavernCleared(true);
                 },
             );

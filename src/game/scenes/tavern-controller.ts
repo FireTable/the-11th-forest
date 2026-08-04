@@ -145,12 +145,16 @@ export class TavernController {
         const w = this.level.imageSize.width;
         const h = this.level.imageSize.height;
         const char = this.defaultCharacter;
+        // Placeholder has no HUDs / debug rects — they're null because
+        // the placeholder's loadCharacter() opts out of those modules.
         char.sprite.setVisible(false);
-        char.hud.setVisible(false);
-        char.weaponHud.setVisible(false);
-        char.statusHud.setVisible(false);
+        char.hud?.setVisible(false);
+        char.weaponHud?.setVisible(false);
+        char.statusHud?.setVisible(false);
         // Park the physics body far off the world bounds so it can't
-        // collide with anything during selection.
+        // collide with anything during selection. The placeholder's
+        // body is already off-world (created at -10000,-10000) but
+        // re-anchor here so any future layout change keeps it parked.
         const Matter = (Phaser as any).Physics.Matter.Matter;
         Matter.Body.setPosition(char.body, { x: -w, y: -h });
     }
