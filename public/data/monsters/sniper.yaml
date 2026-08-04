@@ -68,26 +68,17 @@ prompt: |
     4 rows × 4 columns, every cell the same size):
 
       ┌────┬────┬────┬────┐
-      │  0 │  1 │  2 │  3 │   row 1: idle
+      │  0 │  1 │  2 │  3 │   row 1: idle (4 frames)
       ├────┼────┼────┼────┤
-      │  4 │  5 │  6 │  7 │   row 2: move
+      │  4 │  5 │  6 │  7 │   row 2: move (4 frames)
       ├────┼────┼────┼────┤
-      │  8 │  9 │ 10 │ 11 │   row 3: hit
+      │  8 │  9 │ 10 │ 11 │   row 3: hit (4 frames)
       ├────┼────┼────┼────┤
-      │ 12 │ 13 │ 14 │    │   row 4: death (last cell empty)
+      │ 12 │ 13 │ 14 │    │   row 4: death (3 frames; cell #15 empty)
       └────┴────┴────┴────┘
 
-    The bottom-right cell (cell #15) MUST be empty magenta — do NOT
-    place a frame there. Total: exactly 15 frames + 1 empty cell = 16
-    cells in a 4×4 grid. No other layout is acceptable.
-
-    Create a ** 4×4 grid ** of pixel-art chibi monster frames on a SOLID MAGENTA
-    (#FF00FF) BACKGROUND for chroma keying. The magenta must be saturated
-    and uniform — no gradients, no shadows, no anti-aliased corners on the
-    bg. Leave the bottom-right cell of the grid empty (15 frames + 1
-    blank cell). No grid lines, no guide marks, no cell borders, no
-    reference crosses between cells — the grid is implicit, the bg is
-    pure flat magenta everywhere except where the monster is drawn.
+    The bottom-right cell (cell #15) MUST be empty magenta. Total:
+    exactly 15 frames + 1 empty cell.
 
     Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
     512×512 px. The monster is ~300×480 px in each cell, centered
@@ -96,29 +87,59 @@ prompt: |
 
     Monster Concept (Spore Sniper - Ranged Poison Forest Archer):
     A tall cloaked forest archer kneeling on one leg, wrapped in hanging
-    moss and spotted mushroom caps. Holding a long slender wooden bow
-    loaded with a glowing purple spore-arrow. Glowing yellow eyes under
-    the hood.
+    moss and spotted mushroom caps. Hands empty and held forward in an
+    invisible-drawn-bow pose — right hand pulled back to the cheek as
+    if releasing an arrow, left hand extended forward as if gripping an
+    invisible bow. Glowing yellow eyes under the hood. (The bow + arrow
+    are added in-game as a separate orbiting weapon sprite; the monster
+    sprite itself does NOT render them.)
 
-    Same monster in every frame — cloak, mushrooms, bow, arrow are
+    Same monster in every frame — cloak, mushrooms, pose-hands, eyes are
     identical. Only the pose/state changes.
 
     15 frames in row order (left-to-right, top-to-bottom), distributed as:
 
-    Frames 0–3 (idle, 4 frames, row 1):
-      Crouched and aiming, bow held steady. Slow breathing, spore-arrow
-      pulsing faintly purple.
+    Frames 0–3 (idle, 4 frames, row 1) — crouched aim hold:
+      Frame 0: Crouched low. Right hand pulled back to cheek in release
+               pose, left hand extended forward. Yellow eyes squinting in
+               concentration.
+      Frame 1: Same pose — subtle exhale, cloak tip swaying right.
+               Hands still held in drawn-bow position.
+      Frame 2: Right hand twitches — micro quiver release. Hand briefly
+               relaxes then re-draws. Left hand still extended.
+      Frame 3: Back to baseline drawn-bow pose. Holding for the perfect
+               shot. Eyes steady.
 
-    Frames 4–7 (move, 4 frames, row 2):
-      Sidestep shuffle to reposition. Cloak sways, bow kept level.
+    Frames 4–7 (move, 4 frames, row 2) — walk cycle:
+      Frame 4: LEFT foot planted forward, RIGHT foot trailing back
+               (extreme stride). Body weight fully on left leg. Cloak
+               swings back-left. Hands kept in drawn-bow pose.
+      Frame 5: Passing pose — RIGHT foot swinging forward, both legs
+               vertical. Body upright. Cloak settling. Bow arms stay
+               locked forward.
+      Frame 6: RIGHT foot planted forward, LEFT foot trailing back
+               (extreme stride, opposite leg). Weight on right leg.
+               Cloak swings forward.
+      Frame 7: Passing pose — LEFT foot swinging forward, both legs
+               vertical. Mid-stride return to neutral.
 
-    Frames 8–11 (hit, 4 frames, row 3):
-      Knockback, hood falls back revealing skull-like mask, mushrooms
-      shatter off the shoulders.
+    Frames 8–11 (hit, 4 frames, row 3) — knockback reveal:
+      Frame 8:  Initial impact — body jolts back-left. Hood flutters up.
+               Eyes dim briefly.
+      Frame 9:  Hood flies fully off, skull-like mask underneath revealed.
+               Knocked further left. Mushrooms wobble.
+      Frame 10: Mushroom caps shatter off shoulders, fragments flying.
+               Mask cracks. Arms flailing from recoil.
+      Frame 11: Settling in stun. Half-recovered stance. Hood hanging
+               limp. Eyes flickering.
 
-    Frames 12–14 (death, 3 frames, row 4):
-      Cloak collapses into a pile of spores, bow snaps in half, a faint
-      purple cloud dissipates upward.
+    Frames 12–14 (death, 3 frames, row 4) — spore collapse:
+      Frame 12: Cloak starts collapsing inward, knees buckling. Hands
+               fall to sides. Purple spores puffing out at seams.
+      Frame 13: Cloak pooling on ground. Stronger purple cloud.
+               Arms limp inside the folds.
+      Frame 14: Empty cloak puddle on ground. Faint purple spore cloud
+               drifting upward. Skull mask visible in the pile.
 
     Style requirements:
     - High-end handcrafted 16-bit RPG aesthetic.

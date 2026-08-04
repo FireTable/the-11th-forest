@@ -552,7 +552,7 @@ export function findFrames(png: PNG, _minRun = 8, _minArea = 500): Box[] {
     // 8px Box Proximity Merge Pass:
     // Merges bounding boxes if their edge-to-edge gap is <= gapThreshold (8px),
     // bridging cracks, broken arches, and floating particles into a single material piece.
-    const gapThreshold = 8;
+    const gapThreshold = 2;
     let merged = true;
     while (merged) {
         merged = false;
