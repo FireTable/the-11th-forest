@@ -20,7 +20,7 @@ import * as Phaser from 'phaser';
 import { EventBus } from '@/lib/events/bus';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
-import type { WeaponSpec } from '@/lib/weapons';
+import type { CharacterRuntime } from '@/game/characters/character';
 import { animKey, textureKey } from '@/game/characters/keys';
 import type { SceneAssets } from './scene';
 import { useGameStore } from '@/store/game-store';
@@ -53,11 +53,6 @@ export interface TavernFocusPayload {
     viewportX?: number;
     viewportY?: number;
     /**
-     * Per-frame bobbing offset of the arrow in viewport pixels (phase 1
-     * only). The HUD reads this to ride the arrow's float animation.
-     */
-    arrowOffsetY?: number;
-    /**
      * F-key long-press progress (0..1). `undefined` when not holding.
      * The HUD uses this to fill the F-key cap's border as the player
      * holds F toward the 1.5s confirm threshold.
@@ -77,9 +72,6 @@ export class TavernController {
     private phase: Phase = 'selection';
     private npcs: TavernNpcEntry[] = [];
     private selectedIndex = 0;
-
-    private arrowOffsetY = 0;
-    private arrowTime = 0;
 
     private keyLeft!: Phaser.Input.Keyboard.Key;
     private keyRight!: Phaser.Input.Keyboard.Key;
@@ -107,16 +99,16 @@ export class TavernController {
         private readonly scene: Phaser.Scene,
         private readonly level: Level,
         private readonly assets: SceneAssets,
+        /** The default character LoadScene spawned — hidden behind the
+         *  selection UI, parked off-screen, swapped on confirm. */
+        private readonly defaultCharacter: CharacterRuntime,
         /**
-         * Called once when the player confirms a character.
-         * The second argument is a callback the scene should pass into
-         * DropController's onWeaponPickup — it returns true if the pickup
-         * was accepted (count < cap), false if capped.
+         * Called once when the player confirms a character. The scene
+         * destroys the default character, loads the picked spec, and
+         * re-points monsterSystem at the new body. TavernController
+         * self-destroys after this fires.
          */
-        private readonly onConfirm: (
-            selectedSpec: CharacterSpec,
-            onWeaponPickup: (weaponId: string, weaponSpec: WeaponSpec) => boolean,
-        ) => void,
+        private readonly onConfirm: (selectedSpec: CharacterSpec) => void,
     ) {
         // Pixel-crosshair + TavernHud inline `cursor: none` together
         // replace the default system arrow — see TavernHud's outer wrap
@@ -125,6 +117,11 @@ export class TavernController {
         // without `useHandCursor`, so the canvas cursor stays at
         // whatever Phaser's default is (empty in v4, so CSS rules win).
         this.bindCursor();
+
+        // Hide the default character that LoadScene.create() already
+        // spawned — it's a placeholder until the player picks. Park it
+        // far off-screen so its physics body can't collide with NPCs.
+        this.hideDefaultCharacter();
 
         this.setupKeys();
         this.spawnNpcs();
@@ -137,6 +134,39 @@ export class TavernController {
     }
 
     // ─── Keyboard ────────────────────────────────────────────────────────
+
+    /**
+     * Hide the default character LoadScene.create() spawned — it stays in
+     * the scene tree (so teleporter/drop wiring remains valid) but is
+     * parked far off-screen so it can't collide with NPCs or be visible.
+     * On confirm, the scene swaps the character in place.
+     */
+    private hideDefaultCharacter(): void {
+        const w = this.level.imageSize.width;
+        const h = this.level.imageSize.height;
+        const char = this.defaultCharacter;
+        char.sprite.setVisible(false);
+        char.hud.setVisible(false);
+        char.weaponHud.setVisible(false);
+        char.statusHud.setVisible(false);
+        // Park the physics body far off the world bounds so it can't
+        // collide with anything during selection.
+        const Matter = (Phaser as any).Physics.Matter.Matter;
+        Matter.Body.setPosition(char.body, { x: -w, y: -h });
+    }
+
+    /**
+     * Cap check for the tavern phase-2 weapon pickup. Called by
+     * LoadScene's DropController onWeaponPickup callback. Increments
+     * the counter when the pickup is accepted.
+     */
+    public tryAcceptWeapon(): boolean {
+        if (this.weaponCount >= TAVERN_WEAPON_MAX) return false;
+        this.weaponCount++;
+        useGameStore.getState().setTavernWeaponCount(this.weaponCount);
+        this.emitFocusEvent();
+        return true;
+    }
 
     private setupKeys(): void {
         const kb = this.scene.input.keyboard!;
@@ -225,11 +255,9 @@ export class TavernController {
     // ─── Selection visuals ───────────────────────────────────────────────
 
     private buildSelectionVisuals(): void {
-        // The selection arrow now lives in the React TavernHud so it
-        // rides the same bobbing offset as the card. Reset the timer so
-        // the animation starts at sin(0)=0 the moment the controller boots.
-        this.arrowTime = 0;
-        this.arrowOffsetY = 0;
+        // The selection arrow lives in the React TavernHud, bobs via
+        // CSS (`tavern-hud-bob`). Nothing to wire up here — kept as a
+        // hook for future selection visuals (e.g. a highlight ring).
     }
 
     private updateHighlight(): void {
@@ -268,7 +296,6 @@ export class TavernController {
             weaponMax: TAVERN_WEAPON_MAX,
             viewportX,
             viewportY,
-            arrowOffsetY: this.phase === 'selection' ? this.arrowOffsetY : undefined,
             holdProgress: this.phase === 'selection' ? holdProgress : undefined,
         };
         EventBus.emit('tavern-focus', payload);
@@ -330,14 +357,11 @@ export class TavernController {
         useGameStore.getState().setTavernWeaponCount(0);
         this.emitFocusEvent();
 
-        // Hand control back to LoadScene
-        this.onConfirm(spec, (_weaponId, _spec) => {
-            if (this.weaponCount >= TAVERN_WEAPON_MAX) return false;
-            this.weaponCount++;
-            useGameStore.getState().setTavernWeaponCount(this.weaponCount);
-            this.emitFocusEvent();
-            return true;
-        });
+        // Hand control back to LoadScene — it swaps the character to
+        // the picked spec. The phase 2 weapon cap is tracked here and
+        // gated through tryAcceptWeapon() called by LoadScene's drop
+        // onWeaponPickup callback.
+        this.onConfirm(spec);
     }
 
     // ─── Per-frame ───────────────────────────────────────────────────────
@@ -385,15 +409,12 @@ export class TavernController {
                 this.holdElapsed = 0;
             }
 
-            // Animate floating arrow (the arrow is rendered by the React HUD; we
-            // just track the bobbing offset and push it through every frame)
-            this.arrowTime += delta;
-            this.arrowOffsetY = Math.sin(this.arrowTime / 350) * 6;
-
-            // One combined emit per frame: position + arrow bob + hold
-            // progress. Content fields stay identical between frames, so the
-            // React side short-circuits setState and writes the new
-            // `transform` / `clip-path` straight to the DOM.
+            // One combined emit per frame: position (unchanged for this NPC) +
+            // hold progress. Content fields stay identical between frames, so
+            // the React side short-circuits setState and writes the new
+            // `clip-path` straight to the DOM. Arrow bobbing is handled by
+            // CSS keyframes (`tavern-hud-bob` in TavernHud) — the JS no
+            // longer computes or emits `arrowOffsetY`.
             this.emitFocusEvent(holdProgress);
         }
     }

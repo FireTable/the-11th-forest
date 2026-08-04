@@ -103,13 +103,14 @@ function applyWrapPosition(
         payload.viewportX !== undefined &&
         payload.viewportY !== undefined
     ) {
-        // Divide the bob by scale so the *visual* bob stays at
-        // `arrowOffsetY` regardless of viewport scale.
-        const oy = (payload.arrowOffsetY ?? 0) / s;
+        // Position only — the bobbing is CSS (`tavern-hud-bob`), not JS.
+        // This handler only fires on selection change (the controller's
+        // per-frame emit is content-stable so React short-circuits it),
+        // so we don't burn a style recalc per frame anymore.
         wrap.style.left = `${payload.viewportX / s}px`;
         wrap.style.top = `${payload.viewportY / s}px`;
         wrap.style.right = 'auto';
-        wrap.style.transform = `translate(-50%, calc(-100% + ${oy}px))`;
+        wrap.style.transform = `translate(-50%, -100%)`;
     } else if (payload) {
         // Phase 2: right-rail anchor, also in layout space.
         wrap.style.left = '';
@@ -218,6 +219,10 @@ export const TavernHud: React.FC = () => {
                     transform: 'translateY(-50%)',
                 }}
             >
+                {/* `.tavern-hud-bob` runs the float on the GPU; the
+                    outer `wrapRef` only receives a transform write on
+                    selection change. */}
+                <div className="tavern-hud-bob flex flex-col items-center">
                 <div className={`${RETRO_BOX} relative p-4 w-[280px]`}>
                     <CornerPixels hideBottom={isSelection} />
 
@@ -392,6 +397,7 @@ export const TavernHud: React.FC = () => {
                         <polygon points="1,1 13,1 7,8" fill="#fbbf24" />
                     </svg>
                 )}
+                </div>
             </div>
         </div>
     );

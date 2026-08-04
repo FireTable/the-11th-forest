@@ -125,24 +125,23 @@ export class LoadScene extends Phaser.Scene {
         // scene's background. Namespace with the scene id.
         this.load.image(`background:${this.id}`, this.level.background);
 
+        // Default player character — same key scheme in both modes; the
+        // tavern just spawns additional NPC sheets on top so the player
+        // can pick from a roster.
+        loadCharacterAssets(
+            this,
+            this.assets.character,
+            this.assets.spriteCell.width,
+            this.assets.spriteCell.height,
+        );
         if (this.level.tavern) {
-            // Tavern mode: load every character spritesheet so NPC idle
-            // sprites can be spawned for selection. Use the same key scheme
-            // as the normal character loader (`<id>-sheet`) and the standard
-            // cell dimensions derived from the texture (128×128 for our
-            // 4×4 grid + downsample-4 assets).
+            // Tavern NPCs: every other character in the roster gets its
+            // own spritesheet so TavernController can spawn idle sprites
+            // for the selection UI.
             const allChars = this.assets.allCharacters ?? [];
             for (const spec of allChars) {
                 loadCharacterAssets(this, spec, 128, 128);
             }
-        } else {
-            // Normal mode: single player character.
-            loadCharacterAssets(
-                this,
-                this.assets.character,
-                this.assets.spriteCell.width,
-                this.assets.spriteCell.height,
-            );
         }
 
         // Load monster spritesheet assets (if spec contains sprite config)
@@ -182,143 +181,26 @@ export class LoadScene extends Phaser.Scene {
         // Build static Matter bodies for every air wall + outer boundary walls.
         createWallBodies(this.matter, this.level.airWalls, this.level.imageSize);
 
+        // ── Animations ──────────────────────────────────────────────────
+        // Player character always; tavern NPCs in addition (so the
+        // selection UI has idle sprites to show).
+        createCharacterAnims(this, this.assets.character);
         if (this.level.tavern) {
-            // ── TAVERN MODE ──────────────────────────────────────────────
-            // Register every animation track for every NPC character using
-            // the standard helper. `loadCharacterAssets` already queued the
-            // textures in `preload()` with the correct cell dimensions, so
-            // the textures are ready and the standard `<id>-<track>` keys
-            // point at the right frames.
             const allChars = this.assets.allCharacters ?? [];
             for (const spec of allChars) {
                 createCharacterAnims(this, spec);
             }
-
-            // Register drop anims + monster anims (empty in the tavern,
-            // but safe to call regardless).
-            createDropAnims(this, this.assets.dropSpecs.values());
-
-            // Spawn TavernController — it creates NPC sprites and handles
-            // A/D + click + E/Enter selection.
-            this.tavernController = new TavernController(
-                this,
-                this.level,
-                this.assets,
-                async (selectedSpec, onWeaponPickup) => {
-                    // Phase 2: spawn the player with the chosen character.
-                    // The texture is already preloaded; update SceneAssets
-                    // so loadCharacter sees the right spec + cell dims.
-                    (this.assets as any).character = selectedSpec;
-                    if (selectedSpec.sprite) {
-                        (this.assets as any).spriteCell = {
-                            width: 128,
-                            height: 128,
-                        };
-                    }
-
-                    this.character = loadCharacter(
-                        this,
-                        this.level,
-                        selectedSpec,
-                        this.assets.weapons,
-                    );
-
-                    // Wire drops with the weapon-pickup cap enforced by
-                    // TavernController.
-                    this.dropSystem = new DropController(
-                        this,
-                        this.character,
-                        this.level.dropSpawns,
-                        (id) => {
-                            const spec = this.assets.dropSpecs.get(id);
-                            if (!spec) throw new Error(`Unknown drop id: ${id}`);
-                            return spec;
-                        },
-                        {
-                            onWeaponPickup: (weaponId) => {
-                                const wSpec = this.assets.weaponsById.get(weaponId);
-                                if (!wSpec) return;
-                                const accepted = onWeaponPickup(weaponId, wSpec);
-                                if (!accepted) return; // capped — drop stays on ground
-                                this.character.pickUpWeapon(weaponId);
-                            },
-                        },
-                    );
-
-                    // Wire teleporter — exit is always available once the
-                    // player has chosen their character.
-                    this.teleporterSystem = new TeleporterController(
-                        this,
-                        this.level.teleporters,
-                        this.id,
-                        () => (this.character?.body?.position ?? null),
-                        () => true, // tavern exit is always unblocked
-                    );
-
-                    // Wire editor HUD toggles (same as normal flow)
-                    const setHubsVisible = (visible: boolean) => {
-                        this.character.hud.setVisible(visible);
-                        this.character.weaponHud.setVisible(visible);
-                        this.character.statusHud.setVisible(visible);
-                    };
-                    const onEditorOpen = (editorOpen: unknown) => {
-                        setHubsVisible(editorOpen !== true);
-                        this.character.debugBodyRect.setVisible(editorOpen === true);
-                        this.character.debugHitboxRect.setVisible(editorOpen === true);
-                    };
-                    EventBus.on('editor-open', onEditorOpen);
-                    this.events.once('shutdown', () => EventBus.removeListener('editor-open', onEditorOpen));
-
-                    // Mark tavern cleared when the teleporter fires so the
-                    // next session skips the tavern.
-                    EventBus.on('scene-transition', () => {
-                        useGameStore.getState().setTavernCleared(true);
-                    });
-
-                    this.materialManager = new MaterialManager(this, this.level);
-
-                    // Wire per-frame update for phase 2
-                    this.events.on('update', (_time: number) => {
-                        this.dropSystem?.update();
-                        this.materialManager?.update();
-                        this.teleporterSystem?.update(0);
-                    });
-                },
-            );
-
-            // Audio
-            this.audio = new AudioController(
-                this,
-                this.assets.sfxSpecs.values(),
-                this.assets.musicSpecs.values(),
-            );
-            if (this.level.music) EventBus.emit(MUSIC_EVENT(this.level.music));
-
-            this.cameras.main.centerOn(
-                this.level.imageSize.width / 2,
-                this.level.imageSize.height / 2,
-            );
-
-            const payload = { id: this.id, level: this.level };
-            setCurrentLevel(payload);
-            useGameStore.getState().setCurrentLevelId(this.id);
-            useGameStore.getState().setLevelTitle(this.level.title || this.id);
-            this.levelStartAt = this.time.now;
-            this.lastSavePushAt = this.time.now;
-            EventBus.emit('level-loaded', payload);
-            EventBus.emit('current-scene-ready', this);
-            return; // ── end tavern branch ──
+        } else {
+            // Tavern has no monsters; non-tavern scenes register them.
+            createMonsterAnims(this, this.assets.monsterSpecs.values());
         }
-
-        // ── NORMAL LEVEL MODE (unchanged below) ───────────────────────────
-        // Register character anims once the sprite sheet has finished loading.
-        createCharacterAnims(this, this.assets.character);
-        // Register monster anims for all loaded monster specs.
-        createMonsterAnims(this, this.assets.monsterSpecs.values());
-        // Register drop anims.
         createDropAnims(this, this.assets.dropSpecs.values());
 
-        // Spawn the player character (WASD + Shift dodge + hotbar).
+        // ── Player character ────────────────────────────────────────────
+        // Always spawn: tavern mode uses a placeholder (hidden behind the
+        // selection UI) that TavernController swaps to the chosen one on
+        // confirm. Reusing the same load path means physics / sprite /
+        // body wiring stays in one place.
         this.character = loadCharacter(
             this,
             this.level,
@@ -410,11 +292,13 @@ export class LoadScene extends Phaser.Scene {
             },
             {
                 onWeaponPickup: (weaponId) => {
-                    // ponytail: weapon pickup isn't supported in the demo's
-                    // fixed hotbar. Acknowledge the pickup by destroying the
-                    // drop without applying — the data still parses + flows
-                    // through the system.
-                    void weaponId;
+                    // Tavern mode caps pickups at TAVERN_WEAPON_MAX;
+                    // TavernController owns that counter. Non-tavern
+                    // scenes don't change the hotbar — ack silently.
+                    if (this.level.tavern) {
+                        if (!this.tavernController?.tryAcceptWeapon()) return;
+                    }
+                    this.character.pickUpWeapon(weaponId);
                 },
             },
         );
@@ -515,13 +399,16 @@ export class LoadScene extends Phaser.Scene {
             });
         }
 
-        // Wire TeleporterController (code-drawn magic circle & scene transition)
+        // Wire TeleporterController (code-drawn magic circle & scene transition).
+        // Position callback reads `this.character` lazily so a tavern
+        // character swap on confirm picks up the new body automatically.
+        // Tavern exit is always unblocked; other scenes block on monster clear.
         this.teleporterSystem = new TeleporterController(
             this,
             this.level.teleporters,
             this.id,
             () => (this.character?.body?.position ? this.character.body.position : null),
-            () => this.monsterSystem.isAllCleared(),
+            () => (this.level.tavern ? true : this.monsterSystem.isAllCleared()),
         );
 
         this.events.on('update', (_time: number, delta: number) => {
@@ -548,6 +435,34 @@ export class LoadScene extends Phaser.Scene {
         useGameStore.getState().setLevelElapsedMs(savedElapsedMs);
         EventBus.emit('level-loaded', payload);
         EventBus.emit('current-scene-ready', this);
+
+        // ── Tavern UI overlay ──────────────────────────────────────────
+        // Pure UI on top of the now-fully-wired scene. Hides the default
+        // character behind the selection UI; on confirm, swaps it for the
+        // picked spec and re-points monsterSystem at the new body.
+        if (this.level.tavern) {
+            this.tavernController = new TavernController(
+                this,
+                this.level,
+                this.assets,
+                this.character,
+                (selectedSpec: CharacterSpec) => {
+                    this.character.destroy();
+                    (this.assets as any).character = selectedSpec;
+                    if (selectedSpec.sprite) {
+                        (this.assets as any).spriteCell = { width: 128, height: 128 };
+                    }
+                    this.character = loadCharacter(
+                        this,
+                        this.level,
+                        selectedSpec,
+                        this.assets.weapons,
+                    );
+                    this.monsterSystem.setPlayerBody(this.character.body);
+                    useGameStore.getState().setTavernCleared(true);
+                },
+            );
+        }
     }
 
     shutdown(): void {

@@ -352,7 +352,7 @@ export class MonsterController {
     private readonly projectiles: MonsterProjectile[] = [];
     private readonly cb: MonsterControllerCallbacks;
     /** Cached for fast lookup in attack tests. */
-    private readonly playerBody: MatterJS.BodyType;
+    private playerBody: MatterJS.BodyType;
     private readonly matter: any;
     private readonly pathfinder?: PathfindingService;
     private lastPathCalcAt = 0;
@@ -450,6 +450,16 @@ export class MonsterController {
         }
 
         this.bindCollisions();
+    }
+
+    /**
+     * Swap the player body reference. Used by the tavern UI to rewire
+     * monsters / collisions to a freshly-spawned character after the
+     * player picks a new one — the `playerBody` field is otherwise
+     * captured once at construction.
+     */
+    public setPlayerBody(body: MatterJS.BodyType): void {
+        this.playerBody = body;
     }
 
     /** Export fine-grained snapshot of active monsters and remaining pending spawn queue. */

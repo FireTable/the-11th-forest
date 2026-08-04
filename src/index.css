@@ -182,12 +182,21 @@
     font-size: 0.8em;
 }
 
-/* Hide the system cursor everywhere in the app — TavernHud and
-   other HUDs sit outside `#game-container`, and `PixelCrosshair`
-   draws the only on-screen pointer. Children with their own cursor
-   rule (e.g. editor buttons `cursor: pointer`) override this. */
-#app {
-    cursor: none;
+/* Tavern HUD bob — runs on the GPU compositor, no JS / layout
+   recalc per frame. Period ≈ 2.2s with ease-in-out + alternate
+   gives a smooth pendulum that approximates the previous
+   `Math.sin(t/350) * 6`. */
+@keyframes tavern-hud-bob {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(6px);
+    }
+}
+.tavern-hud-bob {
+    animation: tavern-hud-bob 1.1s ease-in-out infinite alternate;
 }
 
 @keyframes crosshairBreathe {
