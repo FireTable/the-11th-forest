@@ -537,17 +537,18 @@ export class LoadScene extends Phaser.Scene {
                 }
                 // Clear stale playerSnapshot so tickSaveState (which runs every 1s)
 // doesn't immediately re-poison the store with off-world coords the
-// very first time it fires. `loadCharacter` itself ignores savedPlayer
-// (via `ignoreSavedPosition: true`) so the character spawns at the
-// level center; this set just keeps the store consistent.
-useGameStore.setState({ playerSnapshot: undefined });
+// Preserve the player's saved position so the tavern refresh path
+// (re-entering with the same selected character) restores the
+                // spot they were standing in. Other levels already do
+                // this — the tavern refresh path was the odd one out
+                // before because of the placeholder→real-character swap.
+useGameStore.getState().clearSceneSnapshots();
                 this.character = loadCharacter(
                     this,
                     this.level,
                     pickedSpec,
                     this.assets.weapons,
                     {
-                        ignoreSavedPosition: true,
                         weaponsById: this.assets.weaponsById,
                     },
                 );
