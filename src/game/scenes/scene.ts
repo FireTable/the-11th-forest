@@ -263,6 +263,17 @@ export class LoadScene extends Phaser.Scene {
         this.events.once('shutdown', unbindEditorOpen);
         this.events.once('destroy', unbindEditorOpen);
 
+        // Bind the subsystem-cleanup (audio.destroy() in particular) to
+        // BOTH 'shutdown' AND 'destroy'. Phaser's SceneManager.remove()
+        // path fires 'destroy' but NOT 'shutdown' (only boot() /
+        // scene-transition do). Without the 'destroy' hook, every old
+        // AudioController stays subscribed to the music event bus
+        // after a scene swap, and the new scene's MUSIC_EVENT makes
+        // both controllers try to play — stacked BGM. idempotent via
+        // `isShutdown` so the double-binding doesn't run cleanup twice.
+        this.events.once('shutdown', () => this.shutdown());
+        this.events.once('destroy', () => this.shutdown());
+
         // Path-debug overlay stays hidden until the designer opts in via
         // the toggle in the Air-walls section — defaulting to off keeps
         // the canvas readable for the common case of just editing walls.
@@ -626,7 +637,16 @@ export class LoadScene extends Phaser.Scene {
         }
     }
 
+    private isShutdown = false;
+
     shutdown(): void {
+        // Phaser fires both 'shutdown' AND 'destroy' on some paths
+        // and only 'destroy' on scene.remove(). The once() bindings
+        // above would still run this twice in the first case if the
+        // subsystems aren't idempotent — guard so each subsystem is
+        // torn down exactly once.
+        if (this.isShutdown) return;
+        this.isShutdown = true;
         this.tavernController?.destroy();
         this.teleporterSystem?.destroy();
         this.audio?.destroy();
