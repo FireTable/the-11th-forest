@@ -134,10 +134,6 @@ export class TavernController {
         // whatever Phaser's default is (empty in v4, so CSS rules win).
         this.bindCursor();
 
-        // Hide the default character that LoadScene.create() already
-        // spawned — it's a placeholder until the player picks. Park it
-        // far off-screen so its physics body can't collide with NPCs.
-        this.hideDefaultCharacter();
 
         if (startPhase === 'selection') {
             // NPC selection UI: spawn idle sprites, bind A/D/F, emit
@@ -161,25 +157,6 @@ export class TavernController {
 
     // ─── Keyboard ────────────────────────────────────────────────────────
 
-    /**
-     * Hide the default character LoadScene.create() spawned — it stays in
-     * the scene tree (so teleporter/drop wiring remains valid) but is
-     * parked far off-screen so it can't collide with NPCs or be visible.
-     * On confirm, the scene swaps the character in place.
-     */
-    private hideDefaultCharacter(): void {
-        const char = this.defaultCharacter;
-        // Placeholder sprite is null (loadCharacter's placeholder mode
-        // skips the visual entirely — no shadow, no sprite, no light) so
-        // there's nothing to hide here. The body is intentionally NOT
-        // moved: tickSaveState snapshots it every second, and the
-        // snapshot becomes the spawn point for the real character on
-        // confirm. If we parked it off-world, the real character would
-        // spawn off-world too.
-        char.hud?.setVisible(false);
-        char.weaponHud?.setVisible(false);
-        char.statusHud?.setVisible(false);
-    }
 
     /**
      * Cap check for the tavern phase-2 weapon pickup. Called by
