@@ -114,6 +114,11 @@ const SaveLevelSchema = z
                         type: z.string().min(1),
                         x: z.number(),
                         y: z.number(),
+                        // Weapon-pickup override: lets one generic drop
+                        // spec (e.g. "weapon-drop") be reused per spawn
+                        // with a specific weapon id. Mirrors the TS
+                        // schema in src/lib/levels/schema.ts.
+                        weaponId: z.string().min(1).optional(),
                     })
                     .strict(),
             )
@@ -556,11 +561,11 @@ function serializeLevelYaml(level) {
         });
     }
     if (level.dropSpawns !== undefined) {
-        payload.dropSpawns = level.dropSpawns.map((d) => ({
-            type: d.type,
-            x: d.x,
-            y: d.y,
-        }));
+        payload.dropSpawns = level.dropSpawns.map((d) => {
+            const out = { type: d.type, x: d.x, y: d.y };
+            if (d.weaponId !== undefined) out.weaponId = d.weaponId;
+            return out;
+        });
     }
     if (level.materials !== undefined) payload.materials = level.materials;
     if (level.teleporters !== undefined) payload.teleporters = level.teleporters;
