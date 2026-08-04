@@ -72,6 +72,21 @@ const SaveLevelSchema = z
             })
             .strict()
             .optional(),
+        /** Tavern-mode flag: when true, LoadScene enters character-select
+         *  mode (NPCs rendered for selection; weapon pickup capped at 3). */
+        tavern: z.boolean().optional(),
+        /** Tavern-mode only: per-character NPC standing positions. */
+        npcSpawns: z
+            .array(
+                z
+                    .object({
+                        characterId: z.string().min(1),
+                        x: z.number(),
+                        y: z.number(),
+                    })
+                    .strict(),
+            )
+            .optional(),
         monsters: z
             .array(
                 z
