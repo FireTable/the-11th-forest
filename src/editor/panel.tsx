@@ -266,7 +266,7 @@ export function EditorPanel() {
                 )}
             </Button>
             <aside
-                className="w-[360px] h-screen shrink-0 bg-neutral-900 border-l border-neutral-800 text-neutral-100 flex flex-col font-sans text-[13px] relative z-[200]"
+                className="w-[360px] h-screen shrink-0 bg-neutral-900 border-l border-neutral-800 text-neutral-100 flex flex-col font-sans text-[13px] relative z-[60]"
                 hidden={!open}
             >
                 <nav className="flex border-b border-neutral-800">
