@@ -26,6 +26,8 @@ import { fetchMonster } from '@/lib/monsters';
 import type { WeaponSpec } from '@/lib/weapons';
 import { fetchWeapon } from '@/lib/weapons';
 
+import { useGameStore } from '@/store/game-store';
+
 export interface ResolvedScene {
     id: string;
     level: Awaited<ReturnType<typeof fetchLevel>>;
@@ -87,7 +89,15 @@ export async function resolveScene(
     const id = sceneId;
     const level = await deps.fetchLevelId(id);
 
-    const characterId = level.character ?? (await deps.fetchFirstCharacterId());
+    // Pick the character for this scene, in priority order:
+    //   1. Player's tavern selection (persisted) — survives into every
+    //      non-tavern scene so the picked character follows the player.
+    //   2. The level's `character:` field — author override per level.
+    //   3. First character in index.yaml — fall-back for fresh starts
+    //      before the player has picked anyone.
+    const selectedCharacterId = useGameStore.getState().selectedCharacterId;
+    const characterId =
+        selectedCharacterId ?? level.character ?? (await deps.fetchFirstCharacterId());
     if (!characterId) {
         throw new Error('No character available — add one to public/data/characters/index.yaml');
     }

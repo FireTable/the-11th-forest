@@ -162,7 +162,20 @@ export class LoadScene extends Phaser.Scene {
         // only need their bullet texture; their in-hand sprite is
         // never on screen, so skipping `visual.texture` saves ~19
         // network requests on monster-heavy levels.
-        const playerWeapons = [...this.assets.playerWeaponIds]
+        //
+        // Player weapons also include the slots persisted in the
+        // store from a previous tavern session — resolveScene only
+        // sees character.hotbar + dropSpawns.weaponId, both of
+        // which are empty for non-tavern levels even though the
+        // player may have picked up weapons in the tavern. Without
+        // these textures the in-hand visual renders nothing after a
+        // scene transition.
+        const savedSlotIds = new Set(
+            (useGameStore.getState().slots ?? []).map((s) => s.id),
+        );
+        const playerWeaponIds = new Set<string>(this.assets.playerWeaponIds);
+        savedSlotIds.forEach((id) => playerWeaponIds.add(id));
+        const playerWeapons = [...playerWeaponIds]
             .map((id) => this.assets.weaponsById.get(id))
             .filter((w): w is WeaponSpec => Boolean(w));
         const monsterWeapons = [...this.assets.monsterWeaponIds]
@@ -565,7 +578,6 @@ useGameStore.setState({ playerSnapshot: undefined });
                     this,
                     this.level,
                     this.assets,
-                    this.character,
                     () => {
                         /* no-op — selection phase is not active */
                     },
@@ -576,7 +588,6 @@ useGameStore.setState({ playerSnapshot: undefined });
                     this,
                     this.level,
                     this.assets,
-                    this.character,
                     (selectedSpec: CharacterSpec) => {
                         this.character.destroy();
                         (this.assets as any).character = selectedSpec;

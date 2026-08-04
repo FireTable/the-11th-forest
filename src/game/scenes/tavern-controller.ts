@@ -104,9 +104,6 @@ export class TavernController {
         private readonly scene: Phaser.Scene,
         private readonly level: Level,
         private readonly assets: SceneAssets,
-        /** The default character LoadScene spawned — hidden behind the
-         *  selection UI, parked off-screen, swapped on confirm. */
-        private readonly defaultCharacter: CharacterRuntime,
         /**
          * Called once when the player confirms a character. The scene
          * destroys the default character, loads the picked spec, and
