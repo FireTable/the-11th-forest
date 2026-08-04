@@ -403,12 +403,15 @@ export class TavernController {
 
     update(_time: number, delta: number): void {
         if (this.phase === 'selection') {
-            // A / D navigation
-            if (
-                Phaser.Input.Keyboard.JustDown(this.keyLeft) ||
-                Phaser.Input.Keyboard.JustDown(this.keyRight)
-            ) {
-                const dir = Phaser.Input.Keyboard.JustDown(this.keyLeft) ? -1 : 1;
+            // A / D navigation. JustDown is edge-triggered — capture the result
+            // once into a local, otherwise calling it twice in one
+            // frame always reads false on the second call (the rising
+            // edge was consumed by the first) and A would silently
+            // cycle in the same direction as D.
+            const left = Phaser.Input.Keyboard.JustDown(this.keyLeft);
+            const right = Phaser.Input.Keyboard.JustDown(this.keyRight);
+            if (left || right) {
+                const dir = left ? -1 : 1;
                 this.selectedIndex =
                     (this.selectedIndex + dir + this.npcs.length) % this.npcs.length;
                 this.updateHighlight();
