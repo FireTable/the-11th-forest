@@ -1,24 +1,26 @@
-name: Bramble Stalker
-hp: 140
-moveSpeed: 6
+name: Spore Sniper
+# NOTE: spec pairs this monster with spore-shot, which was removed from
+# the AI sheet and replaced by bramble-knuckles. Reuses moss-bark-rifle
+# (the only ranged forest weapon) until a sniper-specific ranged weapon
+# is generated.
+hp: 90
+moveSpeed: 2.5
 body:
-  halfW: 18
-  halfH: 18
-weaponId: vine-lash
+  halfW: 22
+  halfH: 22
+weaponId: moss-bark-rifle
 sfx:
   hit: monster-hit
   death: monster-death
   aggro: monster-aggro
 drops:
+  - dropId: ammo-cache
+    chance: 0.5
   - dropId: hp-shard
-    chance: 0.45
-  - dropId: sp-fragment
-    chance: 0.25
-  - dropId: overcharge-core
-    chance: 0.10
+    chance: 0.2
 
 sprite:
-  texture: assets/image/monsters/stalker.png
+  texture: assets/image/monsters/sniper.png
   grid: { rows: 4, cols: 4 }
   scale: 1.0
   offset: { left: 0, bottom: 0 }
@@ -46,7 +48,7 @@ anims:
     repeat: 0
 
 prompt: |
-    The 11th Forest — Bramble Stalker sprite sheet
+    The 11th Forest — Spore Sniper sprite sheet
 
     HARD NEGATIVE PROMPTS (must NOT appear in the image):
       - No visible grid, no dividers, no borders, no ground, no scene,
@@ -88,36 +90,35 @@ prompt: |
     pure flat magenta everywhere except where the monster is drawn.
 
     Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
-    512×512 px. The monster is ~320×440 px in each cell, centered
+    512×512 px. The monster is ~300×480 px in each cell, centered
     horizontally. No overlapping between cells. The monster faces RIGHT in
     every frame (its front = screen right).
 
-    Monster Concept (Bramble Stalker - Melee Forest Dashing Automaton):
-    A slender bipedal ruin-stalker made of twisted dark vines braided over
-    cracked terracotta armor plates, with a single glowing amber eye slit
-    on the chest. Long barbed arm-blades extend from both forearms. Fast
-    and aggressive.
+    Monster Concept (Spore Sniper - Ranged Poison Forest Archer):
+    A tall cloaked forest archer kneeling on one leg, wrapped in hanging
+    moss and spotted mushroom caps. Holding a long slender wooden bow
+    loaded with a glowing purple spore-arrow. Glowing yellow eyes under
+    the hood.
 
-    Same monster in every frame — vines, eye, arm-blades are identical.
-    Only the pose/state changes.
+    Same monster in every frame — cloak, mushrooms, bow, arrow are
+    identical. Only the pose/state changes.
 
     15 frames in row order (left-to-right, top-to-bottom), distributed as:
 
     Frames 0–3 (idle, 4 frames, row 1):
-      Low crouch, vines coiling around the arm-blades. Subtle weight shift,
-      amber eye flickering.
+      Crouched and aiming, bow held steady. Slow breathing, spore-arrow
+      pulsing faintly purple.
 
     Frames 4–7 (move, 4 frames, row 2):
-      Sprint lunge cycle. Body stretched forward, vines trailing behind,
-      arm-blades pulled back ready to strike.
+      Sidestep shuffle to reposition. Cloak sways, bow kept level.
 
     Frames 8–11 (hit, 4 frames, row 3):
-      Stagger — knocked backward to the left, vines snap apart, amber eye
-      flashes bright, terracotta shards fly off.
+      Knockback, hood falls back revealing skull-like mask, mushrooms
+      shatter off the shoulders.
 
     Frames 12–14 (death, 3 frames, row 4):
-      Vine body unravels and crumbles to dust, arm-blades clatter to the
-      ground, amber eye dims to black.
+      Cloak collapses into a pile of spores, bow snaps in half, a faint
+      purple cloud dissipates upward.
 
     Style requirements:
     - High-end handcrafted 16-bit RPG aesthetic.

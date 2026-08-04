@@ -1,24 +1,24 @@
-name: Bramble Stalker
-hp: 140
-moveSpeed: 6
+name: Iron Warden
+hp: 420
+moveSpeed: 2.5
 body:
-  halfW: 18
-  halfH: 18
-weaponId: vine-lash
+  halfW: 38
+  halfH: 32
+weaponId: rune-shield
 sfx:
   hit: monster-hit
   death: monster-death
   aggro: monster-aggro
 drops:
-  - dropId: hp-shard
-    chance: 0.45
-  - dropId: sp-fragment
-    chance: 0.25
   - dropId: overcharge-core
-    chance: 0.10
+    chance: 1.0
+  - dropId: hp-shard
+    chance: 0.8
+  - dropId: ammo-cache
+    chance: 0.6
 
 sprite:
-  texture: assets/image/monsters/stalker.png
+  texture: assets/image/monsters/warden.png
   grid: { rows: 4, cols: 4 }
   scale: 1.0
   offset: { left: 0, bottom: 0 }
@@ -46,7 +46,7 @@ anims:
     repeat: 0
 
 prompt: |
-    The 11th Forest — Bramble Stalker sprite sheet
+    The 11th Forest — Iron Warden sprite sheet
 
     HARD NEGATIVE PROMPTS (must NOT appear in the image):
       - No visible grid, no dividers, no borders, no ground, no scene,
@@ -88,36 +88,35 @@ prompt: |
     pure flat magenta everywhere except where the monster is drawn.
 
     Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
-    512×512 px. The monster is ~320×440 px in each cell, centered
+    512×512 px. The monster is ~420×500 px in each cell, centered
     horizontally. No overlapping between cells. The monster faces RIGHT in
     every frame (its front = screen right).
 
-    Monster Concept (Bramble Stalker - Melee Forest Dashing Automaton):
-    A slender bipedal ruin-stalker made of twisted dark vines braided over
-    cracked terracotta armor plates, with a single glowing amber eye slit
-    on the chest. Long barbed arm-blades extend from both forearms. Fast
-    and aggressive.
+    Monster Concept (Iron Warden - Heavy Melee Miniboss):
+    A massive iron-clad forest warden fused with ancient bronze plate
+    armor, moss-rusted, carrying a tower shield etched with glowing green
+    runes. Single cyclops-style emerald eye in the center of the helmet.
+    Built like a walking fortress.
 
-    Same monster in every frame — vines, eye, arm-blades are identical.
-    Only the pose/state changes.
+    Same monster in every frame — armor, shield, helmet, eye are
+    identical. Only the pose/state changes.
 
     15 frames in row order (left-to-right, top-to-bottom), distributed as:
 
     Frames 0–3 (idle, 4 frames, row 1):
-      Low crouch, vines coiling around the arm-blades. Subtle weight shift,
-      amber eye flickering.
+      Tower shield raised, helmet visor glowing emerald. Heavy breathing,
+      moss on the armor gently swaying.
 
     Frames 4–7 (move, 4 frames, row 2):
-      Sprint lunge cycle. Body stretched forward, vines trailing behind,
-      arm-blades pulled back ready to strike.
+      Slow heavy march. Each step cracks the ground, shield shifts with
+      the stride.
 
     Frames 8–11 (hit, 4 frames, row 3):
-      Stagger — knocked backward to the left, vines snap apart, amber eye
-      flashes bright, terracotta shards fly off.
+      Staggers under the blow, shield arm dips, runes flicker orange.
 
     Frames 12–14 (death, 3 frames, row 4):
-      Vine body unravels and crumbles to dust, arm-blades clatter to the
-      ground, amber eye dims to black.
+      One knee buckles, shield slams into the ground, armor plates burst
+      outward, emerald eye fades out slowly.
 
     Style requirements:
     - High-end handcrafted 16-bit RPG aesthetic.
