@@ -444,9 +444,15 @@ export class DropController {
      * as a runtime drop with the same drop-the-character-just-picked
      * visual style, so the player can walk back and pick it up
      * later if they change their mind.
+     *
+     * Marks the new drop `rejected = true` so the magnet stays off
+     * until the player walks past RADIUS * 1.5 — without this, the
+     * parabola lands well within the magnet radius and the player
+     * immediately sucks the just-thrown weapon back up.
      */
     spawnWeapon(spec: DropSpec, weaponSpec: WeaponSpec, x: number, y: number): DropInstance {
         const d = new DropInstance(this.scene, spec, x, y, true, weaponSpec);
+        d.rejected = true;
         this.runtimeDrops.push(d);
         return d;
     }

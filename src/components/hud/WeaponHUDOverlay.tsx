@@ -29,13 +29,13 @@ export const WeaponHUDOverlay: React.FC = () => {
         reloadProgress,
         slots,
         hubsVisible,
-        tavernCleared,
     } = useGameStore();
     const mobile = useIsMobile();
 
-    // Hide during tavern phase 1 — placeholder has no WeaponHud so this
-    // would otherwise show a stale hotbar from a previous save.
-    if (!tavernCleared || !hubsVisible || !activeWeaponName || slots.length === 0) return null;
+    // Show whenever the character has weapons. Tavern phase 1
+    // placeholder has no WeaponHud so the store has no slots; that
+    // case naturally short-circuits on `slots.length === 0`.
+    if (!hubsVisible || !activeWeaponName || slots.length === 0) return null;
 
     if (mobile) {
         const handleSwitch = (index: number): void => {

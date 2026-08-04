@@ -6,15 +6,15 @@ import { useIsMobile } from '@/lib/use-is-mobile';
 import { CornerPixels, RETRO_BOX } from './retro-box';
 
 export const CharacterHUDOverlay: React.FC = () => {
-    const { characterName, hp, maxHp, sp, maxSp, hubsVisible, tavernCleared } =
-        useGameStore();
+    const { characterName, hp, maxHp, sp, maxSp, hubsVisible } = useGameStore();
     const mobile = useIsMobile();
 
-    // Hide during tavern phase 1 — the placeholder has no CharacterHud
-    // so this overlay would otherwise show a stale characterName carried
-    // over from a previous save (characterName is persisted; tavern
-    // selection has not happened yet in this run).
-    if (!tavernCleared || !hubsVisible || !characterName) return null;
+    // Show whenever the character exists. Previously gated on
+    // `!tavernCleared` to avoid a stale characterName during tavern
+    // phase 1, but the player needs HP/SP feedback after picking up
+    // weapons in the tavern too — characterName is only set once the
+    // real character is loaded, so phase 1 still renders nothing.
+    if (!hubsVisible || !characterName) return null;
 
     const hpPercent = Math.max(0, Math.min(100, (hp / (maxHp || 1)) * 100));
     const spPercent = Math.max(0, Math.min(100, (sp / (maxSp || 1)) * 100));

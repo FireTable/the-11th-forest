@@ -228,9 +228,8 @@ export class WeaponController {
      * `'capped'` when the hotbar already holds `maxSlots` weapons.
      *
      * Used by the tavern pickup flow: below the cap the drop is
-     * auto-consumed; at the cap the caller surfaces a replace-HUD
-     * instead of consuming the drop, so the player decides which slot
-     * to overwrite.
+     * auto-consumed; at the cap the caller auto-swaps the active
+     * slot (see `src/game/scenes/scene.ts`).
      */
     tryPickupWeapon(spec: WeaponSpec): 'added' | 'capped' {
         if (this.slots.length >= this.maxSlots) return 'capped';
@@ -243,7 +242,15 @@ export class WeaponController {
             reloadStartedAt: 0,
             justCompletedAt: 0,
         });
-        this.switchTo(this.slots.length - 1);
+        // Bypass switchTo's "same index → skip" guard: when
+        // transitioning from 0 slots → 1 slot, currentIndex is
+        // still the default 0, so switchTo(0) would early-return
+        // and never update the in-hand visual. Manually drive the
+        // visual here so the first pickup actually appears in the
+        // character's hand.
+        this.currentIndex = this.slots.length - 1;
+        this.visualController.setWeapon(spec);
+        EventBus.emit(SFX_EVENT('weapon-switch'));
         return 'added';
     }
 
