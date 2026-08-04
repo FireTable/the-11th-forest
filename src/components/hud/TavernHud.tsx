@@ -200,7 +200,6 @@ export const TavernHud: React.FC = () => {
                 height: `${height / scale}px`,
                 transform: `scale(${scale})`,
                 transformOrigin: 'top left',
-                cursor: 'none'
             }
             : { position: 'absolute', inset: 0 };
 
@@ -209,10 +208,10 @@ export const TavernHud: React.FC = () => {
     const isSelection = focus.phase === 'selection';
 
     return (
-        <div style={outerStyle}>
+        <div className="pointer-events-none [&>*]:pointer-events-none select-none cursor-none" style={outerStyle} >
             <div
                 ref={wrapRef}
-                className="absolute z-20 flex flex-col items-center pointer-events-none [&>*]:pointer-events-none select-none"
+                className="absolute z-20 flex flex-col items-center"
                 style={{
                     fontFamily: "'Silkscreen', monospace",
                     right: '24px',
