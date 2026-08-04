@@ -40,6 +40,15 @@ export interface ResolvedScene {
     drops: Map<string, DropSpec>;
     sfx: Map<string, SfxSpec>;
     music: Map<string, MusicSpec>;
+    /** Weapon ids referenced by monster specs in this level. Their
+     *  `visual.texture` is NOT loaded — only `bullet.texture` is.
+     *  Scene uses this set to call `loadWeaponAssets` with
+     *  `loadVisualTexture: false` for monster weapons. */
+    monsterWeaponIds: Set<string>;
+    /** Weapon ids the player can hold / see rendered: character hotbar
+     *  + tavern dropSpawn entries. These get the full visual+bullet
+     *  texture load. */
+    playerWeaponIds: Set<string>;
     /** Tavern mode only: all available characters for NPC display + selection. */
     allCharacters?: CharacterSpec[];
 }
@@ -112,11 +121,14 @@ export async function resolveScene(
     level.dropSpawns?.forEach((d) => {
         if (d.weaponId) spawnWeaponIds.add(d.weaponId);
     });
-    const allWeaponIds = new Set<string>([
-        ...character.hotbar,
-        ...monsterWeaponIds,
-        ...spawnWeaponIds,
-    ]);
+    // Player-pickupable weapons: spec hotbar + tavern dropSpawn ids.
+    // These get their in-hand texture loaded because the player holds
+    // them and they're rendered as drops on the ground.
+    const playerWeaponIds = new Set<string>([...character.hotbar, ...spawnWeaponIds]);
+    // Monster weapons: only need their bullet texture loaded, never
+    // held by the player. Kept out of the player set so the loader
+    // skips `visual.texture` for them.
+    const allWeaponIds = new Set<string>([...playerWeaponIds, ...monsterWeaponIds]);
     const allWeaponEntries = await Promise.all(
         [...allWeaponIds].map(async (wid) => [wid, await fetchWeapon(wid)] as const),
     );
@@ -156,6 +168,8 @@ export async function resolveScene(
         drops: new Map(dropEntries),
         sfx,
         music,
+        monsterWeaponIds,
+        playerWeaponIds,
         ...(allCharacters ? { allCharacters } : {}),
     };
 }
@@ -220,6 +234,8 @@ export function toSceneAssets(resolved: ResolvedScene): SceneAssets {
         dropSpecs: resolved.drops,
         sfxSpecs: resolved.sfx,
         musicSpecs: resolved.music,
+        monsterWeaponIds: resolved.monsterWeaponIds,
+        playerWeaponIds: resolved.playerWeaponIds,
         ...(resolved.allCharacters ? { allCharacters: resolved.allCharacters } : {}),
     };
 }

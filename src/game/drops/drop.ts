@@ -22,6 +22,15 @@ import { useGameStore } from '@/store/game-store';
 
 import { planDropEffect } from './logic';
 
+/**
+ * Ground-display scale multiplier for weapon-pickup drops. The
+ * weapon's `visual.scale` (e.g. 0.16 for arcana-staff) is sized for the
+ * in-hand sprite anchored to the character body. On the ground the
+ * drop is its own prop, so we bump it by this factor for legibility.
+ * Hand-tuned — change here if a weapon ends up too tiny / too big.
+ */
+export const DROP_WEAPON_PICKUP_SCALE_MULTIPLIER = 3;
+
 // ─── Entity ──────────────────────────────────────────────────────────────
 
 export function textureKey(spec: DropSpec): string {
@@ -170,6 +179,14 @@ export class DropInstance {
             // drop on the ground is visually identical to the gun you're
             // about to pick up. No spritesheet / anim — weapons are
             // single-frame static images.
+            //
+            // Scale: use the weapon's own `visual.scale` from the YAML so
+            // every weapon renders at its hand-tuned size on the ground
+            // (arcana-staff at 0.16 stays tiny, plasma-sword at 0.16
+            // stays tiny, etc). The × GROUND_MULTIPLIER bump makes the
+            // drop legible at world zoom — the in-hand scale is sized
+            // for a tiny sprite anchored to a character body, the
+            // ground drop needs to be a readable prop on its own.
             const spriteObj = scene.add.image(
                 isFromMonster ? x : targetX,
                 isFromMonster ? y : targetY,
@@ -177,7 +194,7 @@ export class DropInstance {
             );
             spriteObj.setDepth(Math.round(targetY));
             const pickupScale = weaponSpec.visual.scale ?? 0.16;
-            spriteObj.setScale(pickupScale * 2.5);
+            spriteObj.setScale(pickupScale * DROP_WEAPON_PICKUP_SCALE_MULTIPLIER);
             this.sprite = spriteObj as unknown as Phaser.GameObjects.Sprite;
         } else if (spec.sprite && scene.textures.exists(textureKey(spec))) {
             const idleAnimKey = animKey(spec, 'idle');
@@ -278,9 +295,17 @@ export class DropInstance {
 // ─── Controller ──────────────────────────────────────────────────────────
 
 export interface DropControllerCallbacks {
-    /** Called on weapon pickup — character owns the runtime; we tell it
-     *  which weapon id to switch to. */
-    onWeaponPickup: (weaponId: string) => void;
+    /**
+     * Called on weapon pickup — character owns the runtime; we tell it
+     * which weapon id to switch to.
+     *
+     * Return value controls whether the drop is consumed:
+     *   - `true`  — drop is consumed (default pickup succeeded)
+     *   - `false` — drop stays on the ground (cap-replace flow is
+     *               open in the hub; the drop waits for confirmation
+     *               before being destroyed)
+     */
+    onWeaponPickup: (weaponId: string) => boolean;
 }
 
 export class DropController {
@@ -407,9 +432,18 @@ export class DropController {
 
                 // Check final pickup threshold
                 if (dist <= magnet.PICKUP_DISTANCE) {
-                    drop.taken = true;
-                    this.applyEffect(drop);
-                    this.removeDrop(drop);
+                    const consumed = this.applyEffect(drop);
+                    if (consumed) {
+                        drop.taken = true;
+                        this.removeDrop(drop);
+                    } else {
+                        // Cap-replace flow: hub is open. Stop attracting
+                        // so the drop doesn't keep chasing the player;
+                        // collision pickup won't re-trigger because
+                        // `drop.taken` stays false but we also short-
+                        // circuit the loop below.
+                        drop.isAttracting = false;
+                    }
                 }
             }
         }
@@ -437,9 +471,17 @@ export class DropController {
                 const drop = this.findDrop(dropBody as MatterJS.BodyType);
                 if (!drop) continue;
                 if (drop.taken || !drop.isLanded) continue;
-                drop.taken = true;
-                this.applyEffect(drop);
-                this.removeDrop(drop);
+                const consumed = this.applyEffect(drop);
+                if (consumed) {
+                    drop.taken = true;
+                    this.removeDrop(drop);
+                } else {
+                    // Cap-replace flow keeps the drop on the ground
+                    // until the hub confirms. Stop attracting so it
+                    // doesn't ride the player's center while the
+                    // hub is open.
+                    drop.isAttracting = false;
+                }
             }
         });
     }
@@ -458,7 +500,7 @@ export class DropController {
         d.destroy(this.scene);
     }
 
-    private applyEffect(dropInstance: DropInstance): void {
+    private applyEffect(dropInstance: DropInstance): boolean {
         // Emit SFX BEFORE applying effect so the audio engine can play
         // before the pickup animation / freeze-frame finishes. Falls
         // back to a generic pickup tone when the spec doesn't declare
@@ -480,10 +522,34 @@ export class DropController {
                   effect: { type: 'weapon', weaponId: dropInstance.weaponSpec.id },
               } as DropSpec)
             : spec;
+        // Default consumed=true covers non-weapon drops (instant /
+        // refill-ammo) which have no opt-out path. For weapons the
+        // callback returns false when the cap-replace hub has not
+        // confirmed yet — the caller (magnet loop / collisionstart)
+        // uses this to keep the drop on the ground.
+        let consumed = true;
         planDropEffect(effectiveSpec, {
             heal: (hp, sp) => this.character.heal(hp, sp),
             refillAmmo: (f) => this.character.refillAmmo(f),
-            onWeaponPickup: (id) => this.cb.onWeaponPickup(id),
+            onWeaponPickup: (id) => {
+                consumed = this.cb.onWeaponPickup(id);
+            },
         });
+        return consumed;
+    }
+
+    /**
+     * Destroy the still-on-ground weapon drop the cap-replace hub is
+     * negotiating. Called by the scene after `weapon-replace-confirm`
+     * commits the swap, so the drop never lingers once the player has
+     * actually committed to the new weapon.
+     */
+    acknowledgePendingPickup(weaponId: string): void {
+        const all = [...this.staticDrops, ...this.runtimeDrops];
+        const target = all.find(
+            (d) => !d.taken && d.spec.kind === 'static' && d.weaponSpec?.id === weaponId,
+        );
+        if (!target) return;
+        this.removeDrop(target);
     }
 }

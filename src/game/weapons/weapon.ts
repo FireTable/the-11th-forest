@@ -21,10 +21,28 @@ import type { WeaponSpec } from '@/lib/weapons';
 
 /**
  * Queue weapon and paired bullet texture assets into the Phaser Loader.
+ *
+ * `loadVisualTexture` controls whether `spec.visual.texture` is queued:
+ *   - `true` (default) for player-pickup weapons — the in-hand sprite
+ *     is rendered and used as the drop's ground sprite.
+ *   - `false` for monster weapons — they only need `spec.bullet.texture`
+ *     because monsters fire projectiles, not held weapons.
+ *
+ * `spec.bullet.texture` is always queued when present — even monster
+ * weapons render their bullets in flight.
  */
-export function loadWeaponAssets(scene: Phaser.Scene, weaponSpecs: Iterable<WeaponSpec>): void {
+export function loadWeaponAssets(
+    scene: Phaser.Scene,
+    weaponSpecs: Iterable<WeaponSpec>,
+    options: { loadVisualTexture?: boolean } = {},
+): void {
+    const loadVisual = options.loadVisualTexture !== false;
     for (const spec of weaponSpecs) {
-        if (spec.visual?.texture && !scene.textures.exists(spec.visual.texture)) {
+        if (
+            loadVisual &&
+            spec.visual?.texture &&
+            !scene.textures.exists(spec.visual.texture)
+        ) {
             const url = spec.visual.texture.startsWith('/')
                 ? spec.visual.texture
                 : `/${spec.visual.texture}`;

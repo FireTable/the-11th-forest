@@ -75,6 +75,13 @@ export interface SceneAssets {
     /** SFX + music loaded from audios/index.yaml. */
     sfxSpecs: Map<string, SfxSpec>;
     musicSpecs: Map<string, MusicSpec>;
+    /** Weapon ids referenced by monster specs in this level. Their
+     *  `visual.texture` is NOT loaded — only `bullet.texture` is. */
+    monsterWeaponIds: Set<string>;
+    /** Weapon ids the player can hold / see rendered: character hotbar
+     *  + tavern dropSpawn entries. These get the full visual+bullet
+     *  texture load. */
+    playerWeaponIds: Set<string>;
     /** Tavern mode only: all playable characters for NPC display + selection. */
     allCharacters?: CharacterSpec[];
 }
@@ -148,8 +155,21 @@ export class LoadScene extends Phaser.Scene {
         loadMonsterAssets(this, this.assets.monsterSpecs.values(), getMonsterSpriteCellDims);
         // Load drop spritesheet assets
         loadDropAssets(this, this.assets.dropSpecs.values());
-        // Load weapon & bullet visual assets
-        loadWeaponAssets(this, this.assets.weaponsById.values());
+        // Load weapon & bullet visual assets. Player-pickup weapons
+        // (character hotbar + tavern dropSpawns) get their in-hand
+        // texture loaded — the player holds them, and the drop-on-
+        // ground visual reuses the same texture. Monster weapons
+        // only need their bullet texture; their in-hand sprite is
+        // never on screen, so skipping `visual.texture` saves ~19
+        // network requests on monster-heavy levels.
+        const playerWeapons = [...this.assets.playerWeaponIds]
+            .map((id) => this.assets.weaponsById.get(id))
+            .filter((w): w is WeaponSpec => Boolean(w));
+        const monsterWeapons = [...this.assets.monsterWeaponIds]
+            .map((id) => this.assets.weaponsById.get(id))
+            .filter((w): w is WeaponSpec => Boolean(w));
+        loadWeaponAssets(this, playerWeapons, { loadVisualTexture: true });
+        loadWeaponAssets(this, monsterWeapons, { loadVisualTexture: false });
         // Audio assets — every SFX + music track gets queued here.
         loadAudioAssets(this, [
             ...this.assets.sfxSpecs.values(),
@@ -213,7 +233,10 @@ export class LoadScene extends Phaser.Scene {
             this.level,
             this.assets.character,
             this.assets.weapons,
-            { placeholder: this.level.tavern === true },
+            {
+                placeholder: this.level.tavern === true,
+                weaponsById: this.assets.weaponsById,
+            },
         );
 
         // Editor panel hides the on-canvas HUDs so the level / walls are
@@ -302,9 +325,14 @@ export class LoadScene extends Phaser.Scene {
             {
                 onWeaponPickup: (weaponId) => {
                     // Tavern mode routes the pickup through the cap
-                    // check: below cap, the weapon is added to the
-                    // hotbar immediately; at cap, the WeaponReplaceHub
-                    // takes over (press 1/2/3 to overwrite a slot).
+                    // check: below cap the weapon is added to the
+                    // hotbar immediately and the drop is consumed
+                    // (return true). At cap the WeaponReplaceHub
+                    // takes over — the hub asks 1/2/3/4 and only on
+                    // confirmation does the scene call
+                    // `dropSystem.acknowledgePendingPickup` to destroy
+                    // the still-on-ground drop. Returning false here
+                    // keeps the drop visible while the hub is open.
                     // Non-tavern scenes just swap to the picked weapon.
                     if (this.level.tavern) {
                         const result = this.character.tryPickupWeaponById(
@@ -313,12 +341,18 @@ export class LoadScene extends Phaser.Scene {
                         );
                         if (result === 'added') {
                             this.tavernController?.notifyWeaponAdded();
-                        } else if (result === 'capped') {
-                            this.tavernController?.requestWeaponReplace(weaponId, this.character);
+                            return true;
                         }
-                        return;
+                        if (result === 'capped') {
+                            this.tavernController?.requestWeaponReplace(weaponId, this.character);
+                            return false;
+                        }
+                        // 'unknown' (spec id not in weaponsById) — bail
+                        // without consuming so the drop stays for retry.
+                        return false;
                     }
                     this.character.pickUpWeapon(weaponId);
+                    return true;
                 },
             },
             (id) => this.assets.weaponsById.get(id),
@@ -475,7 +509,10 @@ useGameStore.setState({ playerSnapshot: undefined });
                     this.level,
                     pickedSpec,
                     this.assets.weapons,
-                    { ignoreSavedPosition: true },
+                    {
+                        ignoreSavedPosition: true,
+                        weaponsById: this.assets.weaponsById,
+                    },
                 );
                 this.monsterSystem.setPlayerBody(this.character.body);
                 this.dropSystem.setCharacter(this.character);
@@ -505,6 +542,7 @@ useGameStore.setState({ playerSnapshot: undefined });
                             this.level,
                             selectedSpec,
                             this.assets.weapons,
+                            { weaponsById: this.assets.weaponsById },
                         );
                         // Rewire subsystems to the freshly-spawned
                         // character's body / runtime. monsterSystem
@@ -550,6 +588,9 @@ useGameStore.setState({ playerSnapshot: undefined });
                     payload.weaponId,
                     this.character,
                 );
+                // Hub just committed the swap — destroy the still-on-
+                // ground drop so the weapon doesn't sit there twice.
+                this.dropSystem?.acknowledgePendingPickup(payload.weaponId);
             };
             EventBus.on('weapon-replace-confirm', onReplaceConfirm);
         }

@@ -161,6 +161,42 @@ function registerAnim(
 import { useGameStore } from '@/store/game-store';
 
 /**
+ * Pick the WeaponSpec list passed to `WeaponController` at character
+ * load. Three sources, in priority order:
+ *
+ *   1. Persisted slots from `useGameStore.slots` — post-pickup state
+ *      from a previous run. Only used when the character spec's
+ *      hotbar is empty (tavern flow) and `weaponsById` is supplied
+ *      so saved slot ids can be resolved back to specs.
+ *   2. `weapons` argument — the spec's starting hotbar, resolved by
+ *      the scene via `resolveScene`.
+ *   3. Empty array — character spawns with no weapons (tavern phase 2
+ *      before any pickup; non-tavern refresh before savedSlots has
+ *      any entries).
+ *
+ * Pure: no scene access. Shared by `loadCharacter`'s three call sites
+ * in scene.ts so the persistence behaviour is consistent.
+ */
+function resolveInitialWeapons(
+    weapons: WeaponSpec[],
+    spec: CharacterSpec,
+    weaponsById?: ReadonlyMap<string, WeaponSpec>,
+): WeaponSpec[] {
+    if (weapons.length > 0) return weapons;
+    if (!weaponsById) return weapons;
+    const savedSlots = useGameStore.getState().slots;
+    if (!savedSlots || savedSlots.length === 0) return weapons;
+    const resolved = savedSlots
+        .map((s) => weaponsById.get(s.id))
+        .filter((w): w is WeaponSpec => Boolean(w));
+    // Honour the spec's cap when restoring — if the spec tightened
+    // weaponMax since last save, drop the overflow slots rather than
+    // spawning with N+1 weapons.
+    const cap = spec.weaponMax ?? resolved.length;
+    return resolved.slice(0, cap);
+}
+
+/**
  * Options for `loadCharacter`.
  *
  * `placeholder: true` skips the gameplay modules: WeaponController
@@ -181,6 +217,14 @@ import { useGameStore } from '@/store/game-store';
 export interface LoadCharacterOptions {
     placeholder?: boolean;
     ignoreSavedPosition?: boolean;
+    /** Lookup used to re-hydrate persisted weapons when the character
+     *  spec's `hotbar` is empty (tavern flow). When `weapons` is also
+     *  empty but `useGameStore.slots` carries entries from a previous
+     *  pickup, each saved slot id is resolved through this map and
+     *  used as the initial hotbar. Pass `assets.weaponsById` from
+     *  the scene; safe to leave undefined for non-tavern scenes
+     *  whose starting hotbar already covers persistence. */
+    weaponsById?: ReadonlyMap<string, WeaponSpec>;
 }
 
 /**
@@ -379,7 +423,7 @@ export function loadCharacter(
         scene,
         matter,
         body,
-        weapons,
+        resolveInitialWeapons(weapons, spec, opts.weaponsById),
         spec.weaponMax ?? 3,
     );
     const hud = new CharacterHud(scene, spec);
