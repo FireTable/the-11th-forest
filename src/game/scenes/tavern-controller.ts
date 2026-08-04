@@ -62,11 +62,37 @@ export interface TavernFocusPayload {
     holding?: boolean;
 }
 
-/** Maximum weapons the player may pick up during the tavern weapon phase. */
+/** Maximum weapons the player may pick up during the tavern weapon phase.
+ *  The actual cap is per-character (`CharacterSpec.weaponMax`); this
+ *  constant is kept for HUD layout / external callers that still ask
+ *  for a fallback maximum. */
 export const TAVERN_WEAPON_MAX = 3;
 
 /** Long-press duration (ms) needed to confirm character selection with F. */
 const HOLD_MS = 1500;
+
+/**
+ * Event payload emitted when the player walks onto a weapon drop while
+ * the hotbar is at `weaponMax`. The React `WeaponReplaceHub` listens
+ * for this and shows the slot-picker overlay. The hub calls
+ * `confirmWeaponReplace` back into the scene to commit the swap.
+ */
+export interface WeaponReplaceRequest {
+    /** id of the candidate weapon the player walked onto. */
+    weaponId: string;
+    /** Display name of the candidate weapon (HUD shows "Pick up X"). */
+    weaponName: string;
+    /** Public-path texture for the candidate weapon thumbnail. */
+    weaponTexture?: string;
+    /** Slot count + max for the current character's hotbar. */
+    weaponMax: number;
+    /** Snapshots of the current hotbar — empty slots carry `null`. */
+    slots: Array<{ index: number; weaponId: string; name: string; texture?: string } | null>;
+    /** True when at least one slot is a "dedicated" (专武) weapon that
+     *  cannot be replaced. Hotbar weapons that came from the character's
+     *  starting hotbar are flagged here; the HUD dims those buttons. */
+    lockedSlots: boolean[];
+}
 
 // ─── TavernController ─────────────────────────────────────────────────────
 
@@ -159,15 +185,99 @@ export class TavernController {
 
     /**
      * Cap check for the tavern phase-2 weapon pickup. Called by
-     * LoadScene's DropController onWeaponPickup callback. Increments
-     * the counter when the pickup is accepted.
+     * LoadScene's DropController onWeaponPickup callback. The scene
+     * has already added the weapon to the hotbar via the character's
+     * `tryPickupWeaponById`; this method just bumps the displayed
+     * counter and re-emits focus so the HUD updates its `weaponCount`.
      */
-    public tryAcceptWeapon(): boolean {
-        if (this.weaponCount >= TAVERN_WEAPON_MAX) return false;
+    public notifyWeaponAdded(): void {
         this.weaponCount++;
         useGameStore.getState().setTavernWeaponCount(this.weaponCount);
         this.emitFocusEvent();
-        return true;
+    }
+
+    /**
+     * Called when the player walks onto a weapon drop while their
+     * hotbar is at `weaponMax`. Builds the replace-request payload
+     * (candidate weapon + current slot snapshots) and emits it for
+     * the React WeaponReplaceHub. The hub calls back into
+     * `confirmWeaponReplace` once the player picks a slot.
+     */
+    public requestWeaponReplace(weaponId: string, character: CharacterRuntime): void {
+        const weapons = character.weapons;
+        if (!weapons) return;
+        const weaponsById = this.assets.weaponsById;
+        const candidateSpec = weaponsById.get(weaponId);
+        if (!candidateSpec) return;
+
+        const weaponMax = weapons.getMaxSlots();
+        const slots: WeaponReplaceRequest['slots'] = [];
+        const lockedSlots: boolean[] = [];
+        for (let i = 0; i < weaponMax; i++) {
+            const slot = weapons.getSlot(i);
+            if (!slot) {
+                slots.push(null);
+                lockedSlots.push(false);
+                continue;
+            }
+            const slotWeaponId = slot.spec.id ?? '';
+            slots.push({
+                index: i,
+                weaponId: slotWeaponId,
+                name: slot.spec.name,
+                texture: slot.spec.visual?.texture,
+            });
+            // Hotbar weapons are "dedicated" / 专武 once the character
+            // has them at scene spawn time. We track this by comparing
+            // the loaded character's `hotbar` field against the slot's
+            // weapon id; any weapon that originated in the character
+            // spec's hotbar is locked from replacement.
+            lockedSlots.push(this.isLockedSlot(slotWeaponId));
+        }
+
+        const payload: WeaponReplaceRequest = {
+            weaponId: candidateSpec.id ?? weaponId,
+            weaponName: candidateSpec.name,
+            weaponTexture: candidateSpec.visual?.texture,
+            weaponMax,
+            slots,
+            lockedSlots,
+        };
+        EventBus.emit('weapon-replace-request', payload);
+    }
+
+    /** True when `weaponId` was in the chosen character's starting
+     *  hotbar — those slots are locked from replacement by design. */
+    private isLockedSlot(weaponId: string): boolean {
+        // The post-confirm character is the chosen spec; we look it up
+        // by id from `assets.allCharacters` (tavern-only) or fall back
+        // to `assets.character` (single-character mode).
+        const all = this.assets.allCharacters ?? [];
+        const picked = all.find((c) => c.id === this.sceneCharacterId()) ?? this.assets.character;
+        return picked.hotbar.includes(weaponId);
+    }
+
+    /** Read the chosen character's id from the store. Falls back to
+     *  the default-character id when no selection has been recorded. */
+    private sceneCharacterId(): string {
+        return useGameStore.getState().selectedCharacterId ?? this.assets.character.id;
+    }
+
+    /**
+     * Replace the weapon in `slotIndex` with the candidate that
+     * `requestWeaponReplace` last surfaced. Called by the React hub
+     * after the player presses 1/2/3 (or clicks the slot).
+     */
+    public confirmWeaponReplace(slotIndex: number, weaponId: string, character: CharacterRuntime): void {
+        if (this.isLockedSlotForIndex(slotIndex, character)) return;
+        character.replaceWeaponSlot(slotIndex, weaponId, this.assets.weaponsById);
+        EventBus.emit('weapon-replace-request', null);
+    }
+
+    private isLockedSlotForIndex(slotIndex: number, character: CharacterRuntime): boolean {
+        const slot = character.weapons?.getSlot(slotIndex);
+        if (!slot) return false;
+        return this.isLockedSlot(slot.spec.id ?? '');
     }
 
     private setupKeys(): void {

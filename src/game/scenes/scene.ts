@@ -301,15 +301,27 @@ export class LoadScene extends Phaser.Scene {
             },
             {
                 onWeaponPickup: (weaponId) => {
-                    // Tavern mode caps pickups at TAVERN_WEAPON_MAX;
-                    // TavernController owns that counter. Non-tavern
-                    // scenes don't change the hotbar — ack silently.
+                    // Tavern mode routes the pickup through the cap
+                    // check: below cap, the weapon is added to the
+                    // hotbar immediately; at cap, the WeaponReplaceHub
+                    // takes over (press 1/2/3 to overwrite a slot).
+                    // Non-tavern scenes just swap to the picked weapon.
                     if (this.level.tavern) {
-                        if (!this.tavernController?.tryAcceptWeapon()) return;
+                        const result = this.character.tryPickupWeaponById(
+                            weaponId,
+                            this.assets.weaponsById,
+                        );
+                        if (result === 'added') {
+                            this.tavernController?.notifyWeaponAdded();
+                        } else if (result === 'capped') {
+                            this.tavernController?.requestWeaponReplace(weaponId, this.character);
+                        }
+                        return;
                     }
                     this.character.pickUpWeapon(weaponId);
                 },
             },
+            (id) => this.assets.weaponsById.get(id),
         );
 
         // Wire bullet → monster damage flow. Player bullet only. (Player
@@ -328,10 +340,9 @@ export class LoadScene extends Phaser.Scene {
                 if (other.label !== 'monster' && other.label !== 'monster-hitbox') continue;
                 const weapon = this.character.weapons;
                 if (!weapon) continue;
-                this.monsterSystem.applyBulletDamage(
-                    weapon.getActive().damage,
-                    other,
-                );
+                const active = weapon.getActive();
+                if (!active) continue;
+                this.monsterSystem.applyBulletDamage(active.damage, other);
             }
         });
 
@@ -519,11 +530,34 @@ useGameStore.setState({ playerSnapshot: undefined });
                     },
                 );
             }
+
+            // React WeaponReplaceHub presses 1/2/3/4 → scene commits
+            // the swap on the live character. Routed through here so
+            // the hub doesn't need a Phaser handle.
+            const onReplaceConfirm = (payload?: {
+                slotIndex?: number;
+                weaponId?: string;
+            }) => {
+                if (
+                    !payload ||
+                    typeof payload.slotIndex !== 'number' ||
+                    typeof payload.weaponId !== 'string'
+                ) {
+                    return;
+                }
+                this.tavernController?.confirmWeaponReplace(
+                    payload.slotIndex,
+                    payload.weaponId,
+                    this.character,
+                );
+            };
+            EventBus.on('weapon-replace-confirm', onReplaceConfirm);
         }
     }
 
     shutdown(): void {
         this.tavernController?.destroy();
+        EventBus.removeListener('weapon-replace-confirm');
         this.teleporterSystem?.destroy();
         this.audio?.destroy();
         this.pathDebugOverlay?.destroy();

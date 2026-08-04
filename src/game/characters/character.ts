@@ -66,6 +66,29 @@ export interface CharacterRuntime {
     /** Switch to a named weapon if it's in the hotbar. No-op if not present.
      *  Returns false on the placeholder. */
     pickUpWeapon(weaponId: string): boolean;
+    /**
+     * Add a weapon to the next empty hotbar slot. Returns
+     *   - `'added'`   on success (the new weapon becomes active)
+     *   - `'capped'`  when the hotbar is at `weaponMax` (caller should
+     *                  surface a replace-HUD instead of consuming the drop)
+     *   - `'unknown'` when no `WeaponSpec` with that id was registered
+     *
+     * `weaponsById` is the scene-level lookup shared with DropController;
+     * the tavern hands the same map here so pickUps resolve spec → spec.
+     */
+    tryPickupWeaponById(
+        weaponId: string,
+        weaponsById: ReadonlyMap<string, import('@/lib/weapons').WeaponSpec>,
+    ): 'added' | 'capped' | 'unknown';
+    /** Replace the weapon in `slotIndex` with `weaponId`'s spec. No-op
+     *  when the index is out of range or the id isn't registered. */
+    replaceWeaponSlot(
+        slotIndex: number,
+        weaponId: string,
+        weaponsById: ReadonlyMap<string, import('@/lib/weapons').WeaponSpec>,
+    ): boolean;
+    /** Maximum weapon slots this character can hold. */
+    getWeaponMax(): number;
     update(time: number): void;
     destroy(): void;
 }
@@ -242,6 +265,9 @@ export function loadCharacter(
                 /* placeholder: no controller */
             },
             pickUpWeapon: () => false,
+            tryPickupWeaponById: () => 'unknown' as const,
+            replaceWeaponSlot: () => false,
+            getWeaponMax: () => spec.weaponMax ?? 3,
             update: () => {
                 /* placeholder: no controller */
             },
@@ -349,7 +375,13 @@ export function loadCharacter(
         scene.matter.world.add(compoundBody);
     }
 
-    const weaponsSys = new WeaponController(scene, matter, body, weapons);
+    const weaponsSys = new WeaponController(
+        scene,
+        matter,
+        body,
+        weapons,
+        spec.weaponMax ?? 3,
+    );
     const hud = new CharacterHud(scene, spec);
     const weaponHud = new WeaponHud(scene, weaponsSys);
     const statusHud = new StatusHud(scene, body);
@@ -387,6 +419,9 @@ export function loadCharacter(
         heal: (hp, sp) => controller.heal(hp, sp),
         refillAmmo: (f) => controller.refillAmmo(f),
         pickUpWeapon: (id) => controller.pickUpWeapon(id),
+        tryPickupWeaponById: (id, byId) => controller.tryPickupWeaponById(id, byId),
+        replaceWeaponSlot: (idx, id, byId) => controller.replaceWeaponSlot(idx, id, byId),
+        getWeaponMax: () => controller.getWeaponMax(),
         // Controller self-registers with scene.events.on('update'); this
         // method is kept for forward compat (callers that want to drive
         // ticks manually).

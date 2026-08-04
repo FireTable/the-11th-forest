@@ -77,15 +77,25 @@ export class WeaponController {
     private readonly matter: any;
     private readonly slots: SlotState[];
     private currentIndex = 0;
+    /** Cap on slot count, read from CharacterSpec.weaponMax at
+     *  construction. New pickups past this cap are refused so the
+     *  tavern's replace-HUD can take over. */
+    private readonly maxSlots: number;
     private readonly bullets: BulletRecord[] = [];
     private readonly trailGraphics: Phaser.GameObjects.Graphics;
     private readonly visualController: WeaponVisualController;
 
-    constructor(scene: Phaser.Scene, matter: any, body: MatterJS.BodyType, weapons: WeaponSpec[]) {
-        if (weapons.length === 0) throw new Error('WeaponController: at least one weapon required');
+    constructor(
+        scene: Phaser.Scene,
+        matter: any,
+        body: MatterJS.BodyType,
+        weapons: WeaponSpec[],
+        maxSlots: number = 3,
+    ) {
         this.scene = scene;
         this.matter = matter;
         this.body = body;
+        this.maxSlots = Math.max(1, Math.floor(maxSlots));
         const savedActiveIdx = useGameStore.getState().activeWeaponIndex ?? 0;
         const savedSlots = useGameStore.getState().slots;
 
@@ -107,7 +117,9 @@ export class WeaponController {
 
         this.trailGraphics = createBulletTrail(scene);
         this.visualController = new WeaponVisualController(scene);
-        this.visualController.setWeapon(this.slots[this.currentIndex].spec);
+        if (this.slots.length > 0) {
+            this.visualController.setWeapon(this.slots[this.currentIndex].spec);
+        }
 
         // Bullets die on contact with tall walls (WALL_TALL) or monsters.
         // Short walls (WALL_SHORT) and player character hitboxes are explicitly ignored.
@@ -159,6 +171,7 @@ export class WeaponController {
 
     /** 1/2/3 — switch active slot. Cancels any in-progress reload. */
     switchTo(index: number): void {
+        if (this.slots.length === 0) return;
         if (index < 0 || index >= this.slots.length) return;
         if (index === this.currentIndex) return;
         const slot = this.slots[this.currentIndex];
@@ -173,12 +186,14 @@ export class WeaponController {
      *  wrapping around. Delegates to `nextSlotIndex` so the wrap math
      *  is shared with the node-runnable tests. */
     cycleSlot(direction: 1 | -1): void {
+        if (this.slots.length === 0) return;
         const next = nextSlotIndex(this.currentIndex, direction, this.slots.length);
         this.switchTo(next);
     }
 
     /** R key — manual reload. Only when ammo < clipSize and not already reloading. */
     manualReload(): void {
+        if (this.slots.length === 0) return;
         const slot = this.slots[this.currentIndex];
         const isMelee = slot.spec.bullet?.type === 'melee' || slot.spec.hitWidth !== undefined;
         if (isMelee || slot.reloading) return;
@@ -191,6 +206,7 @@ export class WeaponController {
 
     /** Drop ammo into the current slot — caps at clipSize. */
     refillActiveAmmo(fraction: number): void {
+        if (this.slots.length === 0) return;
         const slot = this.slots[this.currentIndex];
         const clipSize = slot.spec.clipSize ?? 1;
         const add = Math.round(clipSize * fraction);
@@ -199,14 +215,61 @@ export class WeaponController {
 
     /** Switch to a named weapon if it's already in the hotbar. */
     swapToWeapon(weaponId: string): boolean {
+        if (this.slots.length === 0) return false;
         const idx = this.slots.findIndex((s) => s.spec.id === weaponId);
         if (idx < 0) return false;
         this.switchTo(idx);
         return true;
     }
 
-    getActive(): WeaponSpec {
-        return this.slots[this.currentIndex].spec;
+    /**
+     * Try to add a weapon to the next empty slot. Returns
+     * `'added'` on success (the new weapon becomes active), or
+     * `'capped'` when the hotbar already holds `maxSlots` weapons.
+     *
+     * Used by the tavern pickup flow: below the cap the drop is
+     * auto-consumed; at the cap the caller surfaces a replace-HUD
+     * instead of consuming the drop, so the player decides which slot
+     * to overwrite.
+     */
+    tryPickupWeapon(spec: WeaponSpec): 'added' | 'capped' {
+        if (this.slots.length >= this.maxSlots) return 'capped';
+        const clipSize = spec.clipSize ?? 1;
+        this.slots.push({
+            spec,
+            ammo: clipSize,
+            lastFireAt: 0,
+            reloading: false,
+            reloadStartedAt: 0,
+            justCompletedAt: 0,
+        });
+        this.switchTo(this.slots.length - 1);
+        return 'added';
+    }
+
+    /**
+     * Replace the weapon in `slotIndex` with `spec`. No-op when the
+     * index is out of range or when there are no slots at all.
+     * Switches the active slot to the replaced one. Ammo resets to
+     * clipSize for the new weapon.
+     */
+    replaceSlot(slotIndex: number, spec: WeaponSpec): void {
+        if (this.slots.length === 0) return;
+        if (slotIndex < 0 || slotIndex >= this.slots.length) return;
+        const clipSize = spec.clipSize ?? 1;
+        this.slots[slotIndex] = {
+            spec,
+            ammo: clipSize,
+            lastFireAt: 0,
+            reloading: false,
+            reloadStartedAt: 0,
+            justCompletedAt: 0,
+        };
+        this.switchTo(slotIndex);
+    }
+
+    getActive(): WeaponSpec | null {
+        return this.slots.length === 0 ? null : this.slots[this.currentIndex].spec;
     }
 
     /** Full slot state (reloading flag + timestamps) for the active weapon. */
@@ -216,6 +279,9 @@ export class WeaponController {
         reloadTimeMs: number;
         justCompletedAt: number;
     } {
+        if (this.slots.length === 0) {
+            return { reloading: false, reloadStartedAt: 0, reloadTimeMs: 0, justCompletedAt: 0 };
+        }
         const s = this.slots[this.currentIndex];
         return {
             reloading: s.reloading,
@@ -226,12 +292,14 @@ export class WeaponController {
     }
 
     getAmmo(): number {
+        if (this.slots.length === 0) return 0;
         const slot = this.slots[this.currentIndex];
         const isMelee = slot.spec.bullet?.type === 'melee' || slot.spec.hitWidth !== undefined;
         return isMelee ? 1 : slot.ammo;
     }
 
     getMaxAmmo(): number {
+        if (this.slots.length === 0) return 0;
         const slot = this.slots[this.currentIndex];
         const isMelee = slot.spec.bullet?.type === 'melee' || slot.spec.hitWidth !== undefined;
         return isMelee ? 1 : (slot.spec.clipSize ?? 1);
@@ -245,19 +313,33 @@ export class WeaponController {
         return this.slots.length;
     }
 
-    getSlot(index: number): { spec: WeaponSpec; ammo: number } {
+    /** Maximum number of weapon slots this character may hold (from
+     *  `CharacterSpec.weaponMax`). Equals `getSlotCount()` when full. */
+    getMaxSlots(): number {
+        return this.maxSlots;
+    }
+
+    /** True when the hotbar still has room for at least one more weapon. */
+    hasEmptySlot(): boolean {
+        return this.slots.length < this.maxSlots;
+    }
+
+    getSlot(index: number): { spec: WeaponSpec; ammo: number } | null {
+        if (index < 0 || index >= this.slots.length) return null;
         const s = this.slots[index];
         const isMelee = s.spec.bullet?.type === 'melee' || s.spec.hitWidth !== undefined;
         return { spec: s.spec, ammo: isMelee ? 1 : s.ammo };
     }
 
     isReloading(): boolean {
+        if (this.slots.length === 0) return false;
         const slot = this.slots[this.currentIndex];
         const isMelee = slot.spec.bullet?.type === 'melee' || slot.spec.hitWidth !== undefined;
         return isMelee ? false : slot.reloading;
     }
 
     getReloadProgress(time: number): number {
+        if (this.slots.length === 0) return 0;
         const s = this.slots[this.currentIndex];
         if (!s.reloading) return 0;
         const reloadTimeMs = s.spec.reloadTimeMs ?? 0;
@@ -276,52 +358,59 @@ export class WeaponController {
      */
     update(time: number, tx: number, ty: number, fire: boolean, halfH: number): void {
         this.lastHalfH = halfH;
-        // 1. Reload tick — every slot ticks independently.
-        for (let i = 0; i < this.slots.length; i++) {
-            const slot = this.slots[i];
-            const reloadTimeMs = slot.spec.reloadTimeMs ?? 0;
-            if (slot.reloading && reloadTimeMs > 0) {
-                const elapsed = time - slot.reloadStartedAt;
-                if (elapsed >= reloadTimeMs) {
-                    slot.ammo = slot.spec.clipSize ?? 1;
-                    slot.reloading = false;
-                    slot.justCompletedAt = time;
-                    EventBus.emit(SFX_EVENT(slot.spec.sfx?.reloadFinish ?? 'reload-finish'));
+        // Empty hotbar (tavern phase 2 / post-spawn with no weapons yet):
+        // skip reload, fire, and auto-reload logic. The visual controller
+        // and bullet trail still update so already-in-flight bullets
+        // continue to render after a player switches characters and the
+        // hotbar resets to empty.
+        if (this.slots.length > 0) {
+            // 1. Reload tick — every slot ticks independently.
+            for (let i = 0; i < this.slots.length; i++) {
+                const slot = this.slots[i];
+                const reloadTimeMs = slot.spec.reloadTimeMs ?? 0;
+                if (slot.reloading && reloadTimeMs > 0) {
+                    const elapsed = time - slot.reloadStartedAt;
+                    if (elapsed >= reloadTimeMs) {
+                        slot.ammo = slot.spec.clipSize ?? 1;
+                        slot.reloading = false;
+                        slot.justCompletedAt = time;
+                        EventBus.emit(SFX_EVENT(slot.spec.sfx?.reloadFinish ?? 'reload-finish'));
+                    }
+                }
+                if (slot.justCompletedAt > 0) {
+                    const since = time - slot.justCompletedAt;
+                    if (since >= 600) {
+                        slot.justCompletedAt = 0;
+                    }
                 }
             }
-            if (slot.justCompletedAt > 0) {
-                const since = time - slot.justCompletedAt;
-                if (since >= 600) {
-                    slot.justCompletedAt = 0;
+
+            // 2. Auto-reload on empty (ranged only).
+            const active = this.slots[this.currentIndex];
+            const isActiveMelee =
+                active.spec.bullet?.type === 'melee' || active.spec.hitWidth !== undefined;
+            if (isActiveMelee) {
+                active.ammo = 1;
+                active.reloading = false;
+            } else if (active.ammo === 0 && !active.reloading && active.justCompletedAt === 0) {
+                active.reloading = true;
+                active.reloadStartedAt = time;
+                EventBus.emit(SFX_EVENT(active.spec.sfx?.reloadStart ?? 'reload-start'));
+            }
+
+            // 3. Fire — gated by reload state and ammo.
+            if (fire && !active.reloading && active.ammo > 0) {
+                if (time - active.lastFireAt >= active.spec.cooldownMs) {
+                    this.fire(tx, ty);
+                    active.lastFireAt = time;
                 }
-            }
-        }
-
-        // 2. Auto-reload on empty (ranged only).
-        const active = this.slots[this.currentIndex];
-        const isActiveMelee =
-            active.spec.bullet?.type === 'melee' || active.spec.hitWidth !== undefined;
-        if (isActiveMelee) {
-            active.ammo = 1;
-            active.reloading = false;
-        } else if (active.ammo === 0 && !active.reloading && active.justCompletedAt === 0) {
-            active.reloading = true;
-            active.reloadStartedAt = time;
-            EventBus.emit(SFX_EVENT(active.spec.sfx?.reloadStart ?? 'reload-start'));
-        }
-
-        // 3. Fire — gated by reload state and ammo.
-        if (fire && !active.reloading && active.ammo > 0) {
-            if (time - active.lastFireAt >= active.spec.cooldownMs) {
-                this.fire(tx, ty);
-                active.lastFireAt = time;
-            }
-        } else if (fire && !active.reloading && active.ammo === 0) {
-            // Dry-fire click on empty clip — once per fire-press. Tracks
-            // the rising edge of `fire` via lastFireAt so we don't spam.
-            if (time - active.lastFireAt >= 80) {
-                EventBus.emit(SFX_EVENT(active.spec.sfx?.dryFire ?? 'dry-fire'));
-                active.lastFireAt = time;
+            } else if (fire && !active.reloading && active.ammo === 0) {
+                // Dry-fire click on empty clip — once per fire-press. Tracks
+                // the rising edge of `fire` via lastFireAt so we don't spam.
+                if (time - active.lastFireAt >= 80) {
+                    EventBus.emit(SFX_EVENT(active.spec.sfx?.dryFire ?? 'dry-fire'));
+                    active.lastFireAt = time;
+                }
             }
         }
 

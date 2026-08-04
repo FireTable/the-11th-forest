@@ -16,6 +16,7 @@ import { CAT, DROP_CONFIG, SFX_EVENT, WALL_PLAYER_MASK } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import type { DropSpec } from '@/lib/drops';
 import type { DropSpawn } from '@/lib/levels/types';
+import type { WeaponSpec } from '@/lib/weapons';
 
 import { useGameStore } from '@/store/game-store';
 
@@ -78,14 +79,30 @@ export class DropInstance {
     readonly body: MatterJS.BodyType;
     readonly rect: Phaser.GameObjects.Rectangle;
     readonly sprite?: Phaser.GameObjects.Sprite;
+    /** When this drop is a weapon pickup, override the spec's
+     *  `effect.weaponId` with this so the on-pickup callback resolves
+     *  to the actual weapon the player is standing on (multiple
+     *  dropSpawns can share one generic drop spec). Also used by the
+     *  visual layer — when present, the weapon's own `visual.texture`
+     *  replaces the spec's spritesheet so the drop on the ground looks
+     *  like the weapon you pick up. */
+    readonly weaponSpec?: WeaponSpec;
     private arcGraphics?: Phaser.GameObjects.Graphics;
 
     taken = false;
     isLanded = true;
     isAttracting = false;
 
-    constructor(scene: Phaser.Scene, spec: DropSpec, x: number, y: number, isFromMonster = false) {
+    constructor(
+        scene: Phaser.Scene,
+        spec: DropSpec,
+        x: number,
+        y: number,
+        isFromMonster = false,
+        weaponSpec?: WeaponSpec,
+    ) {
         this.spec = spec;
+        this.weaponSpec = weaponSpec;
 
         // If from monster, calculate wall-clamped landing position for parabolic drop
         let targetX = x;
@@ -148,7 +165,21 @@ export class DropInstance {
         this.rect.setStrokeStyle(1.5, 0x22c55e, 1);
         this.rect.setVisible(false);
 
-        if (spec.sprite && scene.textures.exists(textureKey(spec))) {
+        if (weaponSpec && weaponSpec.visual?.texture && scene.textures.exists(weaponSpec.visual.texture)) {
+            // Weapon pickups show the weapon's own in-hand texture so the
+            // drop on the ground is visually identical to the gun you're
+            // about to pick up. No spritesheet / anim — weapons are
+            // single-frame static images.
+            const spriteObj = scene.add.image(
+                isFromMonster ? x : targetX,
+                isFromMonster ? y : targetY,
+                weaponSpec.visual.texture,
+            );
+            spriteObj.setDepth(Math.round(targetY));
+            const pickupScale = weaponSpec.visual.scale ?? 0.16;
+            spriteObj.setScale(pickupScale * 2.5);
+            this.sprite = spriteObj as unknown as Phaser.GameObjects.Sprite;
+        } else if (spec.sprite && scene.textures.exists(textureKey(spec))) {
             const idleAnimKey = animKey(spec, 'idle');
             const spriteObj = scene.add.sprite(
                 isFromMonster ? x : targetX,
@@ -258,6 +289,11 @@ export class DropController {
     private readonly staticDrops: DropInstance[] = [];
     private readonly runtimeDrops: DropInstance[] = [];
     private readonly cb: DropControllerCallbacks;
+    /** Optional lookup used to resolve `DropSpawn.weaponId` overrides.
+     *  When a static spawn sets `weaponId`, the drop's visual is
+     *  switched to that weapon's in-hand texture and the pickup
+     *  callback resolves to that weapon. */
+    private readonly getWeapon?: (id: string) => WeaponSpec | undefined;
 
     constructor(
         scene: Phaser.Scene,
@@ -265,10 +301,12 @@ export class DropController {
         spawns: DropSpawn[] | undefined,
         getDrop: (id: string) => DropSpec,
         cb: DropControllerCallbacks,
+        getWeapon?: (id: string) => WeaponSpec | undefined,
     ) {
         this.scene = scene;
         this.character = character;
         this.cb = cb;
+        this.getWeapon = getWeapon;
 
         const dropSnapshots = useGameStore.getState().groundDropsSnapshot;
         if (dropSnapshots !== undefined && Array.isArray(dropSnapshots)) {
@@ -283,7 +321,17 @@ export class DropController {
         } else if (spawns) {
             // Fresh start: spawn initial static drops from level config
             for (const s of spawns) {
-                this.staticDrops.push(new DropInstance(scene, getDrop(s.type), s.x, s.y, false));
+                const weaponOverride = s.weaponId ? this.getWeapon?.(s.weaponId) : undefined;
+                this.staticDrops.push(
+                    new DropInstance(
+                        scene,
+                        getDrop(s.type),
+                        s.x,
+                        s.y,
+                        false,
+                        weaponOverride,
+                    ),
+                );
             }
         }
 
@@ -360,7 +408,7 @@ export class DropController {
                 // Check final pickup threshold
                 if (dist <= magnet.PICKUP_DISTANCE) {
                     drop.taken = true;
-                    this.applyEffect(drop.spec);
+                    this.applyEffect(drop);
                     this.removeDrop(drop);
                 }
             }
@@ -390,7 +438,7 @@ export class DropController {
                 if (!drop) continue;
                 if (drop.taken || !drop.isLanded) continue;
                 drop.taken = true;
-                this.applyEffect(drop.spec);
+                this.applyEffect(drop);
                 this.removeDrop(drop);
             }
         });
@@ -410,17 +458,29 @@ export class DropController {
         d.destroy(this.scene);
     }
 
-    private applyEffect(spec: DropSpec): void {
+    private applyEffect(dropInstance: DropInstance): void {
         // Emit SFX BEFORE applying effect so the audio engine can play
         // before the pickup animation / freeze-frame finishes. Falls
         // back to a generic pickup tone when the spec doesn't declare
         // its own.
+        const spec = dropInstance.spec;
         const sfxId = spec.sfx ?? 'pickup-generic';
         EventBus.emit(SFX_EVENT(sfxId), {
             key: `drop:${spec.id}`,
             throttleMs: spec.throttleMs,
         });
-        planDropEffect(spec, {
+        // For weapon drops carrying a weaponSpec override, the spec's
+        // embedded `effect.weaponId` is the generic placeholder —
+        // resolve to the actual weapon's id so the pickup handler
+        // adds the right weapon to the hotbar. Other drop types
+        // (instant / refill-ammo) go through planDropEffect normally.
+        const effectiveSpec: DropSpec = dropInstance.weaponSpec
+            ? ({
+                  ...spec,
+                  effect: { type: 'weapon', weaponId: dropInstance.weaponSpec.id },
+              } as DropSpec)
+            : spec;
+        planDropEffect(effectiveSpec, {
             heal: (hp, sp) => this.character.heal(hp, sp),
             refillAmmo: (f) => this.character.refillAmmo(f),
             onWeaponPickup: (id) => this.cb.onWeaponPickup(id),

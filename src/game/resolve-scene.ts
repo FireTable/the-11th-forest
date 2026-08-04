@@ -100,7 +100,23 @@ export async function resolveScene(
         [...dropIds].map(async (did) => [did, await fetchDrop(did)] as const),
     );
 
-    const allWeaponIds = new Set<string>([...character.hotbar, ...monsterWeaponIds]);
+    // Weapon ids come from three sources:
+    //   1. character.hotbar (starting weapons, normally empty in tavern)
+    //   2. monster weapon ids (monster AI uses these)
+    //   3. dropSpawn entries with a weaponId override (tavern pickups)
+    //      — these are static-spawn weapon drops, not monster drops.
+    //      Without collecting them here the WeaponSpec lookup map
+    //      would be empty for the tavern and DropController couldn't
+    //      resolve the spawn's `weaponId` to a spec.
+    const spawnWeaponIds = new Set<string>();
+    level.dropSpawns?.forEach((d) => {
+        if (d.weaponId) spawnWeaponIds.add(d.weaponId);
+    });
+    const allWeaponIds = new Set<string>([
+        ...character.hotbar,
+        ...monsterWeaponIds,
+        ...spawnWeaponIds,
+    ]);
     const allWeaponEntries = await Promise.all(
         [...allWeaponIds].map(async (wid) => [wid, await fetchWeapon(wid)] as const),
     );

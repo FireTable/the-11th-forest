@@ -16,7 +16,87 @@ npcSpawns:
     - characterId: wanderer
       x: 1400
       'y': 900
-dropSpawns: []
+dropSpawns:
+    # Row 1 — ranged basics (y=1100)
+    - type: weapon-drop
+      weaponId: assault-rifle
+      x: 400
+      y: 1100
+    - type: weapon-drop
+      weaponId: laser-cannon
+      x: 700
+      y: 1100
+    - type: weapon-drop
+      weaponId: plasma-sword
+      x: 1000
+      y: 1100
+    - type: weapon-drop
+      weaponId: shotgun
+      x: 1300
+      y: 1100
+    - type: weapon-drop
+      weaponId: arcana-staff
+      x: 1600
+      y: 1100
+    # Row 2 — heavy / explosive (y=1250)
+    - type: weapon-drop
+      weaponId: rocket-launcher
+      x: 400
+      y: 1250
+    - type: weapon-drop
+      weaponId: rune-shard
+      x: 700
+      y: 1250
+    - type: weapon-drop
+      weaponId: rune-shield
+      x: 1000
+      y: 1250
+    - type: weapon-drop
+      weaponId: sap-drop
+      x: 1300
+      y: 1250
+    - type: weapon-drop
+      weaponId: moss-bark-rifle
+      x: 1600
+      y: 1250
+    # Row 3 — nature / forest (y=1400)
+    - type: weapon-drop
+      weaponId: vine-lash
+      x: 400
+      y: 1400
+    - type: weapon-drop
+      weaponId: vine-tip
+      x: 700
+      y: 1400
+    - type: weapon-drop
+      weaponId: bramble-knuckles
+      x: 1000
+      y: 1400
+    - type: weapon-drop
+      weaponId: branch-sweep
+      x: 1300
+      y: 1400
+    - type: weapon-drop
+      weaponId: thorn-bolt
+      x: 1600
+      y: 1400
+    # Row 4 — exotic / advanced (y=1450)
+    - type: weapon-drop
+      weaponId: thorn-orb
+      x: 550
+      y: 1450
+    - type: weapon-drop
+      weaponId: thorn-scythe-claws
+      x: 850
+      y: 1450
+    - type: weapon-drop
+      weaponId: drone-claws
+      x: 1150
+      y: 1450
+    - type: weapon-drop
+      weaponId: gunner-blast
+      x: 1450
+      y: 1450
 teleporters:
     - id: tavern-exit
       x: 121

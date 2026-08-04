@@ -188,6 +188,9 @@ export interface WeaponsLike {
     refillActiveAmmo(fraction: number): void;
     swapToWeapon(weaponId: string): boolean;
     getActiveSlotState(): StatusHudState;
+    tryPickupWeapon(spec: import('@/lib/weapons').WeaponSpec): 'added' | 'capped';
+    replaceSlot(slotIndex: number, spec: import('@/lib/weapons').WeaponSpec): void;
+    getMaxSlots(): number;
 }
 
 /** Structural shape the controller needs from the character HUD. */
@@ -368,6 +371,40 @@ export class CharacterController {
     /** Switch to a named weapon if it's in the hotbar. No-op if not present. */
     pickUpWeapon(weaponId: string): boolean {
         return this.parts.weapons.swapToWeapon(weaponId);
+    }
+
+    /**
+     * Add a weapon (resolved from `weaponsById`) to the next empty
+     * slot. Returns `'added'` / `'capped'` / `'unknown'` so the caller
+     * (tavern pickup) can decide whether to consume the drop or show
+     * the replace-HUD.
+     */
+    tryPickupWeaponById(
+        weaponId: string,
+        weaponsById: ReadonlyMap<string, import('@/lib/weapons').WeaponSpec>,
+    ): 'added' | 'capped' | 'unknown' {
+        const spec = weaponsById.get(weaponId);
+        if (!spec) return 'unknown';
+        return this.parts.weapons.tryPickupWeapon(spec);
+    }
+
+    /** Replace the weapon in `slotIndex` with the spec resolved from
+     *  `weaponsById`. Returns false when the index is out of range or
+     *  the id is unknown. */
+    replaceWeaponSlot(
+        slotIndex: number,
+        weaponId: string,
+        weaponsById: ReadonlyMap<string, import('@/lib/weapons').WeaponSpec>,
+    ): boolean {
+        const spec = weaponsById.get(weaponId);
+        if (!spec) return false;
+        this.parts.weapons.replaceSlot(slotIndex, spec);
+        return true;
+    }
+
+    /** Maximum weapon slots this character can hold (from `weaponMax`). */
+    getWeaponMax(): number {
+        return this.parts.weapons.getMaxSlots();
     }
 
     /** Tear down all bindings and visual resources. */

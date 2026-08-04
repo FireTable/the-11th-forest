@@ -126,7 +126,13 @@ export const CharacterSpecSchema = z
         gender: z.enum(['male', 'female']).optional(),
         body: BodySchema,
         dodge: DodgeSchema,
-        hotbar: z.array(z.string().min(1)).min(1),
+        hotbar: z.array(z.string().min(1)),
+        /** Maximum weapons the character may carry at once. Defaults
+         *  to 3 when omitted — applied at runtime by the loadCharacter
+         *  consumer (not the parser, so the type stays `number | undefined`).
+         *  Phase-2 tavern pickups are gated by this value; the
+         *  `tavernWeaponCount` HUD reads it directly from the spec. */
+        weaponMax: z.number().int().gt(0).lte(8).optional(),
         /** Per-character audio identity — SFX ids + tuning knobs for
          *  dodge / hurt / footstep / low-HP heartbeat. All optional. */
         sfx: CharacterSfxSchema.optional(),

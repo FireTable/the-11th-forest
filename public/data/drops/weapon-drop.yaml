@@ -1,0 +1,13 @@
+name: Weapon Drop
+kind: static
+sfx: pickup-weapon
+visual:
+    size: 24
+    tint: 0xfbbf24
+# Real weapon id is supplied per dropSpawn (`DropSpawn.weaponId`).
+# This placeholder lets a single drop spec serve every weapon pickup
+# in the tavern — the scene's DropController looks up the override
+# and rewrites `effect.weaponId` before the pickup callback fires.
+effect:
+    type: weapon
+    weaponId: placeholder

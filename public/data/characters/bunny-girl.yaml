@@ -98,13 +98,8 @@ dodge:
     speed: 15
     durationMs: 200
     cooldownMs: 500
-hotbar:
-    - assault-rifle
-    - laser-cannon
-    - plasma-sword
-    - shotgun
-    - arcana-staff
-    - rocket-launcher
+hotbar: []
+weaponMax: 3
 sfx:
     dodge: dodge
     hurtFemale: player-hurt-female

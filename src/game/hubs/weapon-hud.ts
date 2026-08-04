@@ -17,9 +17,16 @@ export class WeaponHud {
         const reloadProgress = isReloading ? weapons.getReloadProgress(time) : 0;
 
         const slotCount = weapons.getSlotCount();
-        const slots = [];
+        const slots: Array<{
+            id: string;
+            name: string;
+            ammo: number;
+            clipSize: number;
+            texture?: string;
+        }> = [];
         for (let i = 0; i < slotCount; i++) {
             const slotState = weapons.getSlot(i);
+            if (!slotState) continue;
             slots.push({
                 id: slotState.spec.id ?? `slot-${i}`,
                 name: slotState.spec.name,
@@ -31,7 +38,7 @@ export class WeaponHud {
 
         useGameStore.getState().setWeaponStats({
             activeIndex: activeIdx,
-            name: active.name,
+            name: active?.name ?? '',
             ammo,
             maxAmmo: max,
             isReloading,

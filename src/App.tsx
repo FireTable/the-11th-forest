@@ -29,6 +29,9 @@ import { useGameStore } from '@/store/game-store';
  */
 const EditorPanel = lazy(() => import('@/editor/panel').then((m) => ({ default: m.EditorPanel })));
 const TavernHud   = lazy(() => import('@/components/hud/TavernHud').then((m) => ({ default: m.TavernHud })));
+const WeaponReplaceHub = lazy(() =>
+    import('@/components/hud/WeaponReplaceHub').then((m) => ({ default: m.WeaponReplaceHub })),
+);
 
 function App() {
     const tavernCleared = useGameStore((s) => s.tavernCleared);
@@ -44,6 +47,9 @@ function App() {
                     <TavernHud />
                 </Suspense>
             )}
+            <Suspense fallback={null}>
+                <WeaponReplaceHub />
+            </Suspense>
             <Suspense fallback={null}>
                 <EditorPanel />
             </Suspense>

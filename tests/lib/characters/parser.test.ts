@@ -73,13 +73,29 @@ hotbar:
         ).toThrow(/hotbar/);
     });
 
-    it('rejects empty hotbar', () => {
-        expect(() =>
-            parseCharacterYaml(
-                validYaml.replace('hotbar:\n  - pistol\n  - shotgun\n  - smg\n', 'hotbar: []'),
-                'wanderer',
-            ),
-        ).toThrow(/hotbar/);
+    it('accepts empty hotbar (weapons picked up at runtime)', () => {
+        const yamlText = validYaml.replace(
+            'hotbar:\n  - pistol\n  - shotgun\n  - smg\n',
+            'hotbar: []',
+        );
+        const c = parseCharacterYaml(yamlText, 'wanderer');
+        expect(c.hotbar).toEqual([]);
+    });
+
+    it('parses optional weaponMax', () => {
+        const yamlText = validYaml + 'weaponMax: 4\n';
+        const c = parseCharacterYaml(yamlText, 'wanderer');
+        expect(c.weaponMax).toBe(4);
+    });
+
+    it('rejects weaponMax <= 0', () => {
+        const yamlText = validYaml + 'weaponMax: 0\n';
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/weaponMax/);
+    });
+
+    it('rejects weaponMax > 8', () => {
+        const yamlText = validYaml + 'weaponMax: 99\n';
+        expect(() => parseCharacterYaml(yamlText, 'wanderer')).toThrow(/weaponMax/);
     });
 
     it('rejects hotbar with non-string entry', () => {

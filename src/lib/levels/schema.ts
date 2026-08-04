@@ -109,6 +109,13 @@ export const DropSpawnSchema = z
         type: z.string().min(1),
         x: z.number(),
         y: z.number(),
+        /** Override the weapon id for type='weapon' drops. Lets the level
+         *  YAML reuse a single generic drop spec for every weapon in the
+         *  game without needing one drop YAML per weapon. The scene
+         *  looks up the WeaponSpec by this id, uses its visual texture
+         *  for the drop sprite and its name for the HUD, and forwards
+         *  the id to the character on pickup. */
+        weaponId: z.string().min(1).optional(),
     })
     .strict()
     .transform((v) => ({ ...v, x: Math.round(v.x), y: Math.round(v.y) }));
