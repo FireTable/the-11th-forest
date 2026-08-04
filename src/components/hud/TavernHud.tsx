@@ -287,8 +287,12 @@ export const TavernHud: React.FC = () => {
                                         <span>Cycle</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-[9px] text-amber-400">
-                                        {/* F-key cap: matches A/D's px-1 py-0.5 + default border-amber-900 1px border */}
-                                        <span className="relative inline-flex items-center justify-center px-1 py-0.5 bg-amber-900/40 border border-amber-900 text-amber-300 leading-none">
+                                        {/* F-key cap: same px-1 py-0.5 + border as A/D so the two
+                                            key chips line up pixel-for-pixel. Only the
+                                            palette differs (amber instead of stone) plus
+                                            `relative` so the charge-progress SVG can sit
+                                            absolutely underneath. */}
+                                        <span className="relative px-1 py-0.5 bg-amber-900/40 border border-amber-900 text-amber-300">
                                             F
                                             {/* Charge-progress SVG: precise 1px overlap */}
                                             <svg
