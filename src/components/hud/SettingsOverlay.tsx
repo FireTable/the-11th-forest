@@ -19,7 +19,7 @@ import { RotateCcw, Play, Settings, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MUSIC_PAUSE, MUSIC_RESUME } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
-import { getPhaserGame, restartCurrentLevel } from '@/lib/phaser-game';
+import { getPhaserGame, restartAtTavern } from '@/lib/phaser-game';
 
 import { CornerPixels, RETRO_BOX } from './retro-box';
 
@@ -62,7 +62,7 @@ export function SettingsOverlay() {
         paused.current = null;
         setOpen(false);
         EventBus.emit(MUSIC_RESUME);
-        restartCurrentLevel();
+        void restartAtTavern();
     }
 
     useEffect(() => {
@@ -143,7 +143,7 @@ export function SettingsOverlay() {
                         </div>
 
                         <div className="text-[9px] tracking-wider text-stone-500 uppercase">
-                            Restart clears this level's progress
+                            Restart returns to the tavern
                         </div>
                     </div>
                 </div>

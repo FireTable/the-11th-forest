@@ -134,7 +134,7 @@ export interface GameUIState {
      */
     clearSceneSnapshots: () => void;
     clearSaveData: () => void;
-    setSelectedCharacterId: (id: string) => void;
+    setSelectedCharacterId: (id: string | null) => void;
     setTavernCleared: (cleared: boolean) => void;
     setTavernWeaponCount: (n: number) => void;
 }

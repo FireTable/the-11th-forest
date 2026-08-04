@@ -96,6 +96,26 @@ export function restartCurrentLevel(): void {
 }
 
 /**
+ * Restart from the tavern — character selection + weapon pick
+ * rerun. Used by the death overlay and the settings panel as the
+ * "back to the beginning" path. The selected character id is
+ * cleared (player must pick again), but the hotbar of weapons they
+ * picked up is preserved so re-picking the same character replays
+ * the same loadout. tavernCleared is reset to false so the next
+ * page load lands back in the tavern rather than the previous
+ * non-tavern scene.
+ */
+export async function restartAtTavern(): Promise<void> {
+    const store = useGameStore.getState();
+    store.setDead(false);
+    store.setSelectedCharacterId(null);
+    store.setTavernCleared(false);
+    store.clearSceneSnapshots();
+    const resolved = await resolveScene('tavern');
+    await restartSceneWith(resolved);
+}
+
+/**
  * Convenience: resolve by id then restart. Use this from the UI; the
  * API endpoint uses `resolveScene` directly so it can return a 400 on
  * bad id without calling into Phaser.

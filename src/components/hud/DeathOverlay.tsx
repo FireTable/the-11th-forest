@@ -13,7 +13,7 @@
 import { Skull } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { restartCurrentLevel } from '@/lib/phaser-game';
+import { restartAtTavern } from '@/lib/phaser-game';
 import { useGameStore } from '@/store/game-store';
 
 export function DeathOverlay() {
@@ -32,7 +32,7 @@ export function DeathOverlay() {
                     The forest claims another wanderer.
                 </div>
                 <Button
-                    onClick={restartCurrentLevel}
+                    onClick={() => void restartAtTavern()}
                     className="mt-2 h-9 bg-cyan-500 px-6 font-semibold text-black hover:bg-cyan-400"
                 >
                     Restart
