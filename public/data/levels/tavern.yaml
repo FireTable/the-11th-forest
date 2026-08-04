@@ -2,49 +2,49 @@ title: Forest Tavern
 background: assets/image/scenes/tavern.png
 imageSize: 2752x1536
 airWalls: []
+music: forest-ambient
 tavern: true
 npcSpawns:
-    - characterId: kitty
-      x: 800
-      'y': 800
-    - characterId: bunny-girl
-      x: 1000
-      'y': 900
-    - characterId: otaku
-      x: 1200
-      'y': 900
-    - characterId: wanderer
-      x: 1400
-      'y': 900
+  - characterId: kitty
+    x: 800
+    'y': 800
+  - characterId: bunny-girl
+    x: 1000
+    'y': 900
+  - characterId: otaku
+    x: 1200
+    'y': 900
+  - characterId: wanderer
+    x: 1400
+    'y': 900
 dropSpawns:
-    # Row 1 — ranged basics (y=1100)
-    - type: weapon-drop
-      weaponId: assault-rifle
-      x: 400
-      y: 1100
-    - type: weapon-drop
-      weaponId: laser-cannon
-      x: 800
-      y: 1300
-    - type: weapon-drop
-      weaponId: plasma-sword
-      x: 1200
-      y: 1100
-    - type: weapon-drop
-      weaponId: shotgun
-      x: 1600
-      y: 1300
-    - type: weapon-drop
-      weaponId: arcana-staff
-      x: 2000
-      y: 1100
-    - type: weapon-drop
-      weaponId: rocket-launcher
-      x: 2400
-      y: 1300
+  - type: weapon-drop
+    x: 400
+    'y': 1100
+    weaponId: assault-rifle
+  - type: weapon-drop
+    x: 800
+    'y': 1300
+    weaponId: laser-cannon
+  - type: weapon-drop
+    x: 1200
+    'y': 1100
+    weaponId: plasma-sword
+  - type: weapon-drop
+    x: 1600
+    'y': 1300
+    weaponId: shotgun
+  - type: weapon-drop
+    x: 2000
+    'y': 1100
+    weaponId: arcana-staff
+  - type: weapon-drop
+    x: 2400
+    'y': 1300
+    weaponId: rocket-launcher
 teleporters:
-    - id: tavern-exit
-      x: 121
-      'y': 841
-      targetScene: sacred-forest-sanctuary
-      radius: 60
+  - id: tavern-exit
+    x: 121
+    'y': 841
+    targetScene: sacred-forest-sanctuary
+    radius: 60

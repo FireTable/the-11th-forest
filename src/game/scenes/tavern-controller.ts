@@ -18,6 +18,7 @@
 import * as Phaser from 'phaser';
 
 import { EventBus } from '@/lib/events/bus';
+import { SFX_EVENT } from '@/lib/constants';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 import type { CharacterRuntime } from '@/game/characters/character';
@@ -264,6 +265,10 @@ export class TavernController {
                     this.selectedIndex = idx;
                     this.updateHighlight();
                     this.emitFocusEvent();
+                    // SFX on NPC selection change — mirrors the A/D
+                    // keyboard cycle so mouse and keyboard feel the
+                    // same.
+                    EventBus.emit(SFX_EVENT('weapon-switch'));
                 }
                 this.mouseHoldingIdx = idx;
                 this.holdElapsed = 0;
@@ -399,15 +404,16 @@ export class TavernController {
     update(_time: number, delta: number): void {
         if (this.phase === 'selection') {
             // A / D navigation
-            if (Phaser.Input.Keyboard.JustDown(this.keyLeft)) {
-                this.selectedIndex = (this.selectedIndex - 1 + this.npcs.length) % this.npcs.length;
+            if (
+                Phaser.Input.Keyboard.JustDown(this.keyLeft) ||
+                Phaser.Input.Keyboard.JustDown(this.keyRight)
+            ) {
+                const dir = Phaser.Input.Keyboard.JustDown(this.keyLeft) ? -1 : 1;
+                this.selectedIndex =
+                    (this.selectedIndex + dir + this.npcs.length) % this.npcs.length;
                 this.updateHighlight();
                 this.emitFocusEvent();
-            }
-            if (Phaser.Input.Keyboard.JustDown(this.keyRight)) {
-                this.selectedIndex = (this.selectedIndex + 1) % this.npcs.length;
-                this.updateHighlight();
-                this.emitFocusEvent();
+                EventBus.emit(SFX_EVENT('weapon-switch'));
             }
 
             // Hold to confirm (1.5s). Either keyboard F or mouse hold on the
