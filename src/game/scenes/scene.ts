@@ -160,9 +160,6 @@ export class LoadScene extends Phaser.Scene {
         // texture loaded — the player holds them, and the drop-on-
         // ground visual reuses the same texture. Monster weapons
         // only need their bullet texture; their in-hand sprite is
-        // never on screen, so skipping `visual.texture` saves ~19
-        // network requests on monster-heavy levels.
-        //
         // Player weapons also include the slots persisted in the
         // store from a previous tavern session — resolveScene only
         // sees character.hotbar + dropSpawns.weaponId, both of
@@ -170,6 +167,12 @@ export class LoadScene extends Phaser.Scene {
         // player may have picked up weapons in the tavern. Without
         // these textures the in-hand visual renders nothing after a
         // scene transition.
+        //
+        // Monster weapons also load their `visual.texture` — every
+        // MonsterInstance mounts a WeaponVisualController that
+        // renders the in-hand weapon sprite. Skipping that load
+        // (as a "monster weapons don't need it" optimization) left
+        // monsters holding invisible weapons.
         const savedSlotIds = new Set(
             (useGameStore.getState().slots ?? []).map((s) => s.id),
         );
@@ -182,7 +185,7 @@ export class LoadScene extends Phaser.Scene {
             .map((id) => this.assets.weaponsById.get(id))
             .filter((w): w is WeaponSpec => Boolean(w));
         loadWeaponAssets(this, playerWeapons, { loadVisualTexture: true });
-        loadWeaponAssets(this, monsterWeapons, { loadVisualTexture: false });
+        loadWeaponAssets(this, monsterWeapons, { loadVisualTexture: true });
         // Audio assets — every SFX + music track gets queued here.
         loadAudioAssets(this, [
             ...this.assets.sfxSpecs.values(),
