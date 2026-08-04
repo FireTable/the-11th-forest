@@ -33,7 +33,15 @@ import { animKey, textureKey } from './keys';
 
 export interface CharacterRuntime {
     body: MatterJS.BodyType;
-    sprite: Phaser.GameObjects.Sprite;
+    /**
+     * Null on the tavern placeholder. The placeholder is an invisible
+     * sentinel — no sprite, no shadow, no pointlight. The real visual
+     * is mounted after F confirm (or on refresh when
+     * `selectedCharacterId` is already set). Body / sprite / shadow are
+     * created together as a unit; reading null here means phase 1 is
+     * active and the player has NOT chosen yet.
+     */
+    sprite: Phaser.GameObjects.Sprite | null;
     /**
      * Null on the tavern placeholder (no weapons module spawned). The
      * placeholder has no body to attach weapons to and no collision
@@ -189,20 +197,20 @@ export function loadCharacter(
         : (level.characterSpawn?.y ?? level.imageSize.height / 2);
 
     if (opts.placeholder) {
-        // Visual-only placeholder for the tavern selection UI: a sprite
-        // + shadow + idle animation, a static body at the spawn point
-        // (so the 1Hz save snapshot records the real spawn coords), and
-        // NO weapons / HUDs / controller. The "no weapons module" is the
-        // whole point — phase 1 must not fire bullets, play weapon SFX,
-        // bind 1/2/3 hotbar, or write to the React HUD store.
+        // Invisible sentinel for the tavern selection UI. Body is kept
+        // (subsystems need a non-null player reference for hit-detection,
+        // pickup-collision, and tickSaveState) but NO sprite, NO shadow,
+        // NO pointlight — phase 1 should render nothing at the spawn
+        // point. The pointlight is created by LoadScene only after the
+        // real character is loaded (see scene.ts), so there's no green
+        // orb showing where the player would be.
         //
         // `isStatic: true` is essential: a dynamic body can still
         // translate from collisions with the outer-boundary walls or
         // any future physics impulse, even with `setInertia(Infinity)`
         // (which only freezes rotation). Static bodies don't move
-        // regardless of force, so the body stays put for the duration
-        // of phase 1 and the 1Hz `tickSaveState` keeps recording the
-        // spawn coords.
+        // regardless of force, so the 1Hz `tickSaveState` keeps
+        // recording the spawn coords.
         const body = scene.matter.add.rectangle(
             spawnX,
             spawnY - spec.body.halfH,
@@ -218,25 +226,9 @@ export function loadCharacter(
             },
         );
 
-        const shadow = scene.add.ellipse(
-            spawnX,
-            spawnY,
-            spec.body.halfW * 2,
-            spec.body.halfH * 0.8,
-            0x000000,
-            0.35,
-        );
-        const sprite = scene.add.sprite(spawnX, spawnY, textureKey(spec));
-        sprite.setOrigin(0.5, 1.0);
-        if (spec.sprite) sprite.setScale(spec.sprite.scale);
-        sprite.setFlipX((level.characterSpawn?.facing ?? 'right') === 'left');
-        if (spec.anims) {
-            const idleKey = animKey(spec, 'idle');
-            if (scene.anims.exists(idleKey)) sprite.anims.play(idleKey, true);
-        }
         return {
             body,
-            sprite,
+            sprite: null,
             weapons: null,
             hud: null,
             weaponHud: null,
@@ -255,8 +247,6 @@ export function loadCharacter(
             },
             destroy: () => {
                 scene.matter.world.remove(body);
-                shadow.destroy();
-                sprite.destroy();
             },
         };
     }

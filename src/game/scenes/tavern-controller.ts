@@ -145,16 +145,16 @@ export class TavernController {
      */
     private hideDefaultCharacter(): void {
         const char = this.defaultCharacter;
-        // Placeholder has no HUDs / debug rects — they're null because
-        // the placeholder's loadCharacter() opts out of those modules.
-        char.sprite.setVisible(false);
+        // Placeholder sprite is null (loadCharacter's placeholder mode
+        // skips the visual entirely — no shadow, no sprite, no light) so
+        // there's nothing to hide here. The body is intentionally NOT
+        // moved: tickSaveState snapshots it every second, and the
+        // snapshot becomes the spawn point for the real character on
+        // confirm. If we parked it off-world, the real character would
+        // spawn off-world too.
         char.hud?.setVisible(false);
         char.weaponHud?.setVisible(false);
         char.statusHud?.setVisible(false);
-        // The body is intentionally NOT moved: tickSaveState snapshots
-        // it every second, and the snapshot becomes the spawn point for
-        // the real character on confirm. If we parked it off-world, the
-        // real character would spawn off-world too.
     }
 
     /**

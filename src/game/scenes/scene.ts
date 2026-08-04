@@ -355,34 +355,10 @@ export class LoadScene extends Phaser.Scene {
 
         // Optional Pixel Art Light & PostFX pipeline (enabled via PIXEL_LIGHTING_CONFIG.ENABLE or level YAML)
         if (isPixelLightingEnabled) {
-            // 1. Add Phaser 4 PointLight around player
-            const playerLight = (this.add as any).pointlight(
-                this.character.body.position.x,
-                this.character.body.position.y,
-                PIXEL_LIGHTING_CONFIG.LIGHT_COLOR,
-                PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_X,
-                PIXEL_LIGHTING_CONFIG.LIGHT_INTENSITY,
-                PIXEL_LIGHTING_CONFIG.LIGHT_ATTENUATION,
-            );
-            if (playerLight?.setScale) {
-                playerLight.setScale(
-                    1.0,
-                    PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_Y / PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_X,
-                );
-            }
-            playerLight.setDepth?.(DEPTH.LIGHT);
-
-            // Update light position every frame following the player character
-            this.events.on('update', () => {
-                if (this.character?.body?.position && playerLight) {
-                    playerLight.setPosition(
-                        this.character.body.position.x,
-                        this.character.body.position.y,
-                    );
-                }
-            });
-
             // 2. Apply Phaser 4 native filters: Pixelate + Quantize
+            // (filters are scene-wide, applied unconditionally even during
+            // tavern phase 1 — they're cheap and the look is the same
+            // with or without a point light on the placeholder)
             const cameraAny = this.cameras.main as any;
             if (cameraAny.filters?.internal) {
                 if (
@@ -400,14 +376,16 @@ export class LoadScene extends Phaser.Scene {
                 }
             }
 
-            this.events.on('update', () => {
-                if (this.character?.body?.position && playerLight) {
-                    playerLight.setPosition(
-                        this.character.body.position.x,
-                        this.character.body.position.y,
-                    );
-                }
-            });
+            // The pointlight is created LAZILY (createPlayerLight below)
+            // — only after the real character is loaded. During tavern
+            // phase 1 the placeholder has no sprite/shadow, so a
+            // pointlight following its body would render a green orb at
+            // the spawn point with nothing visible inside it. We avoid
+            // that by not creating the light until F confirm (or on
+            // refresh when `selectedCharacterId` is already set).
+            if (!this.level.tavern) {
+                this.createPlayerLight();
+            }
         }
 
         // Wire TeleporterController (code-drawn magic circle & scene transition).
@@ -492,6 +470,10 @@ useGameStore.setState({ playerSnapshot: undefined });
                 this.dropSystem.setCharacter(this.character);
                 useGameStore.getState().setHubsVisible(true);
                 // tavernCleared is already true from the previous run.
+                // Mount the pointlight now that the real character is
+                // loaded — phase 1 was deliberately lightless because the
+                // placeholder has no sprite/shadow to float around.
+                this.createPlayerLight();
             } else {
                 this.tavernController = new TavernController(
                     this,
@@ -529,6 +511,11 @@ useGameStore.setState({ playerSnapshot: undefined });
                         // back.
                         useGameStore.getState().setHubsVisible(true);
                         useGameStore.getState().setTavernCleared(true);
+                        // Mount the pointlight now that the real
+                        // character body is in place. Phase 1 was
+                        // deliberately lightless so the placeholder's
+                        // invisible body wouldn't render a green orb.
+                        this.createPlayerLight();
                     },
                 );
             }
@@ -540,6 +527,50 @@ useGameStore.setState({ playerSnapshot: undefined });
         this.teleporterSystem?.destroy();
         this.audio?.destroy();
         this.pathDebugOverlay?.destroy();
+    }
+
+    /**
+     * Mount the player-following pointlight and register a per-frame
+     * listener that tracks the current `this.character.body.position`.
+     * Called once after the real character is loaded — non-tavern
+     * scenes at the end of `create()`, tavern scenes after F confirm
+     * (or on refresh when `selectedCharacterId` is already set).
+     *
+     * Why lazy: during tavern phase 1, the placeholder has no sprite
+     * or shadow to anchor the light to. A static-body-following
+     * pointlight would render a green orb at the spawn point with a
+     * dark centre (the "ghost" character effect). Deferring creation
+     * until the real character loads eliminates that visual.
+     *
+     * The listener closes over `playerLight` and reads
+     * `this.character.body` each frame, so character swaps on confirm
+     * don't need to re-register — the body reference updates
+     * transparently.
+     */
+    private createPlayerLight(): void {
+        const body = this.character?.body;
+        if (!body?.position) return;
+        const playerLight = (this.add as any).pointlight(
+            body.position.x,
+            body.position.y,
+            PIXEL_LIGHTING_CONFIG.LIGHT_COLOR,
+            PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_X,
+            PIXEL_LIGHTING_CONFIG.LIGHT_INTENSITY,
+            PIXEL_LIGHTING_CONFIG.LIGHT_ATTENUATION,
+        );
+        if (playerLight?.setScale) {
+            playerLight.setScale(
+                1.0,
+                PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_Y / PIXEL_LIGHTING_CONFIG.LIGHT_RADIUS_X,
+            );
+        }
+        playerLight.setDepth?.(DEPTH.LIGHT);
+        this.events.on('update', () => {
+            const liveBody = this.character?.body;
+            if (liveBody?.position && playerLight) {
+                playerLight.setPosition(liveBody.position.x, liveBody.position.y);
+            }
+        });
     }
 
     /**
