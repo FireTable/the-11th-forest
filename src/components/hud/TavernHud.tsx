@@ -281,9 +281,9 @@ export const TavernHud: React.FC = () => {
                                 {/* Keyboard hints */}
                                 <div className="flex flex-col gap-1 pt-2 border-t border-stone-800">
                                     <div className="flex items-center gap-2 text-[9px] text-stone-500">
-                                        <span className="px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">A</span>
+                                        <span className="inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">A</span>
                                         <span>/</span>
-                                        <span className="px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">D</span>
+                                        <span className="inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">D</span>
                                         <span>Cycle</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-[9px] text-amber-400">
@@ -292,7 +292,7 @@ export const TavernHud: React.FC = () => {
                                             palette differs (amber instead of stone) plus
                                             `relative` so the charge-progress SVG can sit
                                             absolutely underneath. */}
-                                        <span className="relative px-1 py-0.5 bg-amber-900/40 border border-amber-900 text-amber-300">
+                                        <span className="relative inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-amber-900/40 border border-amber-900 text-amber-300">
                                             F
                                             {/* Charge-progress SVG: precise 1px overlap */}
                                             <svg
