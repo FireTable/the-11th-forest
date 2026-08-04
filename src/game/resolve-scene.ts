@@ -127,14 +127,27 @@ export async function resolveScene(
     //      Without collecting them here the WeaponSpec lookup map
     //      would be empty for the tavern and DropController couldn't
     //      resolve the spawn's `weaponId` to a spec.
+    //   4. savedSlots weapon ids — weapons the player picked up in
+    //      a previous tavern session and persisted via the zustand
+    //      store. Without these the in-hand weapon visual has no
+    //      texture to render after a scene transition into a
+    //      non-tavern level.
     const spawnWeaponIds = new Set<string>();
     level.dropSpawns?.forEach((d) => {
         if (d.weaponId) spawnWeaponIds.add(d.weaponId);
     });
-    // Player-pickupable weapons: spec hotbar + tavern dropSpawn ids.
-    // These get their in-hand texture loaded because the player holds
-    // them and they're rendered as drops on the ground.
-    const playerWeaponIds = new Set<string>([...character.hotbar, ...spawnWeaponIds]);
+    const savedSlotIds = new Set<string>(
+        (useGameStore.getState().slots ?? []).map((s) => s.id),
+    );
+    // Player-pickupable weapons: spec hotbar + tavern dropSpawn ids +
+    // persisted player pickups. These get their in-hand texture
+    // loaded because the player holds them and they're rendered as
+    // drops on the ground.
+    const playerWeaponIds = new Set<string>([
+        ...character.hotbar,
+        ...spawnWeaponIds,
+        ...savedSlotIds,
+    ]);
     // Monster weapons: only need their bullet texture loaded, never
     // held by the player. Kept out of the player set so the loader
     // skips `visual.texture` for them.
