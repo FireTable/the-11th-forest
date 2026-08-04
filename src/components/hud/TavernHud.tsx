@@ -28,7 +28,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Heart, Zap, Swords, Wind, Shield, Sparkles, Gauge, RotateCcw } from 'lucide-react';
+import { Heart, Zap, Swords, Gauge, Layers } from 'lucide-react';
 
 import { EventBus } from '@/lib/events/bus';
 import type { TavernFocusPayload } from '@/game/scenes/tavern-controller';
@@ -42,13 +42,13 @@ import { CornerPixels, RETRO_BOX } from './retro-box';
  * per 16.67ms step at 60Hz) into a human-readable m/s value.
  *
  *   moveSpeed 5  →  5 px/step × 60 step/s  =  300 px/s
- *   300 px/s ÷ 50 px/m                    =    6 m/s  (sprint)
- *   moveSpeed 4  →  240 px/s ÷ 50         =  4.8 m/s (jog)
+ *   300 px/s ÷ 150 px/m                    =    2 m/s  (brisk walk)
+ *   moveSpeed 4  →  240 px/s ÷ 150         =  1.6 m/s (normal walk)
  *
- * 50 px ≈ 1 m matches the rendered sprite scale (character halfH
- * ≈26 px + sprite scale 1.2 → roughly human-scale on the canvas).
+ * 150 px ≈ 1 m gives real-world walking pace. forest-path map is
+ * 2752 px wide → ~18 m, traversable in ~14–17 s at the slower chars.
  */
-const PX_PER_METER = 50;
+const PX_PER_METER = 150;
 const STEPS_PER_SEC = 60;
 const moveSpeedToMps = (moveSpeed: number): string =>
     ((moveSpeed * STEPS_PER_SEC) / PX_PER_METER).toFixed(1);
@@ -61,33 +61,34 @@ interface StatRowProps {
     value: number | string;
     /** Optional unit suffix, e.g. "/10" or "px/s". */
     suffix?: string;
+    /** Optional secondary value, e.g. SP regen next to SP cap. */
+    subValue?: string;
     color: string;
-    /** Render the value bigger / different (used for HP / SP). */
-    prominent?: boolean;
 }
 
 const StatRow: React.FC<StatRowProps> = React.memo(
-    ({ icon, label, value, suffix, color, prominent }) => (
-        <div className="flex items-center gap-1.5">
-            <span className={`w-3.5 h-3.5 shrink-0 ${color}`}>{icon}</span>
+    ({ icon, label, value, suffix, subValue, color }) => (
+        <div className="flex items-center justify-between">
+            {/* Icon + label group, packed tight (no fixed-width columns
+                so the icon sits flush against its label). */}
+            <div className="flex items-center gap-1 shrink-0">
+                <span className={`${color} flex items-center`}>{icon}</span>
+                <span
+                    className={`uppercase tracking-widest shrink-0 text-[9px] text-stone-200`}
+                >
+                    {label}
+                </span>
+            </div>
             <span
-                className={`uppercase tracking-widest shrink-0 ${
-                    prominent
-                        ? 'text-[11px] text-stone-200 w-10'
-                        : 'text-[9px] text-stone-400 w-12'
-                }`}
-            >
-                {label}
-            </span>
-            <span
-                className={`font-mono tabular-nums leading-none drop-shadow-[1px_1px_0px_#000] ${
-                    prominent
-                        ? `text-[12px] ${color}`
-                        : 'text-[10px] text-stone-200'
-                }`}
+                className={`font-mono tabular-nums leading-none drop-shadow-[1px_1px_0px_#000] text-[10px] text-stone-300`}
             >
                 {value}
-                {suffix && <span className="text-stone-500 text-[8px] ml-0.5">{suffix}</span>}
+                {suffix && <span className="text-stone-500 text-[8px] ml-1">{suffix}</span>}
+                {subValue && (
+                    <span className="text-stone-500 text-[8px] ml-1">
+                        / {subValue}
+                    </span>
+                )}
             </span>
         </div>
     ),
@@ -96,12 +97,18 @@ const StatRow: React.FC<StatRowProps> = React.memo(
 // ─── Radar polygon (stats vs max across all characters) ──────────────────
 
 interface RadarPoint {
-    /** Current value for the focused character, 0–max. */
+    /** Current value for the focused character. */
     value: number;
-    /** Max value across every character, 0–max. */
+    /** Lowest value across every character (inner ring). */
+    min: number;
+    /** Highest value across every character (outer ring). */
     max: number;
     /** Display label for the vertex (rendered outside the polygon). */
     label: string;
+    /** Icon for the axis label (rendered via foreignObject). */
+    icon: React.ReactNode;
+    /** Tailwind color class applied to the icon (e.g. "text-red-400"). */
+    iconColor: string;
 }
 
 interface RadarPolygonProps {
@@ -112,19 +119,39 @@ interface RadarPolygonProps {
     color?: string;
 }
 
+/** Inner ring sits at this fraction of the radius — the weakest
+ *  character's stat lands here instead of at the centre. Lifted
+ *  above the centre so the focused character's polygon has visible
+ *  area even when 3+ stats are at the floor (otherwise Wanderer's
+ *  1-of-4 strong profile collapses to a thin sliver). */
+const FLOOR_RATIO = 0.35;
+
+/** Map a per-vertex value to [0, 1] where 0 = chart centre and 1 =
+ *  outer ring. Values are normalised over [min, max], then re-mapped
+ *  so that `min` lands at FLOOR_RATIO of the radius (not at the
+ *  centre) and `max` lands at the outer ring. Falls back to 0.5
+ *  when all characters share the same stat. */
+const scaleFor = (p: RadarPoint): number => {
+    if (p.max <= p.min) return 0.5;
+    const ratio = (p.value - p.min) / (p.max - p.min);
+    return FLOOR_RATIO + ratio * (1 - FLOOR_RATIO);
+};
+
 /**
- * 4-axis radar chart. Each axis starts at the centre, ends at the
- * outer ring. Vertex distance = (value / max) * outerRadius. The
- * outer ring is drawn at max (full extent), the inner axis
- * cross-hair at half-max (the 50% reference), and the filled
- * polygon shows the focused character's profile. Labels for each
- * axis float just outside the ring.
+ * 4-axis radar chart. The inner ring sits at FLOOR_RATIO of the
+ * radius (where the weakest character's stat lands), the outer
+ * ring at the strongest. Vertex distance is `FLOOR_RATIO + (value
+ * − min) / (max − min) * (1 − FLOOR_RATIO)` so the polygon never
+ * collapses to the centre. A faint half-way cross-hair marks the
+ * 50% reference. The filled polygon shows the focused character's
+ * profile. Each axis label is its lucide icon (rendered inside a
+ * foreignObject) plus the stat name.
  */
 const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
-    ({ points, size = 88, color = '#fbbf24' }) => {
+    ({ points, size = 120, color = '#fbbf24' }) => {
         const cx = size / 2;
         const cy = size / 2;
-        const radius = size / 2 - 14;
+        const radius = size / 2 - 22;
         const n = points.length;
         // 4 axes evenly spaced starting at top (12 o'clock): top,
         // right, bottom, left.
@@ -133,6 +160,16 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
             const a = angleAt(i);
             return { x: cx + Math.cos(a) * radius * scale, y: cy + Math.sin(a) * radius * scale };
         };
+
+        // Inner ring drawn at FLOOR_RATIO (= where the weakest
+        // character's stat lands). Drawn faint so it reads as the
+        // floor, not as a hard limit.
+        const innerRing = points
+            .map((_, i) => {
+                const v = vertex(i, FLOOR_RATIO);
+                return `${v.x},${v.y}`;
+            })
+            .join(' ');
 
         // Outer ring (max reference)
         const outerRing = points
@@ -150,11 +187,10 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
             })
             .join(' ');
 
-        // Focused character's polygon
+        // Focused character's polygon (vertex distance via [min, max])
         const focusPolygon = points
             .map((p, i) => {
-                const scale = p.max > 0 ? Math.max(0, Math.min(1, p.value / p.max)) : 0;
-                const v = vertex(i, scale);
+                const v = vertex(i, scaleFor(p));
                 return `${v.x},${v.y}`;
             })
             .join(' ');
@@ -167,7 +203,15 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                 shapeRendering="geometricPrecision"
                 aria-hidden="true"
             >
-                {/* Outer ring (max) */}
+                {/* Inner ring (min, weakest character) */}
+                <polygon
+                    points={innerRing}
+                    fill="none"
+                    stroke="#1c1917"
+                    strokeWidth="1"
+                    strokeDasharray="2 2"
+                />
+                {/* Outer ring (max, strongest character) */}
                 <polygon
                     points={outerRing}
                     fill="none"
@@ -207,8 +251,7 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                 />
                 {/* Vertex dots */}
                 {points.map((p, i) => {
-                    const scale = p.max > 0 ? Math.max(0, Math.min(1, p.value / p.max)) : 0;
-                    const v = vertex(i, scale);
+                    const v = vertex(i, scaleFor(p));
                     return (
                         <circle
                             key={i}
@@ -219,22 +262,27 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                         />
                     );
                 })}
-                {/* Axis labels — sit just outside the ring */}
+                {/* Axis labels — icon + stat name, sit just outside the
+                    outer ring. foreignObject lets us embed lucide SVG
+                    icons (which are React components) inside the radar
+                    SVG without copying each path manually. */}
                 {points.map((p, i) => {
-                    const lp = vertex(i, 1.18);
+                    const lp = vertex(i, 1.22);
                     return (
-                        <text
+                        <foreignObject
                             key={i}
-                            x={lp.x}
-                            y={lp.y}
-                            fontSize="6"
-                            fontFamily="'Silkscreen', monospace"
-                            fill="#a8a29e"
-                            textAnchor="middle"
-                            dominantBaseline="middle"
+                            x={lp.x - 14}
+                            y={lp.y - 7}
+                            width="28"
+                            height="14"
                         >
-                            {p.label}
-                        </text>
+                            <div className="flex items-center justify-center gap-0.5 text-[6px] leading-none font-mono text-stone-300">
+                                <span className={`${p.iconColor} flex items-center`}>
+                                    {p.icon}
+                                </span>
+                                <span>{p.label}</span>
+                            </div>
+                        </foreignObject>
                     );
                 })}
             </svg>
@@ -267,23 +315,27 @@ function isSameFocusContent(a: TavernFocusPayload | null, b: TavernFocusPayload 
         (!aStats && !bStats) ||
         (!!aStats &&
             !!bStats &&
-            aStats.strength === bStats.strength &&
-            aStats.agility === bStats.agility &&
-            aStats.vitality === bStats.vitality &&
-            aStats.spirit === bStats.spirit);
+            aStats.hp === bStats.hp &&
+            aStats.sp === bStats.sp &&
+            aStats.moveSpeed === bStats.moveSpeed &&
+            aStats.weaponMax === bStats.weaponMax);
     if (!statsEq) return false;
 
-    const aMax = a.maxStats;
-    const bMax = b.maxStats;
-    const maxEq =
-        (!aMax && !bMax) ||
-        (!!aMax &&
-            !!bMax &&
-            aMax.strength === bMax.strength &&
-            aMax.agility === bMax.agility &&
-            aMax.vitality === bMax.vitality &&
-            aMax.spirit === bMax.spirit);
-    return maxEq;
+    const aRange = a.statRange;
+    const bRange = b.statRange;
+    const rangeEq =
+        (!aRange && !bRange) ||
+        (!!aRange &&
+            !!bRange &&
+            aRange.hp.min === bRange.hp.min &&
+            aRange.hp.max === bRange.hp.max &&
+            aRange.sp.min === bRange.sp.min &&
+            aRange.sp.max === bRange.sp.max &&
+            aRange.moveSpeed.min === bRange.moveSpeed.min &&
+            aRange.moveSpeed.max === bRange.moveSpeed.max &&
+            aRange.weaponMax.min === bRange.weaponMax.min &&
+            aRange.weaponMax.max === bRange.weaponMax.max);
+    return rangeEq;
 }
 
 // ─── DOM Direct Translation (0 Reflow / GPU acceleration) ───────────────
@@ -360,14 +412,14 @@ export const TavernHud: React.FC = () => {
     const outerStyle: React.CSSProperties =
         width > 0
             ? {
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  width: `${width / scale}px`,
-                  height: `${height / scale}px`,
-                  transform: `scale(${scale})`,
-                  transformOrigin: 'top left',
-              }
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: `${width / scale}px`,
+                height: `${height / scale}px`,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+            }
             : { position: 'absolute', inset: 0 };
 
     const isSelection = focus.phase === 'selection';
@@ -417,22 +469,21 @@ export const TavernHud: React.FC = () => {
 
                                 {/* Stats grid: left column HP/SP/MoveSpeed,
                                     right column radar polygon + STR/AGI/VIT/SPI */}
-                                <div className="flex gap-3 mb-3">
+                                <div className="flex gap-5 mb-3">
                                     {/* Left column: numerical stats with icons */}
-                                    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                                    <div className="flex flex-col justify-between gap-1 flex-1 min-w-0">
                                         <StatRow
                                             icon={<Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />}
                                             label="HP"
                                             value={focus.hp}
                                             color="text-red-400"
-                                            prominent
                                         />
                                         <StatRow
                                             icon={<Zap className="w-3.5 h-3.5 fill-sky-400 text-sky-300" />}
                                             label="SP"
                                             value={focus.sp}
+                                            subValue={`${spRegenToSec(focus.spRegenMs)}s`}
                                             color="text-sky-400"
-                                            prominent
                                         />
                                         <StatRow
                                             icon={<Gauge className="w-3.5 h-3.5" />}
@@ -442,14 +493,7 @@ export const TavernHud: React.FC = () => {
                                             color="text-emerald-400"
                                         />
                                         <StatRow
-                                            icon={<RotateCcw className="w-3.5 h-3.5" />}
-                                            label="SP+"
-                                            value={spRegenToSec(focus.spRegenMs)}
-                                            suffix="s/cd"
-                                            color="text-cyan-300"
-                                        />
-                                        <StatRow
-                                            icon={<Swords className="w-3.5 h-3.5" />}
+                                            icon={<Layers className="w-3.5 h-3.5" />}
                                             label="SLT"
                                             value={focus.weaponMax}
                                             suffix="max"
@@ -458,59 +502,53 @@ export const TavernHud: React.FC = () => {
                                     </div>
 
                                     {/* Right column: radar polygon */}
-                                    {focus.stats && focus.maxStats && (
-                                        <div className="shrink-0 self-center">
+                                    {focus.stats && focus.statRange && (
+                                        <div className="shrink-0 items-center">
                                             <RadarPolygon
                                                 points={[
-                                                    { value: focus.stats.strength, max: focus.maxStats.strength, label: 'STR' },
-                                                    { value: focus.stats.agility, max: focus.maxStats.agility, label: 'AGI' },
-                                                    { value: focus.stats.vitality, max: focus.maxStats.vitality, label: 'VIT' },
-                                                    { value: focus.stats.spirit, max: focus.maxStats.spirit, label: 'SPI' },
+                                                    {
+                                                        value: focus.stats.hp,
+                                                        min: focus.statRange.hp.min,
+                                                        max: focus.statRange.hp.max,
+                                                        label: 'HP',
+                                                        icon: <Heart className="w-2.5 h-2.5" />,
+                                                        iconColor: 'text-red-400',
+                                                    },
+                                                    {
+                                                        value: focus.stats.sp,
+                                                        min: focus.statRange.sp.min,
+                                                        max: focus.statRange.sp.max,
+                                                        label: 'SP',
+                                                        icon: <Zap className="w-2.5 h-2.5" />,
+                                                        iconColor: 'text-sky-400',
+                                                    },
+                                                    {
+                                                        value: focus.stats.moveSpeed,
+                                                        min: focus.statRange.moveSpeed.min,
+                                                        max: focus.statRange.moveSpeed.max,
+                                                        label: 'SPD',
+                                                        icon: <Gauge className="w-2.5 h-2.5" />,
+                                                        iconColor: 'text-emerald-400',
+                                                    },
+                                                    {
+                                                        value: focus.stats.weaponMax,
+                                                        min: focus.statRange.weaponMax.min,
+                                                        max: focus.statRange.weaponMax.max,
+                                                        label: 'SLT',
+                                                        icon: <Layers className="w-2.5 h-2.5" />,
+                                                        iconColor: 'text-orange-300',
+                                                    },
                                                 ]}
+                                                size={110}
                                             />
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Stats as text rows under the radar (icon +
-                                    value) — duplicates radar visually but
-                                    reads as plain numbers. Stripped when
-                                    radar absent. */}
-                                {focus.stats && (
-                                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 mb-3 pt-2 border-t border-stone-800">
-                                        <StatRow
-                                            icon={<Swords className="w-3.5 h-3.5" />}
-                                            label="STR"
-                                            value={focus.stats.strength}
-                                            suffix="/10"
-                                            color="text-red-400"
-                                        />
-                                        <StatRow
-                                            icon={<Wind className="w-3.5 h-3.5" />}
-                                            label="AGI"
-                                            value={focus.stats.agility}
-                                            suffix="/10"
-                                            color="text-emerald-400"
-                                        />
-                                        <StatRow
-                                            icon={<Shield className="w-3.5 h-3.5" />}
-                                            label="VIT"
-                                            value={focus.stats.vitality}
-                                            suffix="/10"
-                                            color="text-amber-400"
-                                        />
-                                        <StatRow
-                                            icon={<Sparkles className="w-3.5 h-3.5" />}
-                                            label="SPI"
-                                            value={focus.stats.spirit}
-                                            suffix="/10"
-                                            color="text-purple-400"
-                                        />
-                                    </div>
-                                )}
+                                <div className="flex flex-col gap-1 my-4 border-t border-stone-300/90" />
 
                                 {/* Keyboard hints */}
-                                <div className="flex flex-col gap-1 pt-2 border-t border-stone-800">
+                                <div className="flex flex-col gap-2">
                                     <div className="flex items-center gap-2 text-[9px] text-stone-500">
                                         <span className="inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">A</span>
                                         <span>/</span>

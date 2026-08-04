@@ -47,14 +47,20 @@ export interface TavernFocusPayload {
     /** Free-form description from the character spec — lore / role.
      *  Shown on the tavern HUD below the name. */
     description?: string;
-    stats?: { strength: number; agility: number; vitality: number; spirit: number };
+    stats?: { hp: number; sp: number; moveSpeed: number; weaponMax: number };
     /**
-     * Per-stat max across every loaded character. The tavern HUD's
-     * radar polygon uses these as the 100% outer ring so the player
-     * can read each stat as a fraction of the strongest character
-     * for that stat.
+     * Per-stat [min, max] range across every loaded character. The
+     * tavern HUD's radar polygon uses these as the inner ring (min)
+     * and outer ring (max) so the player can read each stat relative
+     * to the strongest / weakest character for that stat. Same axis
+     * order as `stats`.
      */
-    maxStats?: { strength: number; agility: number; vitality: number; spirit: number };
+    statRange?: {
+        hp: { min: number; max: number };
+        sp: { min: number; max: number };
+        moveSpeed: { min: number; max: number };
+        weaponMax: { min: number; max: number };
+    };
     phase: Phase;
     weaponCount: number;
     weaponMax: number;
@@ -88,6 +94,11 @@ const HOLD_MS = 1500;
 export class TavernController {
     private phase: Phase = 'selection';
     private npcs: TavernNpcEntry[] = [];
+    /** [min, max] per stat across all loaded NPCs. Recomputed when
+     *  `npcs` is rebuilt. The radar HUD uses these to scale vertices
+     *  so the inner ring is the weakest character's stat and the
+     *  outer ring is the strongest — see `computeStatRange`. */
+    private statRange: TavernFocusPayload['statRange'] = undefined;
     private selectedIndex = 0;
 
     private keyLeft!: Phaser.Input.Keyboard.Key;
@@ -296,6 +307,8 @@ export class TavernController {
 
             this.npcs.push({ spec, sprite, shadow, x, y });
         });
+        // Recompute min/max range after all NPCs are loaded.
+        this.statRange = this.computeStatRange();
     }
 
     // ─── Selection visuals ───────────────────────────────────────────────
@@ -338,11 +351,11 @@ export class TavernController {
             moveSpeed: s.moveSpeed,
             spRegenMs: s.spRegenMs,
             description: s.description,
-            stats: (s as any).stats,
-            maxStats: this.computeMaxStats(),
+            stats: { hp: s.hp, sp: s.sp, moveSpeed: s.moveSpeed, weaponMax: s.weaponMax ?? TAVERN_WEAPON_MAX },
+            statRange: this.statRange,
             phase: this.phase,
             weaponCount: this.weaponCount,
-            weaponMax: TAVERN_WEAPON_MAX,
+            weaponMax: s.weaponMax ?? TAVERN_WEAPON_MAX,
             viewportX,
             viewportY,
             holding: this.phase === 'selection' ? holding : undefined,
@@ -351,24 +364,52 @@ export class TavernController {
     }
 
     /**
-     * Per-stat max across every character loaded into the tavern.
-     * Powers the radar polygon's outer ring on the HUD — when a stat
-     * is at its max, the vertex sits on the ring edge; when a stat is
-     * zero, the vertex sits on the centre. Computed once per
-     * `npcs` rebuild because every NPC carries a fully-loaded spec
-     * already; recomputing on every focus event would be wasteful.
+     * Per-stat [min, max] range across every character loaded into the
+     * tavern. Powers the radar polygon's rings on the HUD — the inner
+     * ring sits at the weakest character's stat and the outer ring sits
+     * at the strongest. Without min-max scaling the radar looks flat
+     * (e.g. all four HP values sit between 85–100, every vertex ends
+     * at 0.85–1.0 of the outer ring and you can't see who's tankier).
+     *
+     * Computed once per `npcs` rebuild because every NPC carries a
+     * fully-loaded spec already; recomputing on every focus event
+     * would be wasteful.
      */
-    private computeMaxStats(): { strength: number; agility: number; vitality: number; spirit: number } {
-        const result = { strength: 1, agility: 1, vitality: 1, spirit: 1 };
+    private computeStatRange(): {
+        hp: { min: number; max: number };
+        sp: { min: number; max: number };
+        moveSpeed: { min: number; max: number };
+        weaponMax: { min: number; max: number };
+    } {
+        const result = {
+            hp: { min: Infinity, max: -Infinity },
+            sp: { min: Infinity, max: -Infinity },
+            moveSpeed: { min: Infinity, max: -Infinity },
+            weaponMax: { min: Infinity, max: -Infinity },
+        };
         for (const npc of this.npcs) {
-            const st = (npc.spec as any).stats;
-            if (!st) continue;
-            if (st.strength > result.strength) result.strength = st.strength;
-            if (st.agility > result.agility) result.agility = st.agility;
-            if (st.vitality > result.vitality) result.vitality = st.vitality;
-            if (st.spirit > result.spirit) result.spirit = st.spirit;
+            const s = npc.spec;
+            const wm = s.weaponMax ?? TAVERN_WEAPON_MAX;
+            if (s.hp < result.hp.min) result.hp.min = s.hp;
+            if (s.hp > result.hp.max) result.hp.max = s.hp;
+            if (s.sp < result.sp.min) result.sp.min = s.sp;
+            if (s.sp > result.sp.max) result.sp.max = s.sp;
+            if (s.moveSpeed < result.moveSpeed.min) result.moveSpeed.min = s.moveSpeed;
+            if (s.moveSpeed > result.moveSpeed.max) result.moveSpeed.max = s.moveSpeed;
+            if (wm < result.weaponMax.min) result.weaponMax.min = wm;
+            if (wm > result.weaponMax.max) result.weaponMax.max = wm;
         }
-        return result;
+        // Fallback when no NPC is loaded — guard against Infinity.
+        const safe = (r: { min: number; max: number }) => ({
+            min: Number.isFinite(r.min) ? r.min : 1,
+            max: Number.isFinite(r.max) ? r.max : 1,
+        });
+        return {
+            hp: safe(result.hp),
+            sp: safe(result.sp),
+            moveSpeed: safe(result.moveSpeed),
+            weaponMax: safe(result.weaponMax),
+        };
     }
 
     /** World-space Y of the NPC's visual head. Same `topOffset` formula
