@@ -344,6 +344,17 @@ export interface MonsterProjectile {
         | Phaser.GameObjects.Graphics;
     damage: number;
     monster: Monster;
+    /** Spawn point of the projectile (world coords). The per-frame
+     *  cleanup compares the bullet's current position against this to
+     *  retire ones that fly past their effective range instead of
+     *  lingering forever in the world. */
+    originX: number;
+    originY: number;
+    /** Effective range inherited from the firing weapon spec. The
+     *  bullet self-destructs once it's travelled this far from the
+     *  spawn point, mirroring how WeaponController cleans up
+     *  player bullets (logic.ts "speed < 1.0 || distSq >= maxDistance²"). */
+    maxDistance: number;
 }
 
 export class MonsterController {
@@ -869,13 +880,29 @@ export class MonsterController {
             }
         }
 
-        // ── Projectile visual sync ────────────────────────────────────
-        for (const proj of this.projectiles) {
+        // ── Projectile visual sync + cleanup ──────────────────────────
+        // Mirrors WeaponController's bullet lifecycle: retire ranged
+        // bullets that have slowed below a small threshold (usually
+        // they hit something or slid to a stop against a tall wall) OR
+        // flown past their effective range from the spawn point. Without
+        // this, missed shots lingered in the world until something else
+        // killed them — eventually every level's projectile pool grew
+        // unbounded over a long run.
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const proj = this.projectiles[i];
             const bp = proj.body.position;
             const vel = proj.body.velocity;
             proj.rect.setPosition(bp.x, bp.y);
             proj.rect.setDepth(Math.round(bp.y));
             proj.rect.setRotation(Math.atan2(vel.y, vel.x));
+
+            const currentSpeed = Math.hypot(vel.x, vel.y);
+            const dx = bp.x - proj.originX;
+            const dy = bp.y - proj.originY;
+            const distSq = dx * dx + dy * dy;
+            if (currentSpeed < 1.0 || distSq >= proj.maxDistance * proj.maxDistance) {
+                this.destroyProjectile(proj);
+            }
         }
     }
 
