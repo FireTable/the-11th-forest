@@ -4,7 +4,7 @@ moveSpeed: 2.5
 body:
   halfW: 38
   halfH: 32
-weaponId: rune-shield
+weaponId: rune-shard
 sfx:
   hit: monster-hit
   death: monster-death

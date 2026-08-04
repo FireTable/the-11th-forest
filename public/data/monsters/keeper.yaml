@@ -1,0 +1,164 @@
+name: Forest Keeper
+hp: 1200
+moveSpeed: 3
+body:
+  halfW: 44
+  halfH: 44
+weaponId: branch-sweep
+sfx:
+  hit: monster-hit
+  death: monster-death
+  aggro: monster-aggro
+drops:
+  - dropId: overcharge-core
+    chance: 1.0
+  - dropId: hp-shard
+    chance: 1.0
+  - dropId: sp-fragment
+    chance: 1.0
+
+sprite:
+  texture: assets/image/monsters/keeper.png
+  grid: { rows: 4, cols: 4 }
+  scale: 1.0
+  offset: { left: 0, bottom: 0 }
+  script:
+    downsample: 4
+    colors: 32
+    pad: 2
+
+anims:
+  idle:
+    frames: [0, 3]
+    frameRate: 6
+    repeat: -1
+  move:
+    frames: [4, 7]
+    frameRate: 10
+    repeat: -1
+  hit:
+    frames: [8, 11]
+    frameRate: 12
+    repeat: 0
+  death:
+    frames: [12, 14]
+    frameRate: 10
+    repeat: 0
+
+prompt: |
+    The 11th Forest — Forest Keeper sprite sheet
+
+    HARD NEGATIVE PROMPTS (must NOT appear in the image):
+      - No visible grid, no dividers, no borders, no ground, no scene,
+        no text, no logo, no watermark.
+      - No grid lines, no cell borders, no cell separators, no dividers
+        of any kind between the 4×4 frames.
+      - No guide marks, no reference crosses, no axis labels, no frame
+        numbers, no "Frame N" text, no index annotations.
+      - No checkerboard pattern, no tile outline overlays, no debug
+        visualizations.
+      - No watermarks, no logos, no signatures, no UI elements.
+      - The 4×4 layout is COMPLETELY IMPLIED by the character's position
+        — the magenta background is one continuous flat field everywhere
+        except where the character is drawn.
+
+    CRITICAL LAYOUT (must be EXACTLY this — 16 cells, no more, no less,
+    4 rows × 4 columns, every cell the same size):
+
+      ┌────┬────┬────┬────┐
+      │  0 │  1 │  2 │  3 │   row 1: idle (4 frames)
+      ├────┼────┼────┼────┤
+      │  4 │  5 │  6 │  7 │   row 2: move (4 frames)
+      ├────┼────┼────┼────┤
+      │  8 │  9 │ 10 │ 11 │   row 3: hit (4 frames)
+      ├────┼────┼────┼────┤
+      │ 12 │ 13 │ 14 │    │   row 4: death (3 frames; cell #15 empty)
+      └────┴────┴────┴────┘
+
+    The bottom-right cell (cell #15) MUST be empty magenta. Total:
+    exactly 15 frames + 1 empty cell.
+
+    Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
+    512×512 px. The monster is ~480×560 px in each cell, centered
+    horizontally. No overlapping between cells. The monster faces RIGHT in
+    every frame (its front = screen right).
+
+    Monster Concept (Forest Keeper - Final Two-Phase Boss):
+    An enormous ancient forest guardian — a tree-trunk torso with twisting
+    branch-arms (the arms end in short gnarled twig-fingers, no weapons,
+    no props, empty hands), crowned with antler-like roots rising from the
+    shoulders, and a single massive closed wooden eye set into the center
+    of the chest. Glowing golden sap drips slowly from cracks in the bark.
+    (The branch-sweep attack is added in-game as a separate orbiting
+    weapon sprite; the monster sprite itself does NOT render it.)
+
+    Same monster in every frame — bark, branch-arms, antler-roots, chest
+    eye are identical. Only the pose/state changes.
+
+    15 frames in row order (left-to-right, top-to-bottom), distributed as:
+
+    Frames 0–3 (idle, 4 frames, row 1) — phase-1 slow breathing:
+      Frame 0: Standing tall, weight evenly on both root-toes. Branch-arms
+               hang relaxed at sides, twig-fingers slightly curled. Chest
+               eye fully closed, sealed by a wooden lid. Golden sap beads
+               on the bark.
+      Frame 1: Subtle inhale — chest swells slightly, bark creaks. A
+               single drop of golden sap falls from the left shoulder.
+      Frame 2: Slow shoulder roll, weight shifting to the right root-toe.
+               Antler-roots sway. Sap drip from the left shoulder reaches
+               the ground.
+      Frame 3: Exhale — chest sinks. Returned to neutral. Sap starts
+               gathering again on the right shoulder. Phase-1 resting
+               baseline.
+
+    Frames 4–7 (move, 4 frames, row 2) — heavy walk cycle:
+      Frame 4: RIGHT root-toe planted forward, LEFT root-toe trailing
+               back (extreme stride). Weight fully on right leg. Ground
+               cracks under the right foot. Body leans back slightly.
+               Branch-arms swing naturally with the gait — left arm
+               forward, right arm back. Chest eye still closed.
+      Frame 5: Passing pose — LEFT root-toe lifting off the ground, both
+               legs vertical. Heavy weight shift. Body upright. Arms at
+               sides. Sap drips mid-stride.
+      Frame 6: LEFT root-toe planted forward, RIGHT root-toe trailing
+               back (extreme stride, opposite leg). Weight on left. New
+               crack under left foot. Body leans back again. Arms swing
+               naturally — right arm forward, left arm back.
+      Frame 7: Passing pose — RIGHT root-toe lifting, both legs vertical.
+               Return to neutral. Antler-roots sway back to center.
+
+    Frames 8–11 (hit, 4 frames, row 3) — phase-1→phase-2 stagger:
+      Frame 8:  Initial stagger — body jolts back-left. Bark splinters
+               fly. Chest eye cracks, the wooden lid splitting down the
+               middle. A glow leaks through the crack.
+      Frame 9:  Knocked further back-left. Antler-roots whip backward.
+               Sap bursts from cracks along the torso. The chest eye is
+               half-open, glowing bright amber.
+      Frame 10: Body upright, trembling. The chest eye is now FULLY OPEN
+                — a giant luminous amber pupil stares outward (this is
+                the phase-2 transition frame, played on the hit that
+                crosses 50% hp). Sap pouring from every crack.
+      Frame 11: Settling in stun. Half-recovered stance. Chest eye still
+                fully open and glowing. Phase-2 baseline established.
+
+    Frames 12–14 (death, 3 frames, row 4) — final collapse:
+      Frame 12: One root-toe buckles. Branch-arms hang limp. Antler-roots
+                begin to droop. Chest eye dims. Sap flow slowing.
+      Frame 13: Antler-roots fully droop forward. Bark plates burst
+                outward. Chest eye flickers rapidly, tears of amber sap
+                streaming from the corners. Body sagging.
+      Frame 14: Bark crumbles away into golden dust. Chest eye opens
+                fully one last time, then goes dark — the amber light
+                fades to black. Branch-arms disintegrate. Antler-roots
+                snap off and fall. An empty golden dust-pile remains
+                where the keeper stood.
+
+    Style requirements:
+    - High-end handcrafted 16-bit RPG aesthetic.
+    - Inspired by Chrono Trigger, Eastward, Children of Morta, Hyper Light
+      Drifter, and premium modern indie pixel games.
+    - Hard clean pixel edges, no anti-aliasing on the silhouette.
+    - Limited muted color palette: ~32 colors total per character.
+    - No purple, magenta, or pink in the monster body itself.
+    - The chest eye glow (phase-2 frame 10 onward) is warm amber/gold,
+      NEVER purple or magenta.

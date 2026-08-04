@@ -1,0 +1,20 @@
+name: Sap Drop
+damage: 6
+cooldownMs: 850
+range: 440
+bulletsPerShot: 1
+bullet:
+    texture: assets/image/weapons/sap-drop.png
+    type: projectile
+    scale: 0.5
+    anchor: [0.5, 0.5]
+projectile:
+    speed: 14
+    visual:
+        radius: 4
+        width: 10
+        height: 6
+        color: 0xC2A040
+sfx:
+    shoot: gunner-shoot
+    bulletWall: bullet-wall

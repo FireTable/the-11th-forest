@@ -1,0 +1,146 @@
+title: Sunlit Henge
+background: assets/image/scenes/sunlit-henge.png
+imageSize: 2752x1536
+airWalls:
+  # Left tree mass — full-height barrier, follows the inner edge of the
+  # left tree trunk and root cluster.
+  - id: wall-left
+    kind: tall
+    points:
+      - - 0
+        - 0
+      - - 560
+        - 0
+      - - 580
+        - 180
+      - - 540
+        - 380
+      - - 600
+        - 540
+      - - 560
+        - 760
+      - - 540
+        - 940
+      - - 600
+        - 1120
+      - - 560
+        - 1300
+      - - 540
+        - 1536
+      - - 0
+        - 1536
+
+  # Right tree mass — full-height barrier, mirror of the left.
+  - id: wall-right
+    kind: tall
+    points:
+      - - 2752
+        - 0
+      - - 2200
+        - 0
+      - - 2170
+        - 180
+      - - 2210
+        - 380
+      - - 2150
+        - 540
+      - - 2190
+        - 760
+      - - 2210
+        - 940
+      - - 2150
+        - 1120
+      - - 2190
+        - 1300
+      - - 2210
+        - 1536
+      - - 2752
+        - 1536
+
+  # Top forest backdrop — short barrier along the back edge to block
+  # the player from clipping behind the backlit trunk.
+  - id: wall-back
+    kind: short
+    points:
+      - - 740
+        - 0
+      - - 760
+        - 90
+      - - 1240
+        - 130
+      - - 1500
+        - 130
+      - - 2000
+        - 90
+      - - 2020
+        - 0
+      - - 740
+        - 0
+
+  # Bottom forest backdrop — short barrier so the player cannot exit
+  # past the bottom edge.
+  - id: wall-front
+    kind: short
+    points:
+      - - 740
+        - 1536
+      - - 760
+        - 1450
+      - - 1240
+        - 1410
+      - - 1500
+        - 1410
+      - - 2000
+        - 1450
+      - - 2020
+        - 1536
+      - - 740
+        - 1536
+
+  # Loose roots — small cover obstacles inside the arena.
+  - id: root-1
+    kind: short
+    points:
+      - - 880
+        - 1180
+      - - 920
+        - 1170
+      - - 950
+        - 1230
+      - - 910
+        - 1260
+      - - 870
+        - 1220
+      - - 880
+        - 1180
+  - id: root-2
+    kind: short
+    points:
+      - - 1820
+        - 1180
+      - - 1860
+        - 1170
+      - - 1890
+        - 1230
+      - - 1850
+        - 1260
+      - - 1810
+        - 1220
+      - - 1820
+        - 1180
+characterSpawn:
+  x: 1376
+  'y': 1430
+  facing: up
+monsters:
+  # Phase 1 + 2 final boss — keeper spawns 2000 ms after level start.
+  - type: keeper
+    x: 1376
+    'y': 820
+    waveId: boss
+    trigger:
+      kind: time
+      delayMs: 2000
+dropSpawns: []
+materials: []
+teleporters: []

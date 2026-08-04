@@ -4,7 +4,7 @@ moveSpeed: 6
 body:
   halfW: 18
   halfH: 18
-weaponId: vine-lash
+weaponId: vine-tip
 sfx:
   hit: monster-hit
   death: monster-death
