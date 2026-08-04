@@ -260,6 +260,14 @@ export const DROP_CONFIG = {
         /** Minimum distance to trigger actual pickup (px) */
         PICKUP_DISTANCE: 16,
     },
+
+    /** Ground-display scale multiplier for weapon-pickup drops. The
+     *  weapon's `visual.scale` (e.g. 0.16 for arcana-staff) is sized
+     *  for the in-hand sprite anchored to a character body. On the
+     *  ground the drop is its own prop, so we bump it by this factor
+     *  for legibility. Hand-tuned — change here if a weapon ends up
+     *  too tiny / too big on the tavern floor. */
+    WEAPON_PICKUP_SCALE_MULTIPLIER: 3,
 } as const;
 
 // ─── Graphics: Pixel Art Engine Lighting & Camera Filter Config ────────

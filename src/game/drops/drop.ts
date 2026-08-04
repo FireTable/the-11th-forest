@@ -22,15 +22,6 @@ import { useGameStore } from '@/store/game-store';
 
 import { planDropEffect } from './logic';
 
-/**
- * Ground-display scale multiplier for weapon-pickup drops. The
- * weapon's `visual.scale` (e.g. 0.16 for arcana-staff) is sized for the
- * in-hand sprite anchored to the character body. On the ground the
- * drop is its own prop, so we bump it by this factor for legibility.
- * Hand-tuned — change here if a weapon ends up too tiny / too big.
- */
-export const DROP_WEAPON_PICKUP_SCALE_MULTIPLIER = 3;
-
 // ─── Entity ──────────────────────────────────────────────────────────────
 
 export function textureKey(spec: DropSpec): string {
@@ -194,7 +185,7 @@ export class DropInstance {
             );
             spriteObj.setDepth(Math.round(targetY));
             const pickupScale = weaponSpec.visual.scale ?? 0.16;
-            spriteObj.setScale(pickupScale * DROP_WEAPON_PICKUP_SCALE_MULTIPLIER);
+            spriteObj.setScale(pickupScale * DROP_CONFIG.WEAPON_PICKUP_SCALE_MULTIPLIER);
             this.sprite = spriteObj as unknown as Phaser.GameObjects.Sprite;
         } else if (spec.sprite && scene.textures.exists(textureKey(spec))) {
             const idleAnimKey = animKey(spec, 'idle');
