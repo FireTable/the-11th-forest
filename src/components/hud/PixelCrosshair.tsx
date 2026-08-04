@@ -4,17 +4,12 @@ import { EventBus } from '@/lib/events/bus';
 import { appRect } from '@/lib/mobile';
 
 /**
- * Native canvas size the aim logic emits coordinates in. Matches
- * `GameHUDLayer`'s `nativeW/H`. Mirrored here so this component is
- * self-sufficient (it sits at app-root level, not inside the scaled
- * HUD layer anymore, so its size is constant 34px regardless of
- * the canvas's CSS transform).
+ * Native canvas size the aim logic emits coordinates in.
  */
 const NATIVE_W = 1536;
 const NATIVE_H = 864;
 
-/** Map a native-canvas coord to a viewport-pixel coord via the canvas
- *  rect. Pure so the math is testable without a DOM. */
+/** Map a native-canvas coord to a viewport-pixel coord via the canvas rect. */
 export function nativeToViewport(
     coord: number,
     nativeSize: number,
@@ -26,32 +21,57 @@ export function nativeToViewport(
 }
 
 /**
- * Crosshair at the screen-space cursor (or aim-assist lock target).
+ * High-Performance Pixel Crosshair
  *
- * Render path deliberately bypasses React's render cycle for the
- * `left/top` style: every pointermove emits an `aim-crosshair-update`
- * (sometimes ~120 Hz on a high-end mouse). A setState per emit would
- * queue a render per move and trail the cursor by ~1 frame. We keep
- * `visible` + `isLocked` as React state (low frequency) and write
- * position directly to the DOM via a ref. Browser style mutations
- * are coalesced on the next paint so the crosshair tracks instantly.
+ * Performance optimization highlights:
+ * 1. Zero React re-renders for position tracking: high-frequency aim
+ *    coordinates bypass the State mechanism entirely.
+ * 2. Frame-rate synchronization (rAF throttle): uses requestAnimationFrame
+ *    to lock to the display refresh cycle, eliminating redundant DOM writes.
+ * 3. GPU composite layer: translate3d replaces top/left for zero layout
+ *    reflow.
+ * 4. Permanently mounted DOM: visibility toggles replace conditional
+ *    rendering (return null), eliminating DOM rebuilds and first-frame
+ *    invalidation.
+ * 5. Zero closure overhead: rect and visible live in refs; the EventBus
+ *    listener mounts once globally.
  */
 export const PixelCrosshair: React.FC = () => {
-    const [mode, setMode] = useState<{ visible: boolean; isLocked: boolean }>({
-        visible: false,
-        isLocked: false,
-    });
-    const [rect, setRect] = useState<{
-        left: number;
-        top: number;
-        width: number;
-        height: number;
-    } | null>(null);
-    const wrapRef = useRef<HTMLDivElement | null>(null);
-    // Track the latest coords so visibility toggle-on uses the most
-    // recent aim position rather than the stale default `-100, -100`.
-    const lastCoordRef = useRef<{ x: number; y: number }>({ x: -100, y: -100 });
+    // Only low-frequency UI state (lock / animation) stays in React State
+    const [isLocked, setIsLocked] = useState(false);
 
+    // DOM ref
+    const wrapRef = useRef<HTMLDivElement | null>(null);
+
+    // High-frequency / live refs (bypass React re-render)
+    const rectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+    const lastCoordRef = useRef<{ x: number; y: number }>({ x: -100, y: -100 });
+    const visibleRef = useRef(false);
+
+    // Frame-synchronized scheduler (rAF)
+    const rafIdRef = useRef<number | null>(null);
+
+    // Helper: push coord updates to the DOM (GPU composite layer)
+    const applyTransform = () => {
+        const wrap = wrapRef.current;
+        const r = rectRef.current;
+        const pos = lastCoordRef.current;
+
+        if (!wrap) return;
+
+        // Visibility control
+        wrap.style.visibility = visibleRef.current ? 'visible' : 'hidden';
+
+        if (r && visibleRef.current) {
+            const vx = nativeToViewport(pos.x, NATIVE_W, r.left, r.width);
+            const vy = nativeToViewport(pos.y, NATIVE_H, r.top, r.height);
+            // translate3d enables HW acceleration + translate(-50%, -50%)
+            // centers in one shot.
+            wrap.style.transform = `translate3d(${vx}px, ${vy}px, 0px) translate(-50%, -50%)`;
+        }
+    };
+
+    // 1. Bind EventBus high-frequency event (mounts once per lifecycle)
     useEffect(() => {
         const onAimUpdate = (data: {
             x: number;
@@ -59,51 +79,50 @@ export const PixelCrosshair: React.FC = () => {
             isLocked: boolean;
             visible: boolean;
         }) => {
+            // Update latest coords & state
             lastCoordRef.current = { x: data.x, y: data.y };
-            // Direct DOM write — no React render for the position change.
-            const wrap = wrapRef.current;
-            const r = rect;
-            if (wrap && r && data.visible) {
-                wrap.style.left = `${nativeToViewport(data.x, NATIVE_W, r.left, r.width)}px`;
-                wrap.style.top = `${nativeToViewport(data.y, NATIVE_H, r.top, r.height)}px`;
+            visibleRef.current = data.visible;
+
+            // rAF throttle: if a frame is already queued, skip re-scheduling.
+            if (rafIdRef.current === null) {
+                rafIdRef.current = requestAnimationFrame(() => {
+                    rafIdRef.current = null;
+                    applyTransform();
+                });
             }
-            setMode((prev) => {
-                if (prev.visible === data.visible && prev.isLocked === data.isLocked) return prev;
-                return { visible: data.visible, isLocked: data.isLocked };
-            });
+
+            // Only low-frequency UI changes trigger React setState
+            setIsLocked((prev) => (prev === data.isLocked ? prev : data.isLocked));
         };
+
         EventBus.on('aim-crosshair-update', onAimUpdate);
         return () => {
             EventBus.removeListener('aim-crosshair-update', onAimUpdate);
+            if (rafIdRef.current !== null) {
+                cancelAnimationFrame(rafIdRef.current);
+            }
         };
-    }, [rect]);
+    }, []);
 
-    // Track the canvas's bounding rect. Phaser game creation is async:
-    // `StartGame()` first awaits `resolveDefaultSceneId` + `resolveScene`
-    // (HTTP round-trips) and only then constructs the `Phaser.Game` that
-    // appends the canvas. In production those fetches can outlast a short
-    // poll, leaving `rect` null forever — the crosshair then renders at the
-    // 0,0 fallback and looks "missing" because it's pinned to the top-left
-    // corner instead of the cursor. We use a MutationObserver on
-    // `#game-container` so the wait is event-driven (zero polling) and has
-    // no timeout — the canvas WILL appear eventually, even on cold prod
-    // cache.
+    // 2. Watch Game Canvas resize / layout changes
     useEffect(() => {
         let ro: ResizeObserver | null = null;
         let canvas: HTMLCanvasElement | null = null;
         let observer: MutationObserver | null = null;
+
         const update = (): void => {
             if (!canvas) return;
-            // App space: the crosshair is `position: fixed` inside `#app`,
-            // which is the containing block once the mobile rotation
-            // transform is applied.
             const r = appRect(canvas);
-            setRect({ left: r.left, top: r.top, width: r.width, height: r.height });
+            rectRef.current = { left: r.left, top: r.top, width: r.width, height: r.height };
+            // Re-apply coords immediately on layout change.
+            applyTransform();
         };
+
         const install = (): boolean => {
             if (canvas) return true;
             canvas = document.querySelector('#game-container canvas') as HTMLCanvasElement | null;
             if (!canvas) return false;
+
             update();
             ro = new ResizeObserver(update);
             ro.observe(canvas);
@@ -111,8 +130,7 @@ export const PixelCrosshair: React.FC = () => {
             window.visualViewport?.addEventListener('resize', update);
             return true;
         };
-        // Synchronous first try — canvas may already exist if the game
-        // mounted before React painted this component.
+
         if (!install()) {
             const container = document.getElementById('game-container');
             if (container) {
@@ -122,6 +140,7 @@ export const PixelCrosshair: React.FC = () => {
                 observer.observe(container, { childList: true, subtree: true });
             }
         }
+
         return () => {
             observer?.disconnect();
             ro?.disconnect();
@@ -130,23 +149,22 @@ export const PixelCrosshair: React.FC = () => {
         };
     }, []);
 
-    if (!mode.visible) return null;
-
-    const r = rect ?? { left: 0, top: 0, width: 0, height: 0 };
-    const initialX = nativeToViewport(lastCoordRef.current.x, NATIVE_W, r.left, r.width);
-    const initialY = nativeToViewport(lastCoordRef.current.y, NATIVE_H, r.top, r.height);
-
     return (
         <div
             ref={wrapRef}
-            className="pointer-events-none fixed z-50 transform -translate-x-1/2 -translate-y-1/2 select-none"
-            style={{ left: `${initialX}px`, top: `${initialY}px` }}
+            // left-0 top-0 is the base; translate3d fully owns position.
+            className="pointer-events-none fixed left-0 top-0 z-50 select-none will-change-transform"
+            style={{
+                visibility: 'hidden', // Hidden by default; direct DOM drives visibility
+                transform: 'translate3d(-100px, -100px, 0px) translate(-50%, -50%)',
+            }}
             data-testid="pixel-crosshair"
         >
             <div
-                className={`transition-all duration-150 ease-out ${
-                    mode.isLocked ? 'animate-crosshair-breathe' : 'scale-100'
-                }`}
+                // Only animate the transform property; avoid full-attribute
+                // interpolation / reflow during animation.
+                className={`transition-transform duration-150 ease-out ${isLocked ? 'animate-crosshair-breathe' : 'scale-100'
+                    }`}
             >
                 <svg
                     width={34}
@@ -155,7 +173,6 @@ export const PixelCrosshair: React.FC = () => {
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                     style={{ imageRendering: 'pixelated', shapeRendering: 'crispEdges' }}
-                    className="transition-all duration-150 ease-out"
                 >
                     <path d="M 2 2 H 11 V 8 H 8 V 11 H 2 Z" fill="black" />
                     <path d="M 4 4 H 9 V 6 H 6 V 9 H 4 Z" fill="#ffffff" />
