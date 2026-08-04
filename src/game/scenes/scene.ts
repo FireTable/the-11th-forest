@@ -448,41 +448,90 @@ export class LoadScene extends Phaser.Scene {
         EventBus.emit('current-scene-ready', this);
 
         // ── Tavern UI overlay ──────────────────────────────────────────
-        // Pure UI on top of the now-fully-wired scene. Hides the default
-        // character behind the selection UI; on confirm, swaps it for the
-        // picked spec and re-points monsterSystem at the new body.
+        // Two cases:
+        //   1. First visit (selectedCharacterId === null): placeholder +
+        //      TavernController (phase 1 NPC selection).
+        //   2. Returning visit (selectedCharacterId !== null): player
+        //      already chose — load the picked spec directly as the
+        //      real character, skip the selection UI. The character
+        //      renders immediately at the spawn point so the player
+        //      doesn't see NPCs instead of their character on refresh.
         if (this.level.tavern) {
-            this.tavernController = new TavernController(
-                this,
-                this.level,
-                this.assets,
-                this.character,
-                (selectedSpec: CharacterSpec) => {
-                    this.character.destroy();
-                    (this.assets as any).character = selectedSpec;
-                    if (selectedSpec.sprite) {
-                        (this.assets as any).spriteCell = { width: 128, height: 128 };
-                    }
-                    this.character = loadCharacter(
-                        this,
-                        this.level,
-                        selectedSpec,
-                        this.assets.weapons,
-                    );
-                    // Rewire subsystems to the freshly-spawned character's
-                    // body / runtime. monsterSystem tracks the body for
-                    // player-hit detection; dropSystem holds the runtime
-                    // reference for magnet + pickup collision + heal/ ammo
-                    // callbacks. Both were captured against the placeholder.
-                    this.monsterSystem.setPlayerBody(this.character.body);
-                    this.dropSystem.setCharacter(this.character);
-                    // Phase 1 hidden the React HUDs (CharacterHud.setVisible
-                    // → setHubsVisible(false)); restore them for phase 2 so
-                    // the new character's weapon/HP/EXP panels come back.
-                    useGameStore.getState().setHubsVisible(true);
-                    useGameStore.getState().setTavernCleared(true);
-                },
-            );
+            const selectedId = useGameStore.getState().selectedCharacterId;
+            if (selectedId !== null) {
+                // Find the previously-selected spec from allCharacters
+                // (or fall back to the default) and rebuild the scene's
+                // character + subsystems around it. We clear the stale
+                // `playerSnapshot` so the real character spawns at the
+                // level's default (image center) instead of an off-world
+                // position left behind by a previous session's
+                // placeholder snapshot.
+                const allChars = this.assets.allCharacters ?? [];
+                const pickedSpec =
+                    allChars.find((c) => c.id === selectedId) ??
+                    this.assets.character;
+                this.character.destroy();
+                (this.assets as any).character = pickedSpec;
+                if (pickedSpec.sprite) {
+                    (this.assets as any).spriteCell = { width: 128, height: 128 };
+                }
+                // Clear stale playerSnapshot so tickSaveState (which runs every 1s)
+// doesn't immediately re-poison the store with off-world coords the
+// very first time it fires. `loadCharacter` itself ignores savedPlayer
+// (via `ignoreSavedPosition: true`) so the character spawns at the
+// level center; this set just keeps the store consistent.
+useGameStore.setState({ playerSnapshot: undefined });
+                this.character = loadCharacter(
+                    this,
+                    this.level,
+                    pickedSpec,
+                    this.assets.weapons,
+                    { ignoreSavedPosition: true },
+                );
+                this.monsterSystem.setPlayerBody(this.character.body);
+                this.dropSystem.setCharacter(this.character);
+                useGameStore.getState().setHubsVisible(true);
+                // tavernCleared is already true from the previous run.
+            } else {
+                this.tavernController = new TavernController(
+                    this,
+                    this.level,
+                    this.assets,
+                    this.character,
+                    (selectedSpec: CharacterSpec) => {
+                        this.character.destroy();
+                        (this.assets as any).character = selectedSpec;
+                        if (selectedSpec.sprite) {
+                            (this.assets as any).spriteCell = {
+                                width: 128,
+                                height: 128,
+                            };
+                        }
+                        this.character = loadCharacter(
+                            this,
+                            this.level,
+                            selectedSpec,
+                            this.assets.weapons,
+                        );
+                        // Rewire subsystems to the freshly-spawned
+                        // character's body / runtime. monsterSystem
+                        // tracks the body for player-hit detection;
+                        // dropSystem holds the runtime reference for
+                        // magnet + pickup collision + heal/ ammo
+                        // callbacks. Both were captured against the
+                        // placeholder.
+                        this.monsterSystem.setPlayerBody(this.character.body);
+                        this.dropSystem.setCharacter(this.character);
+                        // Phase 1 hidden the React HUDs
+                        // (CharacterHud.setVisible → setHubsVisible
+                        // (false)); restore them for phase 2 so the
+                        // new character's weapon/HP/EXP panels come
+                        // back.
+                        useGameStore.getState().setHubsVisible(true);
+                        useGameStore.getState().setTavernCleared(true);
+                    },
+                );
+            }
         }
     }
 

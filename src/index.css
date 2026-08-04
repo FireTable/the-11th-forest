@@ -207,6 +207,29 @@
     animation: tavern-hud-bob 1.1s ease-in-out infinite alternate;
 }
 
+/* Hold-F-to-confirm border fill. The amber path's strokeDashoffset
+   runs 392 → 0 over 1.5s on the GPU compositor. The path perimeter
+   is 98·4 = 392 viewBox units (top → right → bottom → left). The
+   keyframe finishes at offset 0 (full border drawn); when the
+   animation ends, TavernController fires `confirmSelection`. The
+   keyframe uses linear timing so progress maps 1:1 to wall time —
+   easier to reason about than ease curves when the player is
+   counting seconds.
+
+   The animation is only attached while `.f-holding` is present;
+   removing the class cancels mid-fill and resets the offset. */
+@keyframes tavern-f-fill {
+    from {
+        stroke-dashoffset: 392;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+.f-holding {
+    animation: tavern-f-fill 1.5s linear forwards;
+}
+
 @keyframes crosshairBreathe {
     0%,
     100% {

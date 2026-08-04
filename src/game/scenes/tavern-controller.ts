@@ -53,11 +53,13 @@ export interface TavernFocusPayload {
     viewportX?: number;
     viewportY?: number;
     /**
-     * F-key long-press progress (0..1). `undefined` when not holding.
-     * The HUD uses this to fill the F-key cap's border as the player
-     * holds F toward the 1.5s confirm threshold.
+     * F / mouse hold active right now. The HUD applies a `.f-holding`
+     * CSS class for the duration of the hold; a CSS @keyframes runs
+     * the border fill over 1.5s on the GPU. When the controller's
+     * internal timer reaches HOLD_MS it fires `confirmSelection` and
+     * stops emitting `holding: true`.
      */
-    holdProgress?: number;
+    holding?: boolean;
 }
 
 /** Maximum weapons the player may pick up during the tavern weapon phase. */
@@ -142,8 +144,6 @@ export class TavernController {
      * On confirm, the scene swaps the character in place.
      */
     private hideDefaultCharacter(): void {
-        const w = this.level.imageSize.width;
-        const h = this.level.imageSize.height;
         const char = this.defaultCharacter;
         // Placeholder has no HUDs / debug rects — they're null because
         // the placeholder's loadCharacter() opts out of those modules.
@@ -151,12 +151,10 @@ export class TavernController {
         char.hud?.setVisible(false);
         char.weaponHud?.setVisible(false);
         char.statusHud?.setVisible(false);
-        // Park the physics body far off the world bounds so it can't
-        // collide with anything during selection. The placeholder's
-        // body is already off-world (created at -10000,-10000) but
-        // re-anchor here so any future layout change keeps it parked.
-        const Matter = (Phaser as any).Physics.Matter.Matter;
-        Matter.Body.setPosition(char.body, { x: -w, y: -h });
+        // The body is intentionally NOT moved: tickSaveState snapshots
+        // it every second, and the snapshot becomes the spawn point for
+        // the real character on confirm. If we parked it off-world, the
+        // real character would spawn off-world too.
     }
 
     /**
@@ -272,7 +270,7 @@ export class TavernController {
 
     // ─── EventBus → React ────────────────────────────────────────────────
 
-    private emitFocusEvent(holdProgress?: number): void {
+    private emitFocusEvent(holding: boolean = false): void {
         const entry = this.npcs[this.selectedIndex];
         if (!entry) {
             EventBus.emit('tavern-focus', null);
@@ -300,7 +298,7 @@ export class TavernController {
             weaponMax: TAVERN_WEAPON_MAX,
             viewportX,
             viewportY,
-            holdProgress: this.phase === 'selection' ? holdProgress : undefined,
+            holding: this.phase === 'selection' ? holding : undefined,
         };
         EventBus.emit('tavern-focus', payload);
     }
@@ -385,12 +383,16 @@ export class TavernController {
             }
 
             // Hold to confirm (1.5s). Either keyboard F or mouse hold on the
-            // currently selected NPC drives the same `holdProgress`,
-            // so the F cap border in the HUD fills for either input.
-            // We accumulate per-frame `delta` (ms) rather than reading
-            // Phaser's `time` so the bar fills at exactly HOLD_MS
-            // regardless of any future time-scaling or pause.
-            let holdProgress: number | undefined;
+            // currently selected NPC drives the same `holdElapsed`, so
+            // the F cap border in the HUD fills for either input. We
+            // accumulate per-frame `delta` (ms) rather than reading
+            // Phaser's `time` so the threshold is reached at exactly
+            // HOLD_MS regardless of any future time-scaling or pause.
+            //
+            // The HUD's actual fill animation is a CSS @keyframes
+            // (`tavern-f-fill`) toggled by `holding` — we don't push
+            // per-frame progress here; CSS runs the smooth 1.5s fill
+            // on the GPU compositor and resets on F release.
             const holding =
                 this.keyConfirm.isDown || this.mouseHoldingIdx !== undefined;
             if (holding) {
@@ -399,8 +401,7 @@ export class TavernController {
                     this.holdElapsed = 0;
                 }
                 this.holdElapsed += delta;
-                holdProgress = Math.min(1, this.holdElapsed / HOLD_MS);
-                if (holdProgress >= 1) {
+                if (this.holdElapsed >= HOLD_MS) {
                     this.fHolding = false;
                     this.mouseHoldingIdx = undefined;
                     this.holdElapsed = 0;
@@ -414,12 +415,12 @@ export class TavernController {
             }
 
             // One combined emit per frame: position (unchanged for this NPC) +
-            // hold progress. Content fields stay identical between frames, so
-            // the React side short-circuits setState and writes the new
-            // `clip-path` straight to the DOM. Arrow bobbing is handled by
-            // CSS keyframes (`tavern-hud-bob` in TavernHud) — the JS no
-            // longer computes or emits `arrowOffsetY`.
-            this.emitFocusEvent(holdProgress);
+            // `holding` boolean (CSS drives the fill, not us). Content
+            // fields stay identical between frames, so the React side
+            // short-circuits setState and writes straight to the DOM
+            // for the high-frequency path. Arrow bobbing is handled by
+            // CSS keyframes (`tavern-hud-bob` in TavernHud).
+            this.emitFocusEvent(holding);
         }
     }
 

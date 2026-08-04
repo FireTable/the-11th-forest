@@ -124,8 +124,8 @@ function applyWrapPosition(
 
 export const TavernHud: React.FC = () => {
     const [focus, setFocus] = useState<TavernFocusPayload | null>(null);
+    const [holding, setHolding] = useState(false);
     const wrapRef = useRef<HTMLDivElement>(null);
-    const holdProgressRef = useRef<SVGRectElement>(null);
     const { scale, width, height } = useHudScale();
     const scaleRef = useRef(scale);
 
@@ -149,20 +149,17 @@ export const TavernHud: React.FC = () => {
             const wrap = wrapRef.current;
             if (wrap) applyWrapPosition(wrap, payload, scaleRef.current);
 
-            // ── F-key hold progress: write the path's stroke-dashoffset so the
-            //    amber border fills clockwise (top → right → bottom → left)
-            //    from the cap's top-left corner. The path perimeter is
-            //    392 viewBox units (98·4), so dashoffset runs 392 → 0.
-            const holdEl = holdProgressRef.current;
-            if (holdEl) {
-                if (payload && payload.holdProgress !== undefined) {
-                    holdEl.style.strokeDashoffset = String(
-                        392 * (1 - payload.holdProgress),
-                    );
-                } else {
-                    holdEl.style.strokeDashoffset = '392';
-                }
-            }
+            // ── F-key hold progress: gate the CSS `.f-holding`
+            //    animation via a boolean toggle. Adding the class
+            //    starts a 1.5s linear keyframe that runs the border
+            //    fill on the GPU compositor; removing it cancels
+            //    mid-fill and resets to dashoffset=392. No per-frame
+            //    DOM writes needed.
+            const nextHolding =
+                payload !== null &&
+                payload.phase === 'selection' &&
+                payload.holding === true;
+            setHolding(nextHolding);
 
             // ── Low-frequency content: only re-render when it actually
             //    changes. Phase 1 bobbing keeps `name`/`hp`/etc identical
@@ -298,33 +295,31 @@ export const TavernHud: React.FC = () => {
                                     </div>
                                     <div className="flex items-center gap-2 text-[9px] text-amber-400">
                                         <span className="relative inline-flex">
-                                            <span className="relative px-1 py-0.5 bg-amber-900/40 border border-amber-700 text-amber-300">
+                                            {/* Hold-F-to-confirm cap. The cap
+                                                has no Tailwind border — the
+                                                amber stroke (below) IS the
+                                                border, and it fills clockwise
+                                                over 1.5s while the `.f-holding`
+                                                class is on. Removing the class
+                                                (on F release) cancels mid-fill
+                                                and resets the border. */}
+                                            <span className="relative px-1 py-0.5 bg-amber-900/40 text-amber-300">
                                                 F
-                                                {/* Hold-progress overlay: amber-400
-                                                stroke that traces the cap's
-                                                perimeter clockwise (top →
-                                                right → bottom → left) as F is
-                                                held. `pathLength="100"`
-                                                normalises the perimeter; the
-                                                controller writes `strokeDashoffset`
-                                                per frame (100 - progress·100). */}
+                                                {/* Amber-400 stroke that doubles
+                                                    as the cap's border. Perimeter
+                                                    = 98·4 = 392 viewBox units.
+                                                    CSS @keyframes `tavern-f-fill`
+                                                    runs strokeDashoffset 392 → 0
+                                                    linearly over 1.5s while
+                                                    `.f-holding` is on the path. */}
                                                 <svg
                                                     className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
                                                     viewBox="0 0 100 100"
                                                     preserveAspectRatio="none"
                                                     aria-hidden="true"
                                                 >
-                                                    {/* Clockwise trace around the cap:
-                                                   (1,1) → (99,1) → (99,99) → (1,99).
-                                                   Perimeter = 98·4 = 392 viewBox
-                                                   units; the controller writes
-                                                   `strokeDashoffset` per frame as
-                                                   `392 · (1 - progress)` so the
-                                                   amber stroke fills the cap's
-                                                   border clockwise from the
-                                                   top-left corner. */}
                                                     <path
-                                                        ref={holdProgressRef}
+                                                        className={holding ? 'f-holding' : undefined}
                                                         d="M 1 1 L 99 1 L 99 99 L 1 99 Z"
                                                         fill="none"
                                                         stroke="#fbbf24"
@@ -336,7 +331,7 @@ export const TavernHud: React.FC = () => {
                                                 </svg>
                                             </span>
                                         </span>
-                                        <span>Confirm (1.5s)</span>
+                                        <span>Confirm (hold 1.5s)</span>
                                     </div>
                                 </div>
                             </>

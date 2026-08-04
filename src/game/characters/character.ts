@@ -141,9 +141,15 @@ import { useGameStore } from '@/store/game-store';
  * fire / SFX / hotbar / input can fire. The placeholder is replaced
  * with a real character on confirm; `monsterSystem.setPlayerBody` and
  * `dropSystem.setCharacter` rewire to the new body / runtime.
+ *
+ * `ignoreSavedPosition: true` ignores `useGameStore.playerSnapshot` and
+ * always uses the level's spawn point. Used when refreshing into the
+ * tavern after a previous session's stale (off-world) snapshot would
+ * otherwise place the character out of view.
  */
 export interface LoadCharacterOptions {
     placeholder?: boolean;
+    ignoreSavedPosition?: boolean;
 }
 
 /**
@@ -166,30 +172,44 @@ export function loadCharacter(
     opts: LoadCharacterOptions = {},
 ): CharacterRuntime {
     const savedPlayer = useGameStore.getState().playerSnapshot;
-    // Saved position takes highest priority, then level characterSpawn, then image center
-    const spawnX = savedPlayer?.x ?? level.characterSpawn?.x ?? level.imageSize.width / 2;
-    const spawnY = savedPlayer?.y ?? level.characterSpawn?.y ?? level.imageSize.height / 2;
+    // Saved position takes highest priority, then level characterSpawn,
+    // then image center. `placeholder` and `ignoreSavedPosition` both
+    // opt out of the saved snapshot — placeholders always sit at the
+    // level spawn (a stale off-world snapshot would re-poison the store
+    // via tickSaveState), and refreshes into the tavern (when the
+    // player has already chosen a character) do the same so the
+    // character doesn't spawn wherever the placeholder used to be.
+    const useSaved =
+        !opts.placeholder && !opts.ignoreSavedPosition;
+    const spawnX = useSaved
+        ? (savedPlayer?.x ?? level.characterSpawn?.x ?? level.imageSize.width / 2)
+        : (level.characterSpawn?.x ?? level.imageSize.width / 2);
+    const spawnY = useSaved
+        ? (savedPlayer?.y ?? level.characterSpawn?.y ?? level.imageSize.height / 2)
+        : (level.characterSpawn?.y ?? level.imageSize.height / 2);
 
     if (opts.placeholder) {
         // Visual-only placeholder for the tavern selection UI: a sprite
-        // + shadow + idle animation, a hidden body (parked off-world so
-        // it never collides with anything — subsystems still hold a non-
-        // null body reference, which they swap to the real character's
-        // body on confirm), and NO weapons / HUDs / controller. The
-        // "no weapons module" is the whole point — phase 1 must not fire
-        // bullets, play weapon SFX, bind 1/2/3 hotbar, or write to the
-        // React HUD store.
-        const matter = (Phaser as any).Physics.Matter.Matter;
+        // + shadow + idle animation, a static body at the spawn point
+        // (so the 1Hz save snapshot records the real spawn coords), and
+        // NO weapons / HUDs / controller. The "no weapons module" is the
+        // whole point — phase 1 must not fire bullets, play weapon SFX,
+        // bind 1/2/3 hotbar, or write to the React HUD store.
+        //
+        // `isStatic: true` is essential: a dynamic body can still
+        // translate from collisions with the outer-boundary walls or
+        // any future physics impulse, even with `setInertia(Infinity)`
+        // (which only freezes rotation). Static bodies don't move
+        // regardless of force, so the body stays put for the duration
+        // of phase 1 and the 1Hz `tickSaveState` keeps recording the
+        // spawn coords.
         const body = scene.matter.add.rectangle(
-            // Park the body far off-world so it can't interact with
-            // anything. TavernController doesn't move the sprite via
-            // the body (the placeholder is stationary); only the sprite
-            // + shadow are visible.
-            -10000,
-            -10000,
+            spawnX,
+            spawnY - spec.body.halfH,
             spec.body.halfW * 2,
             spec.body.halfH * 2,
             {
+                isStatic: true,
                 label: 'character',
                 collisionFilter: {
                     category: CAT.CHARACTER,
@@ -197,7 +217,6 @@ export function loadCharacter(
                 },
             },
         );
-        matter.Body.setInertia(body, Infinity);
 
         const shadow = scene.add.ellipse(
             spawnX,
