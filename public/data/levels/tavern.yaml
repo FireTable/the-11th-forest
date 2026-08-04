@@ -6,16 +6,16 @@ tavern: true
 npcSpawns:
     - characterId: kitty
       x: 800
-      'y': 860
+      'y': 800
     - characterId: bunny-girl
       x: 1000
-      'y': 860
+      'y': 900
     - characterId: otaku
       x: 1200
-      'y': 860
+      'y': 900
     - characterId: wanderer
       x: 1400
-      'y': 860
+      'y': 900
 dropSpawns: []
 teleporters:
     - id: tavern-exit
