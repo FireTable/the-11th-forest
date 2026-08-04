@@ -71,9 +71,6 @@ export const CharacterHUDOverlay: React.FC = () => {
                     <span className="text-xs font-bold tracking-wider text-amber-200 uppercase drop-shadow-[1px_1px_0px_#000]">
                         {characterName}
                     </span>
-                    <span className="ml-auto text-[9px] text-amber-600 tracking-widest uppercase">
-                        HERO
-                    </span>
                 </div>
 
                 {/* Bars section */}

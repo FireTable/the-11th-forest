@@ -3,77 +3,228 @@
  * --------------------------------------------------------------------------
  * React HUD shown during the Forest Tavern scene.
  *
- * Performance & UI Fixes:
- * 1. 0 Reflow / Layout Repaint: Uses `translate3d` on GPU composite layer.
- * 2. EventBus Event Throttling: Prevents unnecessary React Re-renders.
- * 3. Exact 1.5s Hold-F Meter: Precise 396px path perimeter matches 1.5s keyframe.
- * 4. Pixel-perfect 1px Border: SVG stroke width mapped to match A/D 1px border.
+ * Layout (Phase 1 — character selection):
+ *   - Character name
+ *   - Description (free-form text from spec)
+ *   - Stats grid (HP / SP / MoveSpeed + STR / AGI / VIT / SPI) shown
+ *     as icon + value, no fill bars
+ *   - Radar polygon: each stat vertex sits at current/max on its
+ *     axis, so the player can read the character's profile against
+ *     the strongest character for each stat
+ *   - Keyboard hints (A/D cycle, F hold-to-confirm with charge
+ *     progress SVG)
+ *
+ * Layout (Phase 2 — weapon pickup): unchanged weapon-slot grid.
+ *
+ * Performance:
+ *   1. Position pinned via direct DOM transform (translate3d on GPU
+ *      composite layer), no React re-render for the position path.
+ *   2. EventBus event throttling: tavern-focus content equality check
+ *      keeps React state stable when only the holding flag flips.
+ *   3. Exact 1.5s Hold-F Meter: precise 396px perimeter path matches
+ *      the CSS keyframe duration.
+ *   4. Pixel-perfect 1px border on key chips via min-w + inline-flex
+ *      centering.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Heart, Zap, Swords, Wind, Shield, Sparkles } from 'lucide-react';
+import { Heart, Zap, Swords, Wind, Shield, Sparkles, Gauge } from 'lucide-react';
 
 import { EventBus } from '@/lib/events/bus';
 import type { TavernFocusPayload } from '@/game/scenes/tavern-controller';
 import { useHudScale } from '@/lib/use-hud-scale';
 import { CornerPixels, RETRO_BOX } from './retro-box';
 
-// ─── Stat bar ─────────────────────────────────────────────────────────────
+// ─── Stat row (icon + label + value) ─────────────────────────────────────
 
-interface StatBarProps {
+interface StatRowProps {
     icon: React.ReactNode;
     label: string;
-    value: number; // 1–10
+    value: number | string;
+    /** Optional unit suffix, e.g. "/10" or "px/s". */
+    suffix?: string;
     color: string;
+    /** Render the value bigger / different (used for HP / SP). */
+    prominent?: boolean;
 }
 
-const StatBar: React.FC<StatBarProps> = React.memo(({ icon, label, value, color }) => (
-    <div className="flex items-center gap-1.5">
-        <span className={`w-3.5 h-3.5 shrink-0 ${color}`}>{icon}</span>
-        <span className="text-[9px] text-stone-400 uppercase tracking-widest w-12 shrink-0">
-            {label}
-        </span>
-        <div className="flex gap-0.5">
-            {Array.from({ length: 10 }, (_, i) => (
-                <span
-                    key={i}
-                    className={`w-2 h-2 border ${i < value
-                        ? `${color.replace('text-', 'bg-')} border-transparent`
-                        : 'bg-stone-800 border-stone-700'
-                        }`}
-                />
-            ))}
-        </div>
-        <span className="text-[9px] text-stone-400 ml-1">{value}/10</span>
-    </div>
-));
-
-// ─── Mini bar ─────────────────────────────────────────────────────────────
-
-interface MiniBarProps {
-    icon: React.ReactNode;
-    value: number;
-    fillClass: string;
-    label: string;
-}
-
-const MiniBar: React.FC<MiniBarProps> = React.memo(({ icon, value, fillClass, label }) => (
-    <div className="flex items-center gap-1.5">
-        <span className="w-3.5 h-3.5 shrink-0">{icon}</span>
-        <div className="flex-1 h-2 bg-black border border-stone-700 relative">
-            <div
-                className={`h-full ${fillClass} transition-all duration-300`}
-                style={{ width: `${Math.min(100, (value / 200) * 100)}%` }}
-            />
-            <span className="absolute inset-0 flex items-center justify-end pr-1 text-[8px] font-bold text-white leading-none drop-shadow-[1px_1px_0px_#000]">
+const StatRow: React.FC<StatRowProps> = React.memo(
+    ({ icon, label, value, suffix, color, prominent }) => (
+        <div className="flex items-center gap-1.5">
+            <span className={`w-3.5 h-3.5 shrink-0 ${color}`}>{icon}</span>
+            <span
+                className={`uppercase tracking-widest shrink-0 ${
+                    prominent
+                        ? 'text-[11px] text-stone-200 w-10'
+                        : 'text-[9px] text-stone-400 w-12'
+                }`}
+            >
+                {label}
+            </span>
+            <span
+                className={`font-mono tabular-nums leading-none drop-shadow-[1px_1px_0px_#000] ${
+                    prominent
+                        ? `text-[12px] ${color}`
+                        : 'text-[10px] text-stone-200'
+                }`}
+            >
                 {value}
+                {suffix && <span className="text-stone-500 text-[8px] ml-0.5">{suffix}</span>}
             </span>
         </div>
-        <span className="text-[9px] text-stone-500 w-8">{label}</span>
-    </div>
-));
+    ),
+);
 
-// ─── Check content equality ───────────────────────────────────────────────
+// ─── Radar polygon (stats vs max across all characters) ──────────────────
+
+interface RadarPoint {
+    /** Current value for the focused character, 0–max. */
+    value: number;
+    /** Max value across every character, 0–max. */
+    max: number;
+    /** Display label for the vertex (rendered outside the polygon). */
+    label: string;
+}
+
+interface RadarPolygonProps {
+    points: RadarPoint[];
+    /** Pixel size of the SVG (square). */
+    size?: number;
+    /** Stroke + fill colour for the focused character's polygon. */
+    color?: string;
+}
+
+/**
+ * 4-axis radar chart. Each axis starts at the centre, ends at the
+ * outer ring. Vertex distance = (value / max) * outerRadius. The
+ * outer ring is drawn at max (full extent), the inner axis
+ * cross-hair at half-max (the 50% reference), and the filled
+ * polygon shows the focused character's profile. Labels for each
+ * axis float just outside the ring.
+ */
+const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
+    ({ points, size = 88, color = '#fbbf24' }) => {
+        const cx = size / 2;
+        const cy = size / 2;
+        const radius = size / 2 - 14;
+        const n = points.length;
+        // 4 axes evenly spaced starting at top (12 o'clock): top,
+        // right, bottom, left.
+        const angleAt = (i: number): number => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+        const vertex = (i: number, scale: number): { x: number; y: number } => {
+            const a = angleAt(i);
+            return { x: cx + Math.cos(a) * radius * scale, y: cy + Math.sin(a) * radius * scale };
+        };
+
+        // Outer ring (max reference)
+        const outerRing = points
+            .map((_, i) => {
+                const p = vertex(i, 1);
+                return `${p.x},${p.y}`;
+            })
+            .join(' ');
+
+        // Half-radius cross-hair
+        const halfRing = points
+            .map((_, i) => {
+                const p = vertex(i, 0.5);
+                return `${p.x},${p.y}`;
+            })
+            .join(' ');
+
+        // Focused character's polygon
+        const focusPolygon = points
+            .map((p, i) => {
+                const scale = p.max > 0 ? Math.max(0, Math.min(1, p.value / p.max)) : 0;
+                const v = vertex(i, scale);
+                return `${v.x},${v.y}`;
+            })
+            .join(' ');
+
+        return (
+            <svg
+                width={size}
+                height={size}
+                viewBox={`0 0 ${size} ${size}`}
+                shapeRendering="geometricPrecision"
+                aria-hidden="true"
+            >
+                {/* Outer ring (max) */}
+                <polygon
+                    points={outerRing}
+                    fill="none"
+                    stroke="#44403c"
+                    strokeWidth="1"
+                />
+                {/* Half ring (50%) */}
+                <polygon
+                    points={halfRing}
+                    fill="none"
+                    stroke="#1c1917"
+                    strokeWidth="1"
+                    strokeDasharray="2 2"
+                />
+                {/* Axis lines */}
+                {points.map((_, i) => {
+                    const p = vertex(i, 1);
+                    return (
+                        <line
+                            key={i}
+                            x1={cx}
+                            y1={cy}
+                            x2={p.x}
+                            y2={p.y}
+                            stroke="#1c1917"
+                            strokeWidth="1"
+                        />
+                    );
+                })}
+                {/* Focused polygon */}
+                <polygon
+                    points={focusPolygon}
+                    fill={color}
+                    fillOpacity="0.25"
+                    stroke={color}
+                    strokeWidth="1.5"
+                />
+                {/* Vertex dots */}
+                {points.map((p, i) => {
+                    const scale = p.max > 0 ? Math.max(0, Math.min(1, p.value / p.max)) : 0;
+                    const v = vertex(i, scale);
+                    return (
+                        <circle
+                            key={i}
+                            cx={v.x}
+                            cy={v.y}
+                            r="1.6"
+                            fill={color}
+                        />
+                    );
+                })}
+                {/* Axis labels — sit just outside the ring */}
+                {points.map((p, i) => {
+                    const lp = vertex(i, 1.18);
+                    return (
+                        <text
+                            key={i}
+                            x={lp.x}
+                            y={lp.y}
+                            fontSize="6"
+                            fontFamily="'Silkscreen', monospace"
+                            fill="#a8a29e"
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                        >
+                            {p.label}
+                        </text>
+                    );
+                })}
+            </svg>
+        );
+    },
+);
+
+// ─── Content equality check ───────────────────────────────────────────────
 
 function isSameFocusContent(a: TavernFocusPayload | null, b: TavernFocusPayload | null): boolean {
     if (a === b) return true;
@@ -85,21 +236,35 @@ function isSameFocusContent(a: TavernFocusPayload | null, b: TavernFocusPayload 
         a.hp !== b.hp ||
         a.sp !== b.sp ||
         a.weaponCount !== b.weaponCount ||
-        a.weaponMax !== b.weaponMax
+        a.weaponMax !== b.weaponMax ||
+        a.description !== b.description
     ) {
         return false;
     }
 
-    if (a.stats && b.stats) {
-        return (
-            a.stats.strength === b.stats.strength &&
-            a.stats.agility === b.stats.agility &&
-            a.stats.vitality === b.stats.vitality &&
-            a.stats.spirit === b.stats.spirit
-        );
-    }
+    const aStats = a.stats;
+    const bStats = b.stats;
+    const statsEq =
+        (!aStats && !bStats) ||
+        (!!aStats &&
+            !!bStats &&
+            aStats.strength === bStats.strength &&
+            aStats.agility === bStats.agility &&
+            aStats.vitality === bStats.vitality &&
+            aStats.spirit === bStats.spirit);
+    if (!statsEq) return false;
 
-    return a.stats === b.stats;
+    const aMax = a.maxStats;
+    const bMax = b.maxStats;
+    const maxEq =
+        (!aMax && !bMax) ||
+        (!!aMax &&
+            !!bMax &&
+            aMax.strength === bMax.strength &&
+            aMax.agility === bMax.agility &&
+            aMax.vitality === bMax.vitality &&
+            aMax.spirit === bMax.spirit);
+    return maxEq;
 }
 
 // ─── DOM Direct Translation (0 Reflow / GPU acceleration) ───────────────
@@ -176,14 +341,14 @@ export const TavernHud: React.FC = () => {
     const outerStyle: React.CSSProperties =
         width > 0
             ? {
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: `${width / scale}px`,
-                height: `${height / scale}px`,
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left',
-            }
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: `${width / scale}px`,
+                  height: `${height / scale}px`,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
+              }
             : { position: 'absolute', inset: 0 };
 
     const isSelection = focus.phase === 'selection';
@@ -213,66 +378,99 @@ export const TavernHud: React.FC = () => {
                 }}
             >
                 <div className="tavern-hud-bob flex flex-col items-center">
-                    <div className={`${RETRO_BOX} relative p-4 w-[280px]`}>
+                    <div className={`${RETRO_BOX} relative p-4 w-[320px]`}>
                         <CornerPixels hideBottom={isSelection} />
-
-                        {/* Phase label */}
-                        <div className="flex items-center gap-2 mb-3 pb-1.5 border-b-2 border-amber-900/60">
-                            <div className="w-2 h-2 bg-amber-400 border border-black animate-pulse shrink-0" />
-                            <span className="text-[9px] text-amber-500 uppercase tracking-widest">
-                                {isSelection ? 'Select Character' : 'Pick Up Weapons'}
-                            </span>
-                        </div>
 
                         {isSelection ? (
                             /* ── Phase 1: Character info ── */
                             <>
                                 {/* Name */}
-                                <div className="text-sm font-bold text-amber-200 uppercase tracking-wider mb-3 drop-shadow-[1px_1px_0px_#000]">
+                                <div className="text-base font-bold text-amber-200 uppercase tracking-wider mb-1 drop-shadow-[1px_1px_0px_#000]">
                                     {focus.name}
                                 </div>
 
-                                {/* HP / SP */}
-                                <div className="flex flex-col gap-1.5 mb-3">
-                                    <MiniBar
-                                        icon={<Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />}
-                                        value={focus.hp}
-                                        fillClass="bg-red-600"
-                                        label="HP"
-                                    />
-                                    <MiniBar
-                                        icon={<Zap className="w-3.5 h-3.5 fill-sky-400 text-sky-300" />}
-                                        value={focus.sp}
-                                        fillClass="bg-sky-500"
-                                        label="SP"
-                                    />
+                                {/* Description */}
+                                {focus.description && (
+                                    <div className="text-[10px] leading-snug text-stone-300/90 italic mb-3 pr-1">
+                                        {focus.description}
+                                    </div>
+                                )}
+
+                                {/* Stats grid: left column HP/SP/MoveSpeed,
+                                    right column radar polygon + STR/AGI/VIT/SPI */}
+                                <div className="flex gap-3 mb-3">
+                                    {/* Left column: numerical stats with icons */}
+                                    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                                        <StatRow
+                                            icon={<Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />}
+                                            label="HP"
+                                            value={focus.hp}
+                                            color="text-red-400"
+                                            prominent
+                                        />
+                                        <StatRow
+                                            icon={<Zap className="w-3.5 h-3.5 fill-sky-400 text-sky-300" />}
+                                            label="SP"
+                                            value={focus.sp}
+                                            color="text-sky-400"
+                                            prominent
+                                        />
+                                        <StatRow
+                                            icon={<Gauge className="w-3.5 h-3.5" />}
+                                            label="SPD"
+                                            value={focus.moveSpeed}
+                                            suffix="px/s"
+                                            color="text-emerald-400"
+                                        />
+                                    </div>
+
+                                    {/* Right column: radar polygon */}
+                                    {focus.stats && focus.maxStats && (
+                                        <div className="shrink-0 self-center">
+                                            <RadarPolygon
+                                                points={[
+                                                    { value: focus.stats.strength, max: focus.maxStats.strength, label: 'STR' },
+                                                    { value: focus.stats.agility, max: focus.maxStats.agility, label: 'AGI' },
+                                                    { value: focus.stats.vitality, max: focus.maxStats.vitality, label: 'VIT' },
+                                                    { value: focus.stats.spirit, max: focus.maxStats.spirit, label: 'SPI' },
+                                                ]}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Stats */}
+                                {/* Stats as text rows under the radar (icon +
+                                    value) — duplicates radar visually but
+                                    reads as plain numbers. Stripped when
+                                    radar absent. */}
                                 {focus.stats && (
-                                    <div className="flex flex-col gap-1.5 mb-4">
-                                        <StatBar
+                                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 mb-3 pt-2 border-t border-stone-800">
+                                        <StatRow
                                             icon={<Swords className="w-3.5 h-3.5" />}
                                             label="STR"
                                             value={focus.stats.strength}
+                                            suffix="/10"
                                             color="text-red-400"
                                         />
-                                        <StatBar
+                                        <StatRow
                                             icon={<Wind className="w-3.5 h-3.5" />}
                                             label="AGI"
                                             value={focus.stats.agility}
+                                            suffix="/10"
                                             color="text-emerald-400"
                                         />
-                                        <StatBar
+                                        <StatRow
                                             icon={<Shield className="w-3.5 h-3.5" />}
                                             label="VIT"
                                             value={focus.stats.vitality}
+                                            suffix="/10"
                                             color="text-amber-400"
                                         />
-                                        <StatBar
+                                        <StatRow
                                             icon={<Sparkles className="w-3.5 h-3.5" />}
                                             label="SPI"
                                             value={focus.stats.spirit}
+                                            suffix="/10"
                                             color="text-purple-400"
                                         />
                                     </div>
@@ -287,14 +485,8 @@ export const TavernHud: React.FC = () => {
                                         <span>Cycle</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-[9px] text-amber-400">
-                                        {/* F-key cap: same px-1 py-0.5 + border as A/D so the two
-                                            key chips line up pixel-for-pixel. Only the
-                                            palette differs (amber instead of stone) plus
-                                            `relative` so the charge-progress SVG can sit
-                                            absolutely underneath. */}
                                         <span className="relative inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-amber-900/40 border border-amber-900 text-amber-300">
                                             F
-                                            {/* Charge-progress SVG: precise 1px overlap */}
                                             <svg
                                                 className="absolute -inset-[1px] w-[calc(100%+2px)] h-[calc(100%+2px)] pointer-events-none overflow-visible"
                                                 viewBox="0 0 100 100"
@@ -319,8 +511,8 @@ export const TavernHud: React.FC = () => {
                         ) : (
                             /* ── Phase 2: Weapon pickup ── */
                             <>
-                                <div className="text-xs font-bold text-amber-200 mb-3">
-                                    Selected: <span className="text-amber-400">{focus.name}</span>
+                                <div className="text-sm font-bold text-amber-200 mb-3">
+                                    {focus.name}
                                 </div>
 
                                 {/* Weapon count */}

@@ -116,6 +116,11 @@ export const CharacterSpecSchema = z
             .regex(/^\d+x\d+$/)
             .optional(),
         prompt: z.string().optional(),
+        /** Free-form description shown on the tavern character-select
+         *  HUD (a few sentences — who they are, lore, role). Pure UI;
+         *  not consumed by gameplay. Optional so existing characters
+         *  without one still load. */
+        description: z.string().min(1).optional(),
         hp: z.number().gte(0),
         sp: z.number().gte(0),
         moveSpeed: z.number().gt(0),

@@ -43,7 +43,17 @@ export interface TavernFocusPayload {
     hp: number;
     sp: number;
     moveSpeed: number;
+    /** Free-form description from the character spec — lore / role.
+     *  Shown on the tavern HUD below the name. */
+    description?: string;
     stats?: { strength: number; agility: number; vitality: number; spirit: number };
+    /**
+     * Per-stat max across every loaded character. The tavern HUD's
+     * radar polygon uses these as the 100% outer ring so the player
+     * can read each stat as a fraction of the strongest character
+     * for that stat.
+     */
+    maxStats?: { strength: number; agility: number; vitality: number; spirit: number };
     phase: Phase;
     weaponCount: number;
     weaponMax: number;
@@ -325,7 +335,9 @@ export class TavernController {
             hp: s.hp,
             sp: s.sp,
             moveSpeed: s.moveSpeed,
+            description: s.description,
             stats: (s as any).stats,
+            maxStats: this.computeMaxStats(),
             phase: this.phase,
             weaponCount: this.weaponCount,
             weaponMax: TAVERN_WEAPON_MAX,
@@ -334,6 +346,27 @@ export class TavernController {
             holding: this.phase === 'selection' ? holding : undefined,
         };
         EventBus.emit('tavern-focus', payload);
+    }
+
+    /**
+     * Per-stat max across every character loaded into the tavern.
+     * Powers the radar polygon's outer ring on the HUD — when a stat
+     * is at its max, the vertex sits on the ring edge; when a stat is
+     * zero, the vertex sits on the centre. Computed once per
+     * `npcs` rebuild because every NPC carries a fully-loaded spec
+     * already; recomputing on every focus event would be wasteful.
+     */
+    private computeMaxStats(): { strength: number; agility: number; vitality: number; spirit: number } {
+        const result = { strength: 1, agility: 1, vitality: 1, spirit: 1 };
+        for (const npc of this.npcs) {
+            const st = (npc.spec as any).stats;
+            if (!st) continue;
+            if (st.strength > result.strength) result.strength = st.strength;
+            if (st.agility > result.agility) result.agility = st.agility;
+            if (st.vitality > result.vitality) result.vitality = st.vitality;
+            if (st.spirit > result.spirit) result.spirit = st.spirit;
+        }
+        return result;
     }
 
     /** World-space Y of the NPC's visual head. Same `topOffset` formula
