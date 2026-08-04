@@ -131,7 +131,7 @@ anims:
     walk:
         frames:
             - 4
-            - 8
+            - 7
         frameRate: 10
         repeat: -1
     dodge:
