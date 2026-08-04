@@ -96,21 +96,16 @@ export function restartCurrentLevel(): void {
 }
 
 /**
- * Restart from the tavern — character selection + weapon pick
- * rerun. Used by the death overlay and the settings panel as the
- * "back to the beginning" path. The selected character id is
- * cleared (player must pick again), but the hotbar of weapons they
- * picked up is preserved so re-picking the same character replays
- * the same loadout. tavernCleared is reset to false so the next
- * page load lands back in the tavern rather than the previous
- * non-tavern scene.
+ * Restart from the tavern — fully reset to the initial state. Used
+ * by the death overlay and the settings panel as the "back to the
+ * beginning" path: clears the persisted save (selected character,
+ * picked weapons, HP/SP, elapsed time, snapshots, …) so the player
+ * re-picks a character and starts the weapon wall fresh.
  */
 export async function restartAtTavern(): Promise<void> {
     const store = useGameStore.getState();
+    store.clearSaveData();
     store.setDead(false);
-    store.setSelectedCharacterId(null);
-    store.setTavernCleared(false);
-    store.clearSceneSnapshots();
     const resolved = await resolveScene('tavern');
     await restartSceneWith(resolved);
 }
