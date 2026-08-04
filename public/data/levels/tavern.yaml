@@ -247,6 +247,34 @@ airWalls:
         - 571
       - - 2
         - 585
+  - id: wall-14
+    kind: tall
+    points:
+      - - 1745
+        - 1151
+      - - 1729
+        - 1336
+      - - 2063
+        - 1334
+      - - 2062
+        - 1157
+      - - 1907
+        - 1144
+  - id: wall-15
+    kind: short
+    points:
+      - - 2169
+        - 1271
+      - - 2156
+        - 1321
+      - - 2216
+        - 1341
+      - - 2271
+        - 1321
+      - - 2261
+        - 1279
+      - - 2236
+        - 1259
 music: forest-ambient
 tavern: true
 npcSpawns:
@@ -269,24 +297,40 @@ dropSpawns:
     weaponId: assault-rifle
   - type: weapon-drop
     x: 800
-    'y': 1300
+    'y': 1200
     weaponId: laser-cannon
+  - type: weapon-drop
+    x: 400
+    'y': 1300
+    weaponId: plasma-sword
+  - type: weapon-drop
+    x: 800
+    'y': 1400
+    weaponId: shotgun
   - type: weapon-drop
     x: 1200
     'y': 1100
-    weaponId: plasma-sword
-  - type: weapon-drop
-    x: 1600
-    'y': 1300
-    weaponId: shotgun
-  - type: weapon-drop
-    x: 2000
-    'y': 1100
     weaponId: arcana-staff
   - type: weapon-drop
-    x: 2400
+    x: 1200
     'y': 1300
     weaponId: rocket-launcher
+materials:
+  - id: mat-msewt3ct
+    texture: assets/image/materials/tavern/frame-00.png
+    x: 1905
+    'y': 1344
+    scale: 0.8
+    mode: y-sort
+    depthOffset: 0
+  - id: mat-msexah2a
+    texture: assets/image/materials/tavern/frame-03.png
+    x: 2213
+    'y': 1341
+    scale: 0.6
+    flipX: true
+    mode: y-sort
+    depthOffset: 0
 teleporters:
   - id: tavern-exit
     x: 121
