@@ -272,7 +272,15 @@ export class WeaponController {
             reloadStartedAt: 0,
             justCompletedAt: 0,
         };
-        this.switchTo(slotIndex);
+        // Bypass switchTo's "same index → skip" guard when the
+        // replaced slot IS the active slot — the in-hand visual has
+        // to update to the new weapon or the player sees the old one.
+        if (slotIndex === this.currentIndex) {
+            this.visualController.setWeapon(spec);
+            EventBus.emit(SFX_EVENT('weapon-switch'));
+        } else {
+            this.switchTo(slotIndex);
+        }
     }
 
     getActive(): WeaponSpec | null {
