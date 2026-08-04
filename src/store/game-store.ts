@@ -80,6 +80,17 @@ export interface GameUIState {
     // Phaser scene pauses until the user clicks Restart.
     isDead: boolean;
 
+    // Tavern / character selection state
+    /** Persisted id of the character the player selected in the tavern.
+     *  null = never selected (tavern not yet completed). */
+    selectedCharacterId: string | null;
+    /** true once the player has finished the tavern (selected a character
+     *  + entered the first real level). Resets on clearSaveData. */
+    tavernCleared: boolean;
+    /** How many weapons the player has picked up in the current tavern
+     *  session. Not persisted — resets each time the tavern scene loads. */
+    tavernWeaponCount: number;
+
     // Setters
     setLevelTitle: (title: string) => void;
     setCurrentLevelId: (levelId: string) => void;
@@ -112,6 +123,9 @@ export interface GameUIState {
     setDead: (dead: boolean) => void;
     resetLevelProgress: (levelId: string) => void;
     clearSaveData: () => void;
+    setSelectedCharacterId: (id: string) => void;
+    setTavernCleared: (cleared: boolean) => void;
+    setTavernWeaponCount: (n: number) => void;
 }
 
 export const initialGameState = {
@@ -140,6 +154,10 @@ export const initialGameState = {
 
     hubsVisible: true,
     isDead: false,
+
+    selectedCharacterId: null as string | null,
+    tavernCleared: false,
+    tavernWeaponCount: 0,
 };
 
 export const useGameStore = create<GameUIState>()(
@@ -229,8 +247,12 @@ export const useGameStore = create<GameUIState>()(
                 } catch {
                     // Fallback
                 }
-                set(initialGameState);
+                set({ ...initialGameState, tavernCleared: false, selectedCharacterId: null });
             },
+
+            setSelectedCharacterId: (id) => set({ selectedCharacterId: id }),
+            setTavernCleared: (cleared) => set({ tavernCleared: cleared }),
+            setTavernWeaponCount: (n) => set({ tavernWeaponCount: n }),
         }),
         {
             name: '11th_forest_save_v1',
@@ -248,6 +270,9 @@ export const useGameStore = create<GameUIState>()(
                 playerSnapshot: state.playerSnapshot,
                 activeMonstersSnapshot: state.activeMonstersSnapshot,
                 groundDropsSnapshot: state.groundDropsSnapshot,
+                // Tavern
+                selectedCharacterId: state.selectedCharacterId,
+                tavernCleared: state.tavernCleared,
             }),
         }
     )

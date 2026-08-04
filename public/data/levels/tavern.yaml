@@ -1,0 +1,25 @@
+title: Forest Tavern
+tavern: true
+background: assets/image/scenes/tavern.png
+imageSize: 2752x1536
+airWalls: []
+npcSpawns:
+    - characterId: kitty
+      x: 580
+      y: 860
+    - characterId: bunny-girl
+      x: 900
+      y: 860
+    - characterId: otaku
+      x: 1220
+      y: 860
+    - characterId: wanderer
+      x: 1540
+      y: 860
+dropSpawns: []
+teleporters:
+    - id: tavern-exit
+      x: 2550
+      y: 768
+      targetScene: sacred-forest-sanctuary
+      radius: 60

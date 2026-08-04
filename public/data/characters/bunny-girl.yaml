@@ -1,5 +1,5 @@
 id: bunny-girl
-name: Bunny Girl
+name: Bunny
 imageSize: 2048x2048
 prompt: |
     The 11th Forest — Bunny Girl sprite sheet
@@ -121,7 +121,7 @@ sprite:
         cols: 4
     scale: 1.35
     offset:
-        left: -4
+        left: -2
         bottom: -4
     script:
         downsample: 4

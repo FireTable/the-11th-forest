@@ -9,14 +9,20 @@
  * Four amber corner pixels, sitting 3px outside the border so they read
  * as a pixel-art frame. The parent must be `relative` and must NOT clip
  * its overflow — scope any `overflow-hidden` to an inner wrapper instead.
+ *
+ * `hideBottom` drops the two bottom corners — useful when the panel has
+ * a downward indicator (e.g. TavernHud's selection arrow) so the
+ * corner pixels don't compete with it for the same visual slot.
  */
-export function CornerPixels() {
-    const corners = [
-        '-top-[3px] -left-[3px]',
-        '-top-[3px] -right-[3px]',
-        '-bottom-[3px] -left-[3px]',
-        '-bottom-[3px] -right-[3px]',
-    ];
+export function CornerPixels({ hideBottom = false }: { hideBottom?: boolean }) {
+    const corners = hideBottom
+        ? ['-top-[3px] -left-[3px]', '-top-[3px] -right-[3px]']
+        : [
+              '-top-[3px] -left-[3px]',
+              '-top-[3px] -right-[3px]',
+              '-bottom-[3px] -left-[3px]',
+              '-bottom-[3px] -right-[3px]',
+          ];
     return (
         <>
             {corners.map((c) => (

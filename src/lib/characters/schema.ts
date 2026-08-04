@@ -132,6 +132,21 @@ export const CharacterSpecSchema = z
         sfx: CharacterSfxSchema.optional(),
         sprite: SpriteSchema.optional(),
         anims: AnimsSchema.optional(),
+        /** Display-only stats shown in the tavern character-selection HUD.
+         *  1–10 scale per dimension; do not affect gameplay values. */
+        stats: z
+            .object({
+                /** Physical attack power */
+                strength: z.number().int().gte(1).lte(10),
+                /** Movement and dodge speed */
+                agility: z.number().int().gte(1).lte(10),
+                /** Max HP and resilience */
+                vitality: z.number().int().gte(1).lte(10),
+                /** Max SP and skill potency */
+                spirit: z.number().int().gte(1).lte(10),
+            })
+            .strict()
+            .optional(),
     })
     .strict();
 

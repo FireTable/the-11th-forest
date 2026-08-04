@@ -4,6 +4,7 @@ import { PhaserGame } from '@/PhaserGame';
 import { GameHUDLayer } from '@/components/hud/GameHUDLayer';
 import { PixelCrosshair } from '@/components/hud/PixelCrosshair';
 import { TouchControls } from '@/components/hud/TouchControls';
+import { useGameStore } from '@/store/game-store';
 
 /**
  * Top-level React component.
@@ -21,16 +22,28 @@ import { TouchControls } from '@/components/hud/TouchControls';
  * CheatPanel lives inside the editor sidebar (see `EditorPanel`) so it
  * shares the same surface — no separate floating widget at the app
  * root.
+ *
+ * TavernHud is lazy-loaded and only mounted while the tavern scene is
+ * active (tavernCleared === false). It receives character-focus events
+ * from TavernController via EventBus and shows the selection panel.
  */
 const EditorPanel = lazy(() => import('@/editor/panel').then((m) => ({ default: m.EditorPanel })));
+const TavernHud   = lazy(() => import('@/components/hud/TavernHud').then((m) => ({ default: m.TavernHud })));
 
 function App() {
+    const tavernCleared = useGameStore((s) => s.tavernCleared);
+
     return (
         // Layout lives in index.css (#app). No Tailwind utilities here:
         // they would out-rank the forced-landscape media query.
         <div id="app">
             <PhaserGame />
             <GameHUDLayer />
+            {!tavernCleared && (
+                <Suspense fallback={null}>
+                    <TavernHud />
+                </Suspense>
+            )}
             <Suspense fallback={null}>
                 <EditorPanel />
             </Suspense>

@@ -75,6 +75,8 @@ export interface SceneAssets {
     /** SFX + music loaded from audios/index.yaml. */
     sfxSpecs: Map<string, SfxSpec>;
     musicSpecs: Map<string, MusicSpec>;
+    /** Tavern mode only: all playable characters for NPC display + selection. */
+    allCharacters?: CharacterSpec[];
 }
 
 /**
@@ -89,6 +91,7 @@ export interface SceneAssets {
  * here. Keeps the scene focused on what gameplay needs.
  */
 import { TeleporterController } from '@/game/scenes/teleporter';
+import { TavernController } from '@/game/scenes/tavern-controller';
 import { loadWeaponAssets } from '@/game/weapons/weapon';
 
 export class LoadScene extends Phaser.Scene {
@@ -99,6 +102,7 @@ export class LoadScene extends Phaser.Scene {
     private teleporterSystem!: TeleporterController;
     private audio!: AudioController;
     private pathDebugOverlay!: PathDebugOverlayHandles;
+    private tavernController?: TavernController;
     /** `this.time.now` value at the moment create() finished wiring the
      *  level. Subtracted from current `this.time.now` to get elapsed. */
     private levelStartAt = 0;
@@ -120,15 +124,27 @@ export class LoadScene extends Phaser.Scene {
         // that key, so every subsequent scene would render the first
         // scene's background. Namespace with the scene id.
         this.load.image(`background:${this.id}`, this.level.background);
-        // The character module owns its own asset loading + animation
-        // registration; we just delegate here, with cell dims derived
-        // in main.ts from the texture's natural size + grid.
-        loadCharacterAssets(
-            this,
-            this.assets.character,
-            this.assets.spriteCell.width,
-            this.assets.spriteCell.height,
-        );
+
+        if (this.level.tavern) {
+            // Tavern mode: load every character spritesheet so NPC idle
+            // sprites can be spawned for selection. Use the same key scheme
+            // as the normal character loader (`<id>-sheet`) and the standard
+            // cell dimensions derived from the texture (128×128 for our
+            // 4×4 grid + downsample-4 assets).
+            const allChars = this.assets.allCharacters ?? [];
+            for (const spec of allChars) {
+                loadCharacterAssets(this, spec, 128, 128);
+            }
+        } else {
+            // Normal mode: single player character.
+            loadCharacterAssets(
+                this,
+                this.assets.character,
+                this.assets.spriteCell.width,
+                this.assets.spriteCell.height,
+            );
+        }
+
         // Load monster spritesheet assets (if spec contains sprite config)
         loadMonsterAssets(this, this.assets.monsterSpecs.values(), getMonsterSpriteCellDims);
         // Load drop spritesheet assets
@@ -166,6 +182,135 @@ export class LoadScene extends Phaser.Scene {
         // Build static Matter bodies for every air wall + outer boundary walls.
         createWallBodies(this.matter, this.level.airWalls, this.level.imageSize);
 
+        if (this.level.tavern) {
+            // ── TAVERN MODE ──────────────────────────────────────────────
+            // Register every animation track for every NPC character using
+            // the standard helper. `loadCharacterAssets` already queued the
+            // textures in `preload()` with the correct cell dimensions, so
+            // the textures are ready and the standard `<id>-<track>` keys
+            // point at the right frames.
+            const allChars = this.assets.allCharacters ?? [];
+            for (const spec of allChars) {
+                createCharacterAnims(this, spec);
+            }
+
+            // Register drop anims + monster anims (empty in the tavern,
+            // but safe to call regardless).
+            createDropAnims(this, this.assets.dropSpecs.values());
+
+            // Spawn TavernController — it creates NPC sprites and handles
+            // A/D + click + E/Enter selection.
+            this.tavernController = new TavernController(
+                this,
+                this.level,
+                this.assets,
+                async (selectedSpec, onWeaponPickup) => {
+                    // Phase 2: spawn the player with the chosen character.
+                    // The texture is already preloaded; update SceneAssets
+                    // so loadCharacter sees the right spec + cell dims.
+                    (this.assets as any).character = selectedSpec;
+                    if (selectedSpec.sprite) {
+                        (this.assets as any).spriteCell = {
+                            width: 128,
+                            height: 128,
+                        };
+                    }
+
+                    this.character = loadCharacter(
+                        this,
+                        this.level,
+                        selectedSpec,
+                        this.assets.weapons,
+                    );
+
+                    // Wire drops with the weapon-pickup cap enforced by
+                    // TavernController.
+                    this.dropSystem = new DropController(
+                        this,
+                        this.character,
+                        this.level.dropSpawns,
+                        (id) => {
+                            const spec = this.assets.dropSpecs.get(id);
+                            if (!spec) throw new Error(`Unknown drop id: ${id}`);
+                            return spec;
+                        },
+                        {
+                            onWeaponPickup: (weaponId) => {
+                                const wSpec = this.assets.weaponsById.get(weaponId);
+                                if (!wSpec) return;
+                                const accepted = onWeaponPickup(weaponId, wSpec);
+                                if (!accepted) return; // capped — drop stays on ground
+                                this.character.pickUpWeapon(weaponId);
+                            },
+                        },
+                    );
+
+                    // Wire teleporter — exit is always available once the
+                    // player has chosen their character.
+                    this.teleporterSystem = new TeleporterController(
+                        this,
+                        this.level.teleporters,
+                        this.id,
+                        () => (this.character?.body?.position ?? null),
+                        () => true, // tavern exit is always unblocked
+                    );
+
+                    // Wire editor HUD toggles (same as normal flow)
+                    const setHubsVisible = (visible: boolean) => {
+                        this.character.hud.setVisible(visible);
+                        this.character.weaponHud.setVisible(visible);
+                        this.character.statusHud.setVisible(visible);
+                    };
+                    const onEditorOpen = (editorOpen: unknown) => {
+                        setHubsVisible(editorOpen !== true);
+                        this.character.debugBodyRect.setVisible(editorOpen === true);
+                        this.character.debugHitboxRect.setVisible(editorOpen === true);
+                    };
+                    EventBus.on('editor-open', onEditorOpen);
+                    this.events.once('shutdown', () => EventBus.removeListener('editor-open', onEditorOpen));
+
+                    // Mark tavern cleared when the teleporter fires so the
+                    // next session skips the tavern.
+                    EventBus.on('scene-transition', () => {
+                        useGameStore.getState().setTavernCleared(true);
+                    });
+
+                    this.materialManager = new MaterialManager(this, this.level);
+
+                    // Wire per-frame update for phase 2
+                    this.events.on('update', (_time: number) => {
+                        this.dropSystem?.update();
+                        this.materialManager?.update();
+                        this.teleporterSystem?.update(0);
+                    });
+                },
+            );
+
+            // Audio
+            this.audio = new AudioController(
+                this,
+                this.assets.sfxSpecs.values(),
+                this.assets.musicSpecs.values(),
+            );
+            if (this.level.music) EventBus.emit(MUSIC_EVENT(this.level.music));
+
+            this.cameras.main.centerOn(
+                this.level.imageSize.width / 2,
+                this.level.imageSize.height / 2,
+            );
+
+            const payload = { id: this.id, level: this.level };
+            setCurrentLevel(payload);
+            useGameStore.getState().setCurrentLevelId(this.id);
+            useGameStore.getState().setLevelTitle(this.level.title || this.id);
+            this.levelStartAt = this.time.now;
+            this.lastSavePushAt = this.time.now;
+            EventBus.emit('level-loaded', payload);
+            EventBus.emit('current-scene-ready', this);
+            return; // ── end tavern branch ──
+        }
+
+        // ── NORMAL LEVEL MODE (unchanged below) ───────────────────────────
         // Register character anims once the sprite sheet has finished loading.
         createCharacterAnims(this, this.assets.character);
         // Register monster anims for all loaded monster specs.
@@ -406,6 +551,7 @@ export class LoadScene extends Phaser.Scene {
     }
 
     shutdown(): void {
+        this.tavernController?.destroy();
         this.teleporterSystem?.destroy();
         this.audio?.destroy();
         this.pathDebugOverlay?.destroy();

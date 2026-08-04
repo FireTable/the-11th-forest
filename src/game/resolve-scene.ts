@@ -40,6 +40,8 @@ export interface ResolvedScene {
     drops: Map<string, DropSpec>;
     sfx: Map<string, SfxSpec>;
     music: Map<string, MusicSpec>;
+    /** Tavern mode only: all available characters for NPC display + selection. */
+    allCharacters?: CharacterSpec[];
 }
 
 /** Most-recently-resolved scene bundle. Set by main.ts after the initial
@@ -117,6 +119,16 @@ export async function resolveScene(
 
     const spriteCell = await getSpriteCellDims(character);
 
+    // Tavern mode: also load every available character so NPC sprites
+    // can be spawned for selection. fetchCharacterIndex is cheap (cached
+    // by the browser after the first call).
+    let allCharacters: CharacterSpec[] | undefined;
+    if (level.tavern) {
+        const charIndex = await fetchCharacterIndex();
+        const specs = await Promise.all(charIndex.characters.map((cid) => fetchCharacter(cid)));
+        allCharacters = specs;
+    }
+
     return {
         id,
         level,
@@ -128,6 +140,7 @@ export async function resolveScene(
         drops: new Map(dropEntries),
         sfx,
         music,
+        ...(allCharacters ? { allCharacters } : {}),
     };
 }
 
@@ -191,5 +204,6 @@ export function toSceneAssets(resolved: ResolvedScene): SceneAssets {
         dropSpecs: resolved.drops,
         sfxSpecs: resolved.sfx,
         musicSpecs: resolved.music,
+        ...(resolved.allCharacters ? { allCharacters: resolved.allCharacters } : {}),
     };
 }
