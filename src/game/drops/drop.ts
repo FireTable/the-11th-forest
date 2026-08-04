@@ -325,8 +325,14 @@ export class DropController {
         this.getWeapon = getWeapon;
 
         const dropSnapshots = useGameStore.getState().groundDropsSnapshot;
-        if (dropSnapshots !== undefined && Array.isArray(dropSnapshots)) {
-            // Snapshot exists for this run: restore ground drops if any remain
+        if (dropSnapshots && dropSnapshots.length > 0) {
+            // Snapshot exists for this run with remaining drops: restore
+            // them so the player picks up where they left off after
+            // refresh. An EMPTY snapshot (player consumed every drop
+            // last run) falls through to the level-config branch — the
+            // snapshot is intentionally not rewritten by the snapshot
+            // save path; that's the player's progress state, not a
+            // respawn cue.
             for (const s of dropSnapshots) {
                 try {
                     this.runtimeDrops.push(new DropInstance(scene, getDrop(s.specId), s.x, s.y, false));
@@ -335,7 +341,8 @@ export class DropController {
                 }
             }
         } else if (spawns) {
-            // Fresh start: spawn initial static drops from level config
+            // Fresh start (no snapshot OR snapshot was empty): spawn
+            // initial static drops from level config.
             for (const s of spawns) {
                 const weaponOverride = s.weaponId ? this.getWeapon?.(s.weaponId) : undefined;
                 this.staticDrops.push(

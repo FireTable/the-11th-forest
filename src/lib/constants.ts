@@ -267,7 +267,7 @@ export const DROP_CONFIG = {
      *  ground the drop is its own prop, so we bump it by this factor
      *  for legibility. Hand-tuned — change here if a weapon ends up
      *  too tiny / too big on the tavern floor. */
-    WEAPON_PICKUP_SCALE_MULTIPLIER: 3,
+    WEAPON_PICKUP_SCALE_MULTIPLIER: 1,
 } as const;
 
 // ─── Graphics: Pixel Art Engine Lighting & Camera Filter Config ────────
