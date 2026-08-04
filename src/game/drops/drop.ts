@@ -92,6 +92,16 @@ export class DropInstance {
     taken = false;
     isLanded = true;
     isAttracting = false;
+    /**
+     * True when the cap-replace hub dismissed this drop without
+     * consuming it. The magnet stays disengaged until the player
+     * walks far enough away to "release" the drop — otherwise the
+     * magnet would re-engage every frame the player is in range
+     * (dist <= RADIUS stays true even after pickup was rejected)
+     * and the pickup SFX would loop forever. Cleared when
+     * dist > RADIUS * 1.5 in the magnet update.
+     */
+    rejected = false;
 
     constructor(
         scene: Phaser.Scene,
@@ -427,6 +437,20 @@ export class DropController {
         return d;
     }
 
+    /**
+     * Spawn a weapon-pickup drop with a parabolic arc — used when
+     * the player walks onto a new weapon at cap and the controller
+     * auto-swaps the active slot. The replaced weapon launches out
+     * as a runtime drop with the same drop-the-character-just-picked
+     * visual style, so the player can walk back and pick it up
+     * later if they change their mind.
+     */
+    spawnWeapon(spec: DropSpec, weaponSpec: WeaponSpec, x: number, y: number): DropInstance {
+        const d = new DropInstance(this.scene, spec, x, y, true, weaponSpec);
+        this.runtimeDrops.push(d);
+        return d;
+    }
+
     /** Update magnet attraction towards player for landed drops */
     update(): void {
         const charX = this.character.body.position.x;
@@ -443,8 +467,19 @@ export class DropController {
 
             const dist = Phaser.Math.Distance.Between(charX, charY, dropX, dropY);
 
-            // Trigger magnet attraction when within radius
-            if (dist <= magnet.RADIUS) {
+            // Release a previously-rejected drop once the player
+            // walks far enough away (1.5× magnet radius). Without
+            // this the magnet would re-engage every frame because
+            // dist <= RADIUS stays true while the player stands
+            // near the drop.
+            if (drop.rejected && dist > magnet.RADIUS * 1.5) {
+                drop.rejected = false;
+            }
+
+            // Trigger magnet attraction when within radius. Skipped
+            // for rejected drops so the player isn't yanked back to
+            // the drop while the hub is open (or after dismissing it).
+            if (!drop.rejected && dist <= magnet.RADIUS) {
                 drop.isAttracting = true;
             }
 
@@ -472,12 +507,15 @@ export class DropController {
                         drop.taken = true;
                         this.removeDrop(drop);
                     } else {
-                        // Cap-replace flow: hub is open. Stop attracting
-                        // so the drop doesn't keep chasing the player;
-                        // collision pickup won't re-trigger because
-                        // `drop.taken` stays false but we also short-
-                        // circuit the loop below.
+                        // Cap-replace flow: hub opens, drop stays put
+                        // until the player walks far enough away
+                        // (rejected flag) or confirms a swap
+                        // (acknowledgePendingPickup). Setting
+                        // isAttracting=false here is critical — without
+                        // it the next frame would re-activate the
+                        // magnet because dist is still <= RADIUS.
                         drop.isAttracting = false;
+                        drop.rejected = true;
                     }
                 }
             }

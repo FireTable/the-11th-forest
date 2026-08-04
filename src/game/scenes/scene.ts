@@ -324,17 +324,18 @@ export class LoadScene extends Phaser.Scene {
             },
             {
                 onWeaponPickup: (weaponId) => {
-                    // Tavern mode routes the pickup through the cap
-                    // check: below cap the weapon is added to the
-                    // hotbar immediately and the drop is consumed
-                    // (return true). At cap the WeaponReplaceHub
-                    // takes over — the hub asks 1/2/3/4 and only on
-                    // confirmation does the scene call
-                    // `dropSystem.acknowledgePendingPickup` to destroy
-                    // the still-on-ground drop. Returning false here
-                    // keeps the drop visible while the hub is open.
-                    // Non-tavern scenes just swap to the picked weapon.
+                    // Tavern mode: walk-onto-drop auto-pickup / auto-
+                    // swap. Below cap the weapon slots in fresh; at
+                    // cap the active slot is replaced and the old
+                    // weapon pops out as a parabola drop the player
+                    // can pick back up. 专武 / locked slots block the
+                    // auto-swap — the drop stays on the ground so the
+                    // player can sidestep the locked slot by switching
+                    // to an empty one first.
                     if (this.level.tavern) {
+                        const weapons = this.character.weapons;
+                        if (!weapons) return true;
+
                         const result = this.character.tryPickupWeaponById(
                             weaponId,
                             this.assets.weaponsById,
@@ -344,11 +345,35 @@ export class LoadScene extends Phaser.Scene {
                             return true;
                         }
                         if (result === 'capped') {
-                            this.tavernController?.requestWeaponReplace(weaponId, this.character);
-                            return false;
+                            const activeIdx = weapons.getActiveIndex();
+                            if (this.tavernController?.isSlotLocked(activeIdx, this.character)) {
+                                // Active slot is 专武 — can't auto-
+                                // replace. Leave the drop on the
+                                // ground; player can switch slots with
+                                // 1/2/3 and walk back onto it.
+                                return false;
+                            }
+                            const replacedSlot = weapons.getSlot(activeIdx);
+                            const newSpec = this.assets.weaponsById.get(weaponId);
+                            if (!replacedSlot || !newSpec) return false;
+                            // Drop the replaced weapon as a parabola
+                            // before swapping, so the old gun lands
+                            // behind the player as the new one slots
+                            // in.
+                            const dropSpec = this.assets.dropSpecs.get('weapon-drop');
+                            const charPos = this.character.body?.position;
+                            if (dropSpec && charPos) {
+                                this.dropSystem?.spawnWeapon(
+                                    dropSpec,
+                                    replacedSlot.spec,
+                                    charPos.x,
+                                    charPos.y,
+                                );
+                            }
+                            weapons.replaceSlot(activeIdx, newSpec);
+                            return true;
                         }
-                        // 'unknown' (spec id not in weaponsById) — bail
-                        // without consuming so the drop stays for retry.
+                        // 'unknown' — bail without consuming.
                         return false;
                     }
                     this.character.pickUpWeapon(weaponId);
@@ -451,6 +476,15 @@ export class LoadScene extends Phaser.Scene {
             this.dropSystem.update();
             this.materialManager.update();
             this.teleporterSystem.update(delta);
+            // Publish the character's world position so the React
+            // WeaponReplaceHub can anchor next to them. 1 event per
+            // frame is fine — the hub only mounts while the cap-
+            // replace UI is open, so when nothing's happening no
+            // listener is attached.
+            const body = this.character?.body;
+            if (body?.position) {
+                EventBus.emit('character-position', { x: body.position.x, y: body.position.y });
+            }
             // Persist clock + entity snapshots to the UI store (1Hz).
             this.tickSaveState();
         });
@@ -522,6 +556,21 @@ useGameStore.setState({ playerSnapshot: undefined });
                 // loaded — phase 1 was deliberately lightless because the
                 // placeholder has no sprite/shadow to float around.
                 this.createPlayerLight();
+
+                // Spawn a pickup-only TavernController so the
+                // weapon-replace-hub still works after refresh (the
+                // default branch skips it because the player already
+                // chose a character).
+                this.tavernController = new TavernController(
+                    this,
+                    this.level,
+                    this.assets,
+                    this.character,
+                    () => {
+                        /* no-op — selection phase is not active */
+                    },
+                    'pickup',
+                );
             } else {
                 this.tavernController = new TavernController(
                     this,
@@ -569,36 +618,13 @@ useGameStore.setState({ playerSnapshot: undefined });
                 );
             }
 
-            // React WeaponReplaceHub presses 1/2/3/4 → scene commits
-            // the swap on the live character. Routed through here so
-            // the hub doesn't need a Phaser handle.
-            const onReplaceConfirm = (payload?: {
-                slotIndex?: number;
-                weaponId?: string;
-            }) => {
-                if (
-                    !payload ||
-                    typeof payload.slotIndex !== 'number' ||
-                    typeof payload.weaponId !== 'string'
-                ) {
-                    return;
-                }
-                this.tavernController?.confirmWeaponReplace(
-                    payload.slotIndex,
-                    payload.weaponId,
-                    this.character,
-                );
-                // Hub just committed the swap — destroy the still-on-
-                // ground drop so the weapon doesn't sit there twice.
-                this.dropSystem?.acknowledgePendingPickup(payload.weaponId);
-            };
-            EventBus.on('weapon-replace-confirm', onReplaceConfirm);
+            // (Auto-swap on cap lives in the dropSystem's onWeaponPickup
+            // callback above — no separate hub event handler needed.)
         }
     }
 
     shutdown(): void {
         this.tavernController?.destroy();
-        EventBus.removeListener('weapon-replace-confirm');
         this.teleporterSystem?.destroy();
         this.audio?.destroy();
         this.pathDebugOverlay?.destroy();

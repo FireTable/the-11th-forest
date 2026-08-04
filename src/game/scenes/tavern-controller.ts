@@ -71,29 +71,6 @@ export const TAVERN_WEAPON_MAX = 3;
 /** Long-press duration (ms) needed to confirm character selection with F. */
 const HOLD_MS = 1500;
 
-/**
- * Event payload emitted when the player walks onto a weapon drop while
- * the hotbar is at `weaponMax`. The React `WeaponReplaceHub` listens
- * for this and shows the slot-picker overlay. The hub calls
- * `confirmWeaponReplace` back into the scene to commit the swap.
- */
-export interface WeaponReplaceRequest {
-    /** id of the candidate weapon the player walked onto. */
-    weaponId: string;
-    /** Display name of the candidate weapon (HUD shows "Pick up X"). */
-    weaponName: string;
-    /** Public-path texture for the candidate weapon thumbnail. */
-    weaponTexture?: string;
-    /** Slot count + max for the current character's hotbar. */
-    weaponMax: number;
-    /** Snapshots of the current hotbar — empty slots carry `null`. */
-    slots: Array<{ index: number; weaponId: string; name: string; texture?: string } | null>;
-    /** True when at least one slot is a "dedicated" (专武) weapon that
-     *  cannot be replaced. Hotbar weapons that came from the character's
-     *  starting hotbar are flagged here; the HUD dims those buttons. */
-    lockedSlots: boolean[];
-}
-
 // ─── TavernController ─────────────────────────────────────────────────────
 
 export class TavernController {
@@ -134,10 +111,21 @@ export class TavernController {
          * Called once when the player confirms a character. The scene
          * destroys the default character, loads the picked spec, and
          * re-points monsterSystem at the new body. TavernController
-         * self-destroys after this fires.
+         * self-destroys after this fires. Ignored when `startPhase`
+         * is `'pickup'` — the selection UI doesn't run in that mode.
          */
         private readonly onConfirm: (selectedSpec: CharacterSpec) => void,
+        /**
+         * Initial phase. `'selection'` (default) spawns NPC sprites
+         * for the F-hold selection UI; `'pickup'` skips NPC spawn
+         * and only wires the weapon-pickup / replace-hub callbacks.
+         * The refresh-into-tavern path passes `'pickup'` so the
+         * replace-hub still works after the player already chose a
+         * character.
+         */
+        startPhase: Phase = 'selection',
     ) {
+        this.phase = startPhase;
         // Pixel-crosshair + TavernHud inline `cursor: none` together
         // replace the default system arrow — see TavernHud's outer wrap
         // for the cursor rule. Phaser's input still flips to 'pointer'
@@ -151,10 +139,20 @@ export class TavernController {
         // far off-screen so its physics body can't collide with NPCs.
         this.hideDefaultCharacter();
 
-        this.setupKeys();
-        this.spawnNpcs();
-        this.buildSelectionVisuals();
-        this.emitFocusEvent();
+        if (startPhase === 'selection') {
+            // NPC selection UI: spawn idle sprites, bind A/D/F, emit
+            // focus events so the React TavernHud renders the
+            // character-info panel.
+            this.setupKeys();
+            this.spawnNpcs();
+            this.buildSelectionVisuals();
+            this.emitFocusEvent();
+        }
+        // `startPhase === 'pickup'` skips NPC spawn — used when the
+        // player refreshes into the tavern after already choosing a
+        // character. The scene still wires weapon pickups through
+        // `notifyWeaponAdded` / `requestWeaponReplace` /
+        // `confirmWeaponReplace`, which are all phase-agnostic.
 
         scene.events.on('update', this.update, this);
         scene.events.once('shutdown', this.destroy, this);
@@ -197,53 +195,16 @@ export class TavernController {
     }
 
     /**
-     * Called when the player walks onto a weapon drop while their
-     * hotbar is at `weaponMax`. Builds the replace-request payload
-     * (candidate weapon + current slot snapshots) and emits it for
-     * the React WeaponReplaceHub. The hub calls back into
-     * `confirmWeaponReplace` once the player picks a slot.
+     * True when the weapon at `slotIndex` is part of the chosen
+     * character's starting `hotbar` — those are 专武 / dedicated
+     * weapons and must not be auto-replaced when the player walks
+     * onto a new drop at cap. Used by scene.ts to decide whether
+     * the auto-swap flow should drop the old weapon or skip.
      */
-    public requestWeaponReplace(weaponId: string, character: CharacterRuntime): void {
-        const weapons = character.weapons;
-        if (!weapons) return;
-        const weaponsById = this.assets.weaponsById;
-        const candidateSpec = weaponsById.get(weaponId);
-        if (!candidateSpec) return;
-
-        const weaponMax = weapons.getMaxSlots();
-        const slots: WeaponReplaceRequest['slots'] = [];
-        const lockedSlots: boolean[] = [];
-        for (let i = 0; i < weaponMax; i++) {
-            const slot = weapons.getSlot(i);
-            if (!slot) {
-                slots.push(null);
-                lockedSlots.push(false);
-                continue;
-            }
-            const slotWeaponId = slot.spec.id ?? '';
-            slots.push({
-                index: i,
-                weaponId: slotWeaponId,
-                name: slot.spec.name,
-                texture: slot.spec.visual?.texture,
-            });
-            // Hotbar weapons are "dedicated" / 专武 once the character
-            // has them at scene spawn time. We track this by comparing
-            // the loaded character's `hotbar` field against the slot's
-            // weapon id; any weapon that originated in the character
-            // spec's hotbar is locked from replacement.
-            lockedSlots.push(this.isLockedSlot(slotWeaponId));
-        }
-
-        const payload: WeaponReplaceRequest = {
-            weaponId: candidateSpec.id ?? weaponId,
-            weaponName: candidateSpec.name,
-            weaponTexture: candidateSpec.visual?.texture,
-            weaponMax,
-            slots,
-            lockedSlots,
-        };
-        EventBus.emit('weapon-replace-request', payload);
+    public isSlotLocked(slotIndex: number, character: CharacterRuntime): boolean {
+        const slot = character.weapons?.getSlot(slotIndex);
+        if (!slot) return false;
+        return this.isLockedSlot(slot.spec.id ?? '');
     }
 
     /** True when `weaponId` was in the chosen character's starting
@@ -261,23 +222,6 @@ export class TavernController {
      *  the default-character id when no selection has been recorded. */
     private sceneCharacterId(): string {
         return useGameStore.getState().selectedCharacterId ?? this.assets.character.id;
-    }
-
-    /**
-     * Replace the weapon in `slotIndex` with the candidate that
-     * `requestWeaponReplace` last surfaced. Called by the React hub
-     * after the player presses 1/2/3 (or clicks the slot).
-     */
-    public confirmWeaponReplace(slotIndex: number, weaponId: string, character: CharacterRuntime): void {
-        if (this.isLockedSlotForIndex(slotIndex, character)) return;
-        character.replaceWeaponSlot(slotIndex, weaponId, this.assets.weaponsById);
-        EventBus.emit('weapon-replace-request', null);
-    }
-
-    private isLockedSlotForIndex(slotIndex: number, character: CharacterRuntime): boolean {
-        const slot = character.weapons?.getSlot(slotIndex);
-        if (!slot) return false;
-        return this.isLockedSlot(slot.spec.id ?? '');
     }
 
     private setupKeys(): void {

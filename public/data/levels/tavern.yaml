@@ -24,24 +24,24 @@ dropSpawns:
       y: 1100
     - type: weapon-drop
       weaponId: laser-cannon
-      x: 700
-      y: 1100
+      x: 800
+      y: 1300
     - type: weapon-drop
       weaponId: plasma-sword
-      x: 1000
+      x: 1200
       y: 1100
     - type: weapon-drop
       weaponId: shotgun
-      x: 1300
-      y: 1100
+      x: 1600
+      y: 1300
     - type: weapon-drop
       weaponId: arcana-staff
-      x: 1600
+      x: 2000
       y: 1100
     - type: weapon-drop
       weaponId: rocket-launcher
-      x: 400
-      y: 1250
+      x: 2400
+      y: 1300
 teleporters:
     - id: tavern-exit
       x: 121
