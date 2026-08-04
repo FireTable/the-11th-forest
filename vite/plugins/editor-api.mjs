@@ -534,6 +534,8 @@ function serializeLevelYaml(level) {
     };
     if (level.music !== undefined) payload.music = level.music;
     if (level.character !== undefined) payload.character = level.character;
+    if (level.tavern !== undefined) payload.tavern = level.tavern;
+    if (level.npcSpawns !== undefined) payload.npcSpawns = level.npcSpawns;
     if (level.characterSpawn !== undefined) {
         payload.characterSpawn = {
             x: level.characterSpawn.x,
