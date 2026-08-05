@@ -1,5 +1,5 @@
 /**
- * src/components/hud/SettingsOverlay.tsx
+ * src/components/hud/settings-overlay.tsx
  * --------------------------------------------------------------------------
  * Top-right chrome: a GitHub link and a gear that opens the settings hub.
  *

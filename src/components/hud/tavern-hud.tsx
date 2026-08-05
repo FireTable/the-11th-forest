@@ -1,5 +1,5 @@
 /**
- * src/components/hud/TavernHud.tsx
+ * src/components/hud/tavern-hud.tsx
  * --------------------------------------------------------------------------
  * React HUD shown during the Forest Tavern scene.
  *

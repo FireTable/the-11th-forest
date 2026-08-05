@@ -1,9 +1,9 @@
 import React from 'react';
-import { CharacterHUDOverlay } from './CharacterHUDOverlay';
-import { DeathOverlay } from './DeathOverlay';
-import { SettingsOverlay } from './SettingsOverlay';
-import { WeaponHUDOverlay } from './WeaponHUDOverlay';
-import { SceneHubOverlay } from './SceneHubOverlay';
+import { CharacterHUDOverlay } from './character-hud-overlay';
+import { DeathOverlay } from './death-overlay';
+import { SettingsOverlay } from './settings-overlay';
+import { WeaponHUDOverlay } from './weapon-hud-overlay';
+import { SceneHubOverlay } from './scene-hub-overlay';
 
 import { useHudScale } from '@/lib/use-hud-scale';
 

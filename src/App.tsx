@@ -1,9 +1,9 @@
 import { Suspense, lazy } from 'react';
 
 import { PhaserGame } from '@/PhaserGame';
-import { GameHUDLayer } from '@/components/hud/GameHUDLayer';
-import { PixelCrosshair } from '@/components/hud/PixelCrosshair';
-import { TouchControls } from '@/components/hud/TouchControls';
+import { GameHUDLayer } from '@/components/hud/game-hud-layer';
+import { PixelCrosshair } from '@/components/hud/pixel-crosshair';
+import { TouchControls } from '@/components/hud/touch-controls';
 import { useGameStore } from '@/store/game-store';
 
 /**
@@ -28,7 +28,7 @@ import { useGameStore } from '@/store/game-store';
  * from TavernController via EventBus and shows the selection panel.
  */
 const EditorPanel = lazy(() => import('@/editor/panel').then((m) => ({ default: m.EditorPanel })));
-const TavernHud   = lazy(() => import('@/components/hud/TavernHud').then((m) => ({ default: m.TavernHud })));
+const TavernHud   = lazy(() => import('@/components/hud/tavern-hud').then((m) => ({ default: m.TavernHud })));
 
 function App() {
     const tavernCleared = useGameStore((s) => s.tavernCleared);

@@ -1,5 +1,5 @@
 /**
- * src/components/hud/DeathOverlay.tsx
+ * src/components/hud/death-overlay.tsx
  * --------------------------------------------------------------------------
  * Full-screen "you died" overlay with a Restart button. Rendered by
  * GameHUDLayer when `useGameStore().isDead` is true; the Phaser scene
