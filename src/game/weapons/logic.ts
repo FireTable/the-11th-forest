@@ -436,8 +436,7 @@ export class WeaponController {
         const dx = tx - handX;
         const dy = ty - handY;
         const aimAngle = Math.atan2(dy, dx);
-        const feetY = DEPTH.PROJECTILE_BASE + Math.round(origin.y + halfH);
-        this.visualController.update(handX, handY, feetY, aimAngle);
+        this.visualController.update(handX, handY, aimAngle);
 
         // 5. Sync bullet visuals + record trail + destroy stopped/expired bullets.
         renderBulletTrails(this.trailGraphics, this.bullets);
@@ -455,7 +454,7 @@ export class WeaponController {
             }
 
             b.rect.setPosition(bp.x, bp.y);
-            b.rect.setDepth(DEPTH.PROJECTILE_BASE + Math.round(bp.y));
+            b.rect.setDepth(DEPTH.BULLET);
             b.rect.setRotation(Math.atan2(vel.y, vel.x) + (b.rotationOffset ?? 0));
             pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
         }
@@ -520,7 +519,6 @@ export class WeaponController {
                 scale: slot.spec.bullet?.scale ?? 0.18,
                 rotationOffset: meleeRotationOffset,
                 swingAngle: slot.spec.visual?.swingAngle,
-                feetY: origin.y + this.lastHalfH,
             });
 
             this.bullets.push(meleeBullet);

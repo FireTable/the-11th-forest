@@ -22,13 +22,18 @@ export const CAT = {
 } as const;
 
 // ─── Rendering Depths / Z-Indices ─────────────────────────────────────
+// Flat depth slots — no Y-sort on characters / bullets / weapons. Within
+// the same slot Phaser falls back to creation order (last drawn = on top),
+// so the player (added last) always sits in front of monsters and the
+// weapon (always hand-front) always occludes bullets in its vicinity.
 export const DEPTH = {
     BACKGROUND_IMAGE: 0,
     LIGHT: 1, // Renders over background image, under all materials, walls, and entities
     MATERIAL_BACKGROUND: 10,
     BULLET_TRAIL: 15,
-    PROJECTILE_BASE: 20, // Min base depth for bullets so they always render OVER background materials
-    // Y-sorting range for characters, monsters, bullets, and y-sort materials (PROJECTILE_BASE + y-coord + offset)
+    CHARACTER: 20, // Player + monsters + their shadows
+    BULLET: 30, // Player bullets + monster projectiles + melee hitbox / slash arc
+    WEAPON: 40, // Held weapon sprite (always in front of bullets so the gun isn't drawn over by a passing shot)
     FOREGROUND_MATERIAL: 10000,
     MELEE_SLASH: 12000, // Slash arc always above foreground materials
     SELECTION_BOX: 15000,

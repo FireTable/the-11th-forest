@@ -89,6 +89,11 @@ export interface ProjectileSpawnOptions {
     maxDistance?: number;
     rotationOffset?: number;
     anchor?: [number, number];
+    /** Pin the visual's depth at spawn time. Monsters pass their own
+     *  footY so the bullet rides along with the originating monster's
+     *  depth slot — bullets never Y-sort independently of their owner.
+     *  Defaults to `DEPTH.BULLET` (flat layer above the character). */
+    depth?: number;
 }
 
 /**
@@ -131,6 +136,11 @@ export function spawnProjectile(
         visualObj = rect;
     }
 
+    // Pin depth at spawn time so the bullet stays in its owner's depth
+    // slot — no per-frame re-set. Player bullets default to DEPTH.BULLET
+    // (flat); monster bullets pass their originating monster's footY.
+    visualObj.setDepth(opts.depth ?? DEPTH.BULLET);
+
     const rotRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
     visualObj.setRotation(Math.atan2(direction.y, direction.x) + rotRad);
 
@@ -161,13 +171,18 @@ export interface MeleeSpawnOptions {
      *  when no `texture` is provided; defaults to 120 (the schema
      *  default for `visual.swingAngle`). */
     swingAngle?: number;
-    feetY?: number;
     /** Matter category. Defaults to CAT.BULLET (player melee). */
     category?: number;
     /** Matter mask (who the hitbox collides with). Defaults to PROJECTILE_PLAYER_MASK. */
     mask?: number;
     /** Body label for collisionstart lookup. Defaults to 'player-bullet'. */
     label?: string;
+    /** Pin the visual's depth at swing time. Monsters pass their own
+     *  footY so the swing rides along with the originating monster's
+     *  depth slot — melee arcs never Y-sort independently of their
+     *  owner. Defaults to `DEPTH.BULLET` (flat layer above the
+     *  character; matches the player melee depth). */
+    depth?: number;
 }
 
 /**
@@ -219,10 +234,13 @@ export function spawnMeleeHitbox(
         // Spawn full circle / melee graphic centered directly at character left/right
         const sprite = scene.add.image(hx, hy, opts.texture);
         sprite.setOrigin(0.5, 0.5);
-        // Dynamic depth: Calculate character feetY + 5 so it rests BETWEEN character sprite (feetY) and handheld weapon (feetY + 10)
-        const feetY = opts.feetY ?? opts.origin.y + 32;
-        const effectDepth = Math.round(feetY) + 5;
-        sprite.setDepth(effectDepth);
+        // Fixed depth in the BULLET slot so melee hitboxes render in the
+        // same plane as ranged bullets — character feet sit behind, weapon
+        // sprite sits in front (DEPTH.WEAPON), so a melee swing never
+        // draws over the held weapon but always draws over the body.
+        // Monsters override with their own footY so the swing rides
+        // with the originating monster's depth slot.
+        sprite.setDepth(opts.depth ?? DEPTH.BULLET);
         sprite.setFlipX(isLeft);
         sprite.setScale(scale, scale);
         sprite.setRotation(visualRotation);
@@ -298,8 +316,7 @@ export function spawnMeleeHitbox(
             g.strokePath();
         }
 
-        const feetY = opts.feetY ?? opts.origin.y + 32;
-        const effectDepth = Math.round(feetY) + 5;
+        const effectDepth = opts.depth ?? DEPTH.BULLET;
         g.setDepth(effectDepth);
 
         scene.tweens.add({

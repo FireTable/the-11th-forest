@@ -35,6 +35,7 @@ import {
     KEY_W,
     SFX_EVENT,
     AIM_ASSIST,
+    DEPTH,
 } from '@/lib/constants';
 import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
@@ -477,23 +478,24 @@ export class CharacterController {
         const offX = rawX * (sprite.flipX ? -1 : 1);
         const offY = rawY;
         sprite.setPosition(pos.x + offX, pos.y + this.spec.body.halfH + offY);
-        // Dynamic Y-Sorting depth for character
-        const feetY = Math.round(pos.y + this.spec.body.halfH);
-        sprite.setDepth(feetY);
+        // Flat depth slot — no Y-sort. The player (added last in scene.ts)
+        // draws on top of monsters at the same depth, and the held weapon
+        // sprite (DEPTH.WEAPON) sits above this for hand-front occlusion.
+        sprite.setDepth(DEPTH.CHARACTER);
         if (this.parts.shadow) {
             this.parts.shadow.setPosition(pos.x, pos.y + this.spec.body.halfH);
-            this.parts.shadow.setDepth(feetY - 1);
+            this.parts.shadow.setDepth(DEPTH.CHARACTER - 1);
         }
         if (this.parts.debugBodyRect) {
             this.parts.debugBodyRect.setPosition(pos.x, pos.y);
-            this.parts.debugBodyRect.setDepth(feetY + 1);
+            this.parts.debugBodyRect.setDepth(DEPTH.CHARACTER + 1);
         }
         if (this.parts.debugHitboxRect) {
             this.parts.debugHitboxRect.setPosition(
                 pos.x,
                 pos.y + this.spec.body.halfH - sprite.displayHeight / 2,
             );
-            this.parts.debugHitboxRect.setDepth(feetY + 2);
+            this.parts.debugHitboxRect.setDepth(DEPTH.CHARACTER + 2);
         }
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
         // controller already maintains `targetX` / `targetY` from pointer

@@ -143,7 +143,7 @@ export class TeleporterController {
         // of the lower half and behind the upper half, like a real
         // ground decal. Depth = spec.y (the portal's center y in image
         // pixel space), which lives in the same range characters use
-        // for their feetY-based depth.
+        // for their flat-depth slot.
         const teleporterDepth = Math.round(spec.y);
 
         glow.setPosition(spec.x, spec.y);
