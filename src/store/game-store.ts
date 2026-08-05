@@ -288,7 +288,7 @@ export const useGameStore = create<GameUIState>()(
             setTavernWeaponCount: (n) => set({ tavernWeaponCount: n }),
         }),
         {
-            name: '11th_forest_save_v1',
+            name: '11th_forest_save_v2',
             partialize: (state) => ({
                 currentLevelId: state.currentLevelId,
                 levelProgressMap: state.levelProgressMap,

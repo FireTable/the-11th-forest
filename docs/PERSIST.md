@@ -18,7 +18,7 @@ Phaser systems ──(setters)──▶ useGameStore ──(persist)──▶ lo
 
 |         |                                            |
 | ------- | ------------------------------------------ |
-| Key     | `11th_forest_save_v1`                      |
+| Key     | `11th_forest_save_v2`                      |
 | Backend | `localStorage` (zustand `persist` default) |
 | Format  | JSON, `{ state, version }`                 |
 
@@ -39,7 +39,7 @@ Bump the key suffix (`_v2`) when a shape change would make old saves restore wro
 | `activeMonstersSnapshot`                      | `{ activeMonsters[], pendingSpawnIndices[] }`    |
 | `groundDropsSnapshot`                         | uncollected drops still on the floor             |
 | `selectedCharacterId`                         | tavern selection (id of the chosen character)    |
-| `tavernCleared`                               | `true` once the player has left the tavern      |
+| `tavernCleared`                               | `true` once the player has left the tavern       |
 
 Deliberately **not** persisted: `isDead`, `hubsVisible`, `levelTitle`, `isReloading`, `reloadProgress`, `activeAmmo` / `activeMaxAmmo` (derived from `slots`), and `tavernWeaponCount` (resets each tavern session — counted, not stored). Transient or recomputed on load — persisting them would only create ways to restore into an inconsistent state.
 
@@ -47,23 +47,23 @@ Deliberately **not** persisted: `isDead`, `hubsVisible`, `levelTitle`, `isReload
 
 The store exposes typed setters per HUD slice. The most important are:
 
-| Setter                                                                                  | Purpose                                                                       |
-| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `setLevelTitle(title)`                                                                  | HUD title                                                                     |
-| `setCurrentLevelId(levelId)`                                                            | drives boot-time `resolveScene`                                               |
-| `setWaveProgress(levelId, { currentWaveIndex, clearedWaveIds })`                        | wave-by-wave completion                                                       |
-| `setLevelElapsedMs(ms)`                                                                 | clock — **prefer piggybacking via `setEntitySnapshots` instead**              |
-| `setEntitySnapshots({ player?, monsters?, drops?, elapsedMs? })`                        | **the** 1Hz tick — folds clock + all three entity snapshots into one `set()`   |
-| `setCharacterStats({ name?, hp, maxHp, sp, maxSp })`                                    | character bars                                                                |
-| `setWeaponStats({ activeIndex, name, ammo, maxAmmo, isReloading, reloadProgress, slots })` | weapon HUD                                                                  |
-| `setHubsVisible(visible)`                                                               | HUD visibility (death, settings)                                              |
-| `setDead(dead)`                                                                         | death state                                                                   |
-| `resetLevelProgress(levelId)`                                                           | wipe one level's wave progress, zero HP/SP, drop snapshots + clock             |
-| `clearSceneSnapshots()`                                                                 | wipe only the three entity snapshots — preserves hotbar / HP / SP / character |
-| `clearSaveData()`                                                                       | wipe everything and reset to `initialGameState`                              |
-| `setSelectedCharacterId(id)`                                                            | tavern selection                                                              |
-| `setTavernCleared(cleared)`                                                             | mark tavern complete                                                          |
-| `setTavernWeaponCount(n)`                                                               | per-session weapon counter (not persisted)                                    |
+| Setter                                                                                     | Purpose                                                                       |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `setLevelTitle(title)`                                                                     | HUD title                                                                     |
+| `setCurrentLevelId(levelId)`                                                               | drives boot-time `resolveScene`                                               |
+| `setWaveProgress(levelId, { currentWaveIndex, clearedWaveIds })`                           | wave-by-wave completion                                                       |
+| `setLevelElapsedMs(ms)`                                                                    | clock — **prefer piggybacking via `setEntitySnapshots` instead**              |
+| `setEntitySnapshots({ player?, monsters?, drops?, elapsedMs? })`                           | **the** 1Hz tick — folds clock + all three entity snapshots into one `set()`  |
+| `setCharacterStats({ name?, hp, maxHp, sp, maxSp })`                                       | character bars                                                                |
+| `setWeaponStats({ activeIndex, name, ammo, maxAmmo, isReloading, reloadProgress, slots })` | weapon HUD                                                                    |
+| `setHubsVisible(visible)`                                                                  | HUD visibility (death, settings)                                              |
+| `setDead(dead)`                                                                            | death state                                                                   |
+| `resetLevelProgress(levelId)`                                                              | wipe one level's wave progress, zero HP/SP, drop snapshots + clock            |
+| `clearSceneSnapshots()`                                                                    | wipe only the three entity snapshots — preserves hotbar / HP / SP / character |
+| `clearSaveData()`                                                                          | wipe everything and reset to `initialGameState`                               |
+| `setSelectedCharacterId(id)`                                                               | tavern selection                                                              |
+| `setTavernCleared(cleared)`                                                                | mark tavern complete                                                          |
+| `setTavernWeaponCount(n)`                                                                  | per-session weapon counter (not persisted)                                    |
 
 ## Write cadence — one store write per second
 
@@ -77,17 +77,17 @@ That single call is the design, not a detail. `persist` serialises the whole par
 
 Each system reads the store in its own constructor. Nothing is orchestrated centrally; a system that finds no snapshot falls back to its level-YAML behaviour.
 
-| System          | File                      | Behaviour                                                                                                                 |
-| --------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Boot            | `game/main.ts`            | `currentLevelId` set → resolve that level; resolve failure or empty → default id                                          |
-| Player position | `characters/character.ts` | `playerSnapshot` → `level.characterSpawn` → image centre                                                                  |
-| HP / SP         | `characters/logic.ts`     | saved value clamped to the spec maximum; `hp <= 0` counts as "no save"                                                    |
-| Weapons         | `weapons/logic.ts`        | ammo matched by weapon id (falls back to slot index), clamped to `clipSize`; `activeWeaponIndex` restored if in range     |
-| Monsters        | `monsters/monster.ts`     | rebuilds live monsters at their saved position + HP, and re-queues only the pending spawns named in `pendingSpawnIndices` |
-| Drops           | `drops/drop.ts`           | snapshot present → restore those ground drops **instead of** the level's static `dropSpawns`                              |
-| Level clock     | `scenes/scene.ts`         | `levelStartAt = now - savedElapsedMs`, so the timer continues rather than resetting                                       |
-| Wave progress   | `monsters/monster.ts`     | `levelProgressMap[levelId].clearedWaveIds` records which waves are done                                                   |
-| Tavern state    | `scenes/scene.ts` + tavern-controller | `selectedCharacterId` decides between tavern phase 1 (selection) and phase 2 (already chose)             |
+| System          | File                                  | Behaviour                                                                                                                 |
+| --------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Boot            | `game/main.ts`                        | `currentLevelId` set → resolve that level; resolve failure or empty → default id                                          |
+| Player position | `characters/character.ts`             | `playerSnapshot` → `level.characterSpawn` → image centre                                                                  |
+| HP / SP         | `characters/logic.ts`                 | saved value clamped to the spec maximum; `hp <= 0` counts as "no save"                                                    |
+| Weapons         | `weapons/logic.ts`                    | ammo matched by weapon id (falls back to slot index), clamped to `clipSize`; `activeWeaponIndex` restored if in range     |
+| Monsters        | `monsters/monster.ts`                 | rebuilds live monsters at their saved position + HP, and re-queues only the pending spawns named in `pendingSpawnIndices` |
+| Drops           | `drops/drop.ts`                       | snapshot present → restore those ground drops **instead of** the level's static `dropSpawns`                              |
+| Level clock     | `scenes/scene.ts`                     | `levelStartAt = now - savedElapsedMs`, so the timer continues rather than resetting                                       |
+| Wave progress   | `monsters/monster.ts`                 | `levelProgressMap[levelId].clearedWaveIds` records which waves are done                                                   |
+| Tavern state    | `scenes/scene.ts` + tavern-controller | `selectedCharacterId` decides between tavern phase 1 (selection) and phase 2 (already chose)                              |
 
 ## Reset paths
 
