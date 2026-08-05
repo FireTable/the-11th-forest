@@ -223,7 +223,7 @@ export function TeleportersSection({ level, setLevel }: Props) {
                                 <SelectTrigger className="h-6 text-xs bg-neutral-900 border-neutral-700">
                                     <SelectValue placeholder="Select target scene" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-neutral-900 border-neutral-800 text-xs">
+                                <SelectContent className="bg-neutral-900 border-neutral-800 text-xs min-w-[220px]">
                                     <SelectItem value={AUTO_NEXT_SCENE}>
                                         <span className="text-cyan-400 italic">
                                             Auto (Next Scene in Index)
