@@ -10,6 +10,7 @@ import {
 
 import { PixelLightPostFX } from '@/game/pipelines/pixel-light';
 import { installCanvasFit } from '@/lib/canvas-fit';
+import { initBackgroundPreloader } from '@/lib/background-preloader';
 
 import { useGameStore } from '@/store/game-store';
 
@@ -80,6 +81,7 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
     } as any);
 
     installCanvasFit(game);
+    initBackgroundPreloader();
     return game;
 };
 
