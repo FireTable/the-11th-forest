@@ -22,18 +22,19 @@ export const CAT = {
 } as const;
 
 // ─── Rendering Depths / Z-Indices ─────────────────────────────────────
-// Flat depth slots — no Y-sort on characters / bullets / weapons. Within
-// the same slot Phaser falls back to creation order (last drawn = on top),
-// so the player (added last) always sits in front of monsters and the
-// weapon (always hand-front) always occludes bullets in its vicinity.
+// Per-entity Y-sort: the player and every monster derive their sprite /
+// shadow / bullet / weapon depths from their own footY (world Y). Two
+// entities overlap correctly on screen based on whose feet are lower.
+// `DEPTH.CHARACTER` / `BULLET` / `WEAPON` below are FALLBACKS for
+// callers that don't supply a footY (tests, off-character plumbing).
 export const DEPTH = {
     BACKGROUND_IMAGE: 0,
     LIGHT: 1, // Renders over background image, under all materials, walls, and entities
     MATERIAL_BACKGROUND: 10,
     BULLET_TRAIL: 15,
-    CHARACTER: 20, // Player + monsters + their shadows
-    BULLET: 30, // Player bullets + monster projectiles + melee hitbox / slash arc
-    WEAPON: 40, // Held weapon sprite (always in front of bullets so the gun isn't drawn over by a passing shot)
+    CHARACTER: 20, // Fallback sprite depth when no footY is supplied
+    BULLET: 30, // Fallback bullet depth when no footY is supplied
+    WEAPON: 40, // Fallback weapon depth when no footY is supplied
     FOREGROUND_MATERIAL: 10000,
     MELEE_SLASH: 12000, // Slash arc always above foreground materials
     SELECTION_BOX: 15000,

@@ -367,12 +367,28 @@ export class WeaponController {
      * Per-frame: tick reload, spawn bullets on fire, sync visuals.
      */
     private lastHalfH = 16;
+    private lastFootY: number | undefined = undefined;
 
     /**
      * Per-frame: tick reload, spawn bullets on fire, sync visuals.
+     *
+     * @param footY Owner's foot-Y (world coords) — drives Y-sort depth
+     *  for both the held weapon sprite and in-flight bullets so the
+     *  player's projectiles interleave correctly with monsters (and any
+     *  other Y-sorted entities). When omitted, falls back to flat
+     *  `DEPTH.BULLET` / `DEPTH.WEAPON` so non-character callers (tests,
+     *  scene plumbing) keep their old behaviour.
      */
-    update(time: number, tx: number, ty: number, fire: boolean, halfH: number): void {
+    update(
+        time: number,
+        tx: number,
+        ty: number,
+        fire: boolean,
+        halfH: number,
+        footY?: number,
+    ): void {
         this.lastHalfH = halfH;
+        this.lastFootY = footY;
         // Empty hotbar (tavern phase 2 / post-spawn with no weapons yet):
         // skip reload, fire, and auto-reload logic. The visual controller
         // and bullet trail still update so already-in-flight bullets
@@ -436,10 +452,15 @@ export class WeaponController {
         const dx = tx - handX;
         const dy = ty - handY;
         const aimAngle = Math.atan2(dy, dx);
-        this.visualController.update(handX, handY, aimAngle);
+        // Y-sort: weapon rides with owner's footY so player and monsters
+        // interleave by actual screen-Y. Falls back to flat DEPTH.WEAPON
+        // when no footY was supplied (e.g. tests / off-character callers).
+        const weaponDepth = this.lastFootY !== undefined ? this.lastFootY + 20 : DEPTH.WEAPON;
+        this.visualController.update(handX, handY, aimAngle, weaponDepth);
 
         // 5. Sync bullet visuals + record trail + destroy stopped/expired bullets.
         renderBulletTrails(this.trailGraphics, this.bullets);
+        const bulletDepth = this.lastFootY !== undefined ? this.lastFootY + 10 : DEPTH.BULLET;
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             const b = this.bullets[i];
             const bp = b.body.position;
@@ -454,7 +475,7 @@ export class WeaponController {
             }
 
             b.rect.setPosition(bp.x, bp.y);
-            b.rect.setDepth(DEPTH.BULLET);
+            b.rect.setDepth(bulletDepth);
             b.rect.setRotation(Math.atan2(vel.y, vel.x) + (b.rotationOffset ?? 0));
             pushBulletTrail(b, { graphics: this.trailGraphics, positions: b.trail });
         }

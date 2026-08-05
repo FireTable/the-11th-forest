@@ -292,125 +292,59 @@ characterSpawn:
   'y': 200
   facing: right
 monsters:
-    # wave-1 — intro: 2 drone, fires 1500 ms after level start.
-    - type: drone
-      x: 1280
-      y: 450
+    # debug — single wave spawning one of each monster type, time-triggered
+    # 1500 ms after level start. Spread vertically down the middle of the
+    # play area (player spawns at 1349,200 facing right) so all types are
+    # visible at once for visual / behaviour debugging.
+    - type: keeper
+      x: 1340
+      y: 400
       trigger:
         kind: time
         delayMs: 1500
-      waveId: wave-1
-    - type: drone
-      x: 1400
-      y: 480
-      trigger:
-        kind: time
-        delayMs: 1500
-      waveId: wave-1
-
-    # wave-2 — fast-melee pressure: 3 stalker, fires after wave-1 cleared.
-    - type: stalker
-      x: 1280
-      y: 700
-      trigger:
-        kind: clear
-        waveId: wave-1
-        delayMs: 500
-      waveId: wave-2
-    - type: stalker
-      x: 1380
-      y: 720
-      trigger:
-        kind: clear
-        waveId: wave-1
-        delayMs: 500
-      waveId: wave-2
-    - type: stalker
-      x: 1330
-      y: 760
-      trigger:
-        kind: clear
-        waveId: wave-1
-        delayMs: 500
-      waveId: wave-2
-
-    # wave-3 — spec: 2 stalker + 2 sniper (mixed melee / ranged).
-    - type: stalker
-      x: 1280
-      y: 900
-      trigger:
-        kind: clear
-        waveId: wave-2
-        delayMs: 500
-      waveId: wave-3
-    - type: stalker
-      x: 1380
-      y: 920
-      trigger:
-        kind: clear
-        waveId: wave-2
-        delayMs: 500
-      waveId: wave-3
-    - type: sniper
-      x: 1300
-      y: 980
-      trigger:
-        kind: clear
-        waveId: wave-2
-        delayMs: 500
-      waveId: wave-3
-    - type: sniper
-      x: 1400
-      y: 980
-      trigger:
-        kind: clear
-        waveId: wave-2
-        delayMs: 500
-      waveId: wave-3
-
-    # wave-4 — pre-miniboss ramp: 3 stalker + 1 drone.
-    - type: stalker
-      x: 1280
-      y: 1100
-      trigger:
-        kind: clear
-        waveId: wave-3
-        delayMs: 500
-      waveId: wave-4
-    - type: stalker
-      x: 1380
-      y: 1100
-      trigger:
-        kind: clear
-        waveId: wave-3
-        delayMs: 500
-      waveId: wave-4
-    - type: stalker
-      x: 1330
-      y: 1150
-      trigger:
-        kind: clear
-        waveId: wave-3
-        delayMs: 500
-      waveId: wave-4
-    - type: drone
-      x: 1400
-      y: 1170
-      trigger:
-        kind: clear
-        waveId: wave-3
-        delayMs: 500
-      waveId: wave-4
-
-    # miniboss — warden fires after wave-4 cleared.
+      waveId: debug
     - type: warden
       x: 1340
-      y: 1300
+      y: 550
       trigger:
-        kind: clear
-        waveId: wave-4
-        delayMs: 500
-      waveId: miniboss
+        kind: time
+        delayMs: 1500
+      waveId: debug
+    - type: drone-ultra
+      x: 1340
+      y: 720
+      trigger:
+        kind: time
+        delayMs: 1500
+      waveId: debug
+    - type: drone
+      x: 1340
+      y: 870
+      trigger:
+        kind: time
+        delayMs: 1500
+      waveId: debug
+    - type: stalker
+      x: 1340
+      y: 1020
+      trigger:
+        kind: time
+        delayMs: 1500
+      waveId: debug
+    - type: gunner
+      x: 1340
+      y: 1170
+      trigger:
+        kind: time
+        delayMs: 1500
+      waveId: debug
+    - type: sniper
+      x: 1340
+      y: 1320
+      trigger:
+        kind: time
+        delayMs: 1500
+      waveId: debug
 dropSpawns: []
 materials: []
 teleporters: []

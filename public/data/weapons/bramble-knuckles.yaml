@@ -1,16 +1,25 @@
 name: Bramble Knuckles
-# Fast close-range punch; replaces the level-2-spec spore-shot slot
+# Ranged thorn-orb projectile; replaces the level-2-spec spore-shot slot
 # since the AI sheet generated bramble-knuckles instead.
 damage: 9
 cooldownMs: 320
-range: 40
-hitWidth: 60
-hitHeight: 60
+range: 280
 visual:
     texture: assets/image/weapons/bramble-knuckles.png
-    scale: 0.18
-    orbitRadius: 12
-    anchor: [0.2, 0.5]
-    swingAngle: 180
+    scale: 0.5
+    orbitRadius: 0
+    anchor: [0.5, 0.35]
+bullet:
+    texture: assets/image/weapons/thorn-orb.png
+    type: projectile
+    scale: 0.5
+    anchor: [0.5, 0.5]
+projectile:
+    speed: 11
+    visual:
+        radius: 6
+        width: 20
+        height: 20
+        color: 0x7a4f3a
 sfx:
     bulletWall: bullet-wall

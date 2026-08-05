@@ -22,7 +22,7 @@ drops:
 sprite:
     texture: assets/image/monsters/drone.png
     grid: { rows: 4, cols: 4 }
-    scale: 1.4
+    scale: 1.2
     offset: { left: 0, bottom: 4 }
     script:
         downsample: 4

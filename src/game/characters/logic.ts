@@ -35,7 +35,6 @@ import {
     KEY_W,
     SFX_EVENT,
     AIM_ASSIST,
-    DEPTH,
 } from '@/lib/constants';
 import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
@@ -182,7 +181,7 @@ export function pickNearestMonster<T extends { x: number; y: number }>(
 
 /** Structural shape the controller needs from the WeaponSystem. */
 export interface WeaponsLike {
-    update(time: number, tx: number, ty: number, fire: boolean, halfH: number): void;
+    update(time: number, tx: number, ty: number, fire: boolean, halfH: number, footY?: number): void;
     switchTo(index: number): void;
     cycleSlot(direction: 1 | -1): void;
     manualReload(): void;
@@ -478,24 +477,28 @@ export class CharacterController {
         const offX = rawX * (sprite.flipX ? -1 : 1);
         const offY = rawY;
         sprite.setPosition(pos.x + offX, pos.y + this.spec.body.halfH + offY);
-        // Flat depth slot — no Y-sort. The player (added last in scene.ts)
-        // draws on top of monsters at the same depth, and the held weapon
-        // sprite (DEPTH.WEAPON) sits above this for hand-front occlusion.
-        sprite.setDepth(DEPTH.CHARACTER);
+        // Y-sort anchor for the player stack (sprite < shadow < bullets <
+        // weapon). Mirrors MonsterController.computeFootY so the player and
+        // monsters share one Y-sort layer — a monster at footY=900 no longer
+        // draws in front of a player at footY=200 just because 900 > 20.
+        const footY = Math.round(
+            pos.y + (sprite.displayHeight / 2 - this.spec.body.halfH),
+        );
+        sprite.setDepth(footY);
         if (this.parts.shadow) {
             this.parts.shadow.setPosition(pos.x, pos.y + this.spec.body.halfH);
-            this.parts.shadow.setDepth(DEPTH.CHARACTER - 1);
+            this.parts.shadow.setDepth(footY - 1);
         }
         if (this.parts.debugBodyRect) {
             this.parts.debugBodyRect.setPosition(pos.x, pos.y);
-            this.parts.debugBodyRect.setDepth(DEPTH.CHARACTER + 1);
+            this.parts.debugBodyRect.setDepth(footY + 1);
         }
         if (this.parts.debugHitboxRect) {
             this.parts.debugHitboxRect.setPosition(
                 pos.x,
                 pos.y + this.spec.body.halfH - sprite.displayHeight / 2,
             );
-            this.parts.debugHitboxRect.setDepth(DEPTH.CHARACTER + 2);
+            this.parts.debugHitboxRect.setDepth(footY + 2);
         }
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
         // controller already maintains `targetX` / `targetY` from pointer
@@ -557,6 +560,7 @@ export class CharacterController {
             this.targetY ?? defaultAimY,
             (this.firing || this.mobileFiring) && now >= this.dodgeActiveUntil,
             this.spec.body.halfH,
+            footY,
         );
 
         // ── HUD ─────────────────────────────────────────────────────

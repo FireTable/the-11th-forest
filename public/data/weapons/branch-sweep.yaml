@@ -1,15 +1,24 @@
 name: Branch Sweep
 damage: 16
 cooldownMs: 750
-range: 130
-hitWidth: 140
-hitHeight: 140
+range: 350
 visual:
     texture: assets/image/weapons/branch-sweep.png
-    scale: 0.22
-    orbitRadius: 22
-    anchor: [0.4, 0.5]
-    swingAngle: 240
+    scale: 0.5
+    orbitRadius: 0
+    anchor: [0.5, 0.35]
+bullet:
+    texture: assets/image/weapons/sap-drop-flipped.png
+    type: projectile
+    scale: 0.5
+    anchor: [0.5, 0.5]
+projectile:
+    speed: 9
+    visual:
+        radius: 3
+        width: 10
+        height: 3
+        color: 0x6b8a4a
 sfx:
     shoot: arcana-staff-shoot
     bulletWall: bullet-wall
