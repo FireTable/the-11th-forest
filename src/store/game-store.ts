@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+
 export interface WeaponSlotData {
     id: string;
     name: string;
@@ -279,7 +280,7 @@ export const useGameStore = create<GameUIState>()(
                 } catch {
                     // Fallback
                 }
-                set({ ...initialGameState, tavernCleared: false, selectedCharacterId: null });
+                set(() => ({ ...initialGameState, tavernCleared: false, selectedCharacterId: null, }));
             },
 
             setSelectedCharacterId: (id) => set({ selectedCharacterId: id }),
