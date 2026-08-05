@@ -296,10 +296,10 @@ airWalls:
         - 1003
       - - 1473
         - 1001
-      - - 1588
-        - 922
-      - - 1606
-        - 779
+      - - 1595
+        - 924
+      - - 1599
+        - 777
       - - 1478
         - 679
       - - 1282
@@ -321,6 +321,7 @@ dropSpawns: []
 materials: []
 teleporters:
   - id: teleporter-msfpy6pw
-    x: 1376
-    'y': 589
-    radius: 60
+    x: 1375
+    'y': 544
+    targetScene: tavern
+    radius: 50
