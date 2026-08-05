@@ -106,11 +106,22 @@ export function restartCurrentLevel(): void {
  * → [], all three entity snapshots → undefined, hp/sp/currentLevelId
  * → zero/empty), so the next page load lands in the tavern phase-1
  * NPC selection with no stale snapshot restoring mid-fight.
+ *
+ * Order matters: pause running scenes BEFORE clearSaveData. The
+ * old scene's per-frame CharacterController.update() calls
+ * weaponHud.draw() → setWeaponStats({ slots }) which writes the
+ * previous run's weapons back into the store. If we clear first,
+ * the next frame's HUD draw overwrites our clean state with stale
+ * weapons. Pausing stops the writer loop; restartSceneWith below
+ * removes the scenes outright (paused scenes are still destroyed
+ * by scene.remove).
  */
 export async function restartAtTavern(): Promise<void> {
+    const game = getPhaserGame();
+    game?.pause()
     useGameStore.getState().clearSaveData();
-    const resolved = await resolveScene('tavern');
-    await restartSceneWith(resolved);
+    // const resolved = await resolveScene('tavern');
+    // await restartSceneWith(resolved);
 }
 
 /**
