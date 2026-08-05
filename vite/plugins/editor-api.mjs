@@ -952,7 +952,7 @@ async function handleSaveMonsters(req, res) {
  * visual canvas overlay (which needs each monster's display name,
  * sprite texture path, sheet grid, and idle anim range to render a
  * single idle frame in the marker thumbnail). Each entry:
- *   { id, name, texture, url, cols, rows, idleCount, idleFrameRate }
+ *   { id, name, texture, url, cols, rows, idleStart, idleCount, idleFrameRate }
  *
  * `texture` is the relative path from the monster spec (e.g.
  * "assets/image/monsters/drone.png") — kept for round-tripping into
@@ -982,9 +982,14 @@ async function handleListMonsterTypes(res) {
                         ? spec.sprite.grid.rows
                         : 4;
                 const idle = spec?.anims?.idle;
+                const idleFrames = Array.isArray(idle?.frames) ? idle.frames : null;
+                const idleStart =
+                    idleFrames && idleFrames.length >= 1 && typeof idleFrames[0] === 'number'
+                        ? idleFrames[0]
+                        : 0;
                 const idleCount =
-                    Array.isArray(idle?.frames) && idle.frames.length === 2
-                        ? idle.frames[1] - idle.frames[0] + 1
+                    idleFrames && idleFrames.length === 2
+                        ? idleFrames[1] - idleFrames[0] + 1
                         : 4;
                 const idleFrameRate =
                     typeof idle?.frameRate === 'number' ? idle.frameRate : 6;
@@ -999,6 +1004,7 @@ async function handleListMonsterTypes(res) {
                     url: `/${texture}`,
                     cols,
                     rows,
+                    idleStart,
                     idleCount,
                     idleFrameRate,
                 });
@@ -1010,6 +1016,7 @@ async function handleListMonsterTypes(res) {
                     url: `/assets/image/monsters/${id}.png`,
                     cols: 4,
                     rows: 4,
+                    idleStart: 0,
                     idleCount: 4,
                     idleFrameRate: 6,
                 });
