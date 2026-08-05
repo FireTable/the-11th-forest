@@ -1,8 +1,8 @@
 name: Assault Rifle
-damage: 2
+damage: 3
 cooldownMs: 100
 range: 550
-clipSize: 30
+clipSize: 35
 reloadTimeMs: 1500
 bulletsPerShot: 1
 visual:
