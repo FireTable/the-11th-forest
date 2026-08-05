@@ -338,10 +338,10 @@ export interface MonsterControllerCallbacks {
 export interface MonsterProjectile {
     body: MatterJS.BodyType;
     rect:
-        | Phaser.GameObjects.Shape
-        | Phaser.GameObjects.Sprite
-        | Phaser.GameObjects.Image
-        | Phaser.GameObjects.Graphics;
+    | Phaser.GameObjects.Shape
+    | Phaser.GameObjects.Sprite
+    | Phaser.GameObjects.Image
+    | Phaser.GameObjects.Graphics;
     damage: number;
     monster: Monster;
     /** Spawn point of the projectile (world coords). The per-frame
@@ -895,9 +895,8 @@ export class MonsterController {
             // bullet and body — sprite < bullet < weapon ordering, same as
             // the player stack.
             if (m.weaponVisual) {
-                const halfH = m.spec.body.halfH;
                 const handX = mp.x;
-                const handY = mp.y - halfH;
+                const handY = mp.y;
                 const aimAngle = Math.atan2(dirToPlayer.y, dirToPlayer.x);
                 m.weaponVisual.update(handX, handY, aimAngle, footY + 20);
             }
