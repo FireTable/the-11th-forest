@@ -304,7 +304,10 @@ function MonsterRow({
                         >
                             <SelectTrigger
                                 size="sm"
-                                className="h-6 text-[11px] bg-neutral-950 border-neutral-700"
+                                // py-0 overrides the SelectTrigger's
+                                // default py-2 so the trigger matches
+                                // the h-6 inputs in the same grid row.
+                                className="h-6 py-0 text-[11px] bg-neutral-950 border-neutral-700"
                             >
                                 <SelectValue />
                             </SelectTrigger>
