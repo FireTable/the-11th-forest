@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, ChevronRight } from 'lucide-react';
+import { ChevronRight, Play, Plus, Square } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -1134,20 +1134,22 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                 </Field>
             </Section>
             <Section title="Weapon visual">
-                <Field label="texture">
-                    <SpritePicker
-                        folder="weapons"
-                        value={spec.visual?.texture ?? ''}
-                        onChange={(v) =>
-                            patch({
-                                visual: {
-                                    ...(spec.visual ?? {}),
-                                    texture: v || undefined,
-                                },
-                            })
-                        }
-                    />
-                </Field>
+                <div className="col-span-2">
+                    <Field label="texture">
+                        <SpritePicker
+                            folder="weapons"
+                            value={spec.visual?.texture ?? ''}
+                            onChange={(v) =>
+                                patch({
+                                    visual: {
+                                        ...(spec.visual ?? {}),
+                                        texture: v || undefined,
+                                    },
+                                })
+                            }
+                        />
+                    </Field>
+                </div>
                 <NumberField
                     label="scale"
                     value={spec.visual?.scale ?? 0.16}
@@ -1332,14 +1334,14 @@ export function AudiosSection({
     const [tab, setTab] = useState<'sfx' | 'music'>('sfx');
     return (
         <div className="flex flex-col gap-2">
-            <nav className="flex border-b border-neutral-800">
+            <nav className="flex border-b border-neutral-800 bg-neutral-900/60 overflow-x-auto">
                 <Button
                     variant="ghost"
                     onClick={() => setTab('sfx')}
-                    className={`flex-1 rounded-none border-b-2 ${
+                    className={`flex-shrink-0 rounded-none border-b-2 px-3 ${
                         tab === 'sfx'
                             ? 'border-cyan-400 text-cyan-400'
-                            : 'border-transparent text-neutral-500'
+                            : 'border-transparent text-neutral-500 hover:text-neutral-300'
                     }`}
                 >
                     SFX
@@ -1347,10 +1349,10 @@ export function AudiosSection({
                 <Button
                     variant="ghost"
                     onClick={() => setTab('music')}
-                    className={`flex-1 rounded-none border-b-2 ${
+                    className={`flex-shrink-0 rounded-none border-b-2 px-3 ${
                         tab === 'music'
                             ? 'border-cyan-400 text-cyan-400'
-                            : 'border-transparent text-neutral-500'
+                            : 'border-transparent text-neutral-500 hover:text-neutral-300'
                     }`}
                 >
                     Music
@@ -1423,11 +1425,14 @@ function AudioForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     />
                 </Field>
                 <Field label="Source">
-                    <Input
-                        value={spec.source}
-                        onChange={(e) => patch({ source: e.target.value })}
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono"
-                    />
+                    <div className="flex gap-1.5 col-span-2">
+                        <Input
+                            value={spec.source}
+                            onChange={(e) => patch({ source: e.target.value })}
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono flex-1 min-w-0"
+                        />
+                        <AudioPreviewButton source={spec.source} />
+                    </div>
                 </Field>
             </Section>
             <Section title="Playback">
@@ -1489,6 +1494,74 @@ function AudioForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                 />
             </Section>
         </div>
+    );
+}
+
+/**
+ * In-editor preview for an audio spec's `source` path. Spins up a
+ * transient HTMLAudioElement (Phaser audio isn't available outside a
+ * running scene) and toggles Play / Stop on click. Used in the Audio
+ * tab's form next to the Source field so designers can audition an
+ * sfx/music clip before saving. Cleans up the audio element on
+ * unmount so closing the editor mid-playback doesn't leave a stale
+ * instance pinging the AudioContext.
+ */
+function AudioPreviewButton({ source }: { source: string }) {
+    const [playing, setPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Source is stored relative to the public root (e.g.
+    // "assets/audio/sfx/dry-fire.wav"); leading slash makes it
+    // resolvable from any route (the editor lives at /editor).
+    const url = source.startsWith('/') ? source : `/${source}`;
+
+    const stop = (): void => {
+        const audio = audioRef.current;
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+        setPlaying(false);
+    };
+
+    const preview = (): void => {
+        if (playing) {
+            stop();
+            return;
+        }
+        const audio = new Audio(url);
+        // ended only fires for non-looping audio; looped tracks keep
+        // going until the user clicks Stop again.
+        audio.addEventListener('ended', () => setPlaying(false));
+        audio.addEventListener('error', () => setPlaying(false));
+        audioRef.current = audio;
+        // .play() returns a Promise that rejects on autoplay-policy
+        // violation or 404 — swallow + flip the button back to Stop
+        // state so the UI doesn't lie about an in-flight sound.
+        audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    };
+
+    useEffect(() => {
+        return () => {
+            audioRef.current?.pause();
+            audioRef.current = null;
+        };
+    }, []);
+
+    return (
+        <Button
+            variant="outline"
+            size="xs"
+            onClick={preview}
+            className="h-7 w-7 p-0 border-neutral-700 bg-neutral-950 text-cyan-400 hover:bg-neutral-800 hover:text-cyan-300 shrink-0"
+            title={playing ? 'Stop preview' : 'Play preview'}
+        >
+            {playing ? (
+                <Square className="size-3 fill-current" />
+            ) : (
+                <Play className="size-3 fill-current" />
+            )}
+        </Button>
     );
 }
 
