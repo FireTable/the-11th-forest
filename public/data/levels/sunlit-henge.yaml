@@ -311,8 +311,8 @@ characterSpawn:
   facing: right
 monsters:
   - type: warden
-    x: 1100
-    'y': 1100
+    x: 810
+    'y': 827
     waveId: boss
     trigger:
       kind: time
