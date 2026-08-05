@@ -1,7 +1,7 @@
 kind: music
 id: forest-ambient
 name: Forest Ambient
-source: assets/audio/music/forest-ambient.mp3
+source: assets/audio/music/forest-ambient.webm
 volume: 0.4
 fadeIn: 1500
 fadeOut: 1000
