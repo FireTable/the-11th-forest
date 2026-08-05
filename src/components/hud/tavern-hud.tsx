@@ -471,7 +471,7 @@ export const TavernHud: React.FC = () => {
                                     right column radar polygon + STR/AGI/VIT/SPI */}
                                 <div className="flex gap-5 mb-3">
                                     {/* Left column: numerical stats with icons */}
-                                    <div className="flex flex-col justify-between gap-1 flex-1 min-w-0">
+                                    <div className="flex flex-col justify-center gap-2.5 flex-1 min-w-0">
                                         <StatRow
                                             icon={<Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />}
                                             label="HP"
