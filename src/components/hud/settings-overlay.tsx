@@ -139,8 +139,31 @@ export function SettingsOverlay() {
                             <X className="size-5" />
                         </button>
 
-                        <div className="text-base font-bold tracking-widest text-amber-500 uppercase drop-shadow-[1px_1px_0px_#000]">
-                            Settings
+                        {/* Gear icon — plain large glyph inside the panel */}
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="size-9 text-amber-500"
+                            aria-hidden="true"
+                            style={{ filter: 'drop-shadow(0 0 6px rgba(245,158,11,0.6))' }}
+                        >
+                            <path
+                                fillRule="evenodd"
+                                clipRule="evenodd"
+                                d="M19.5 12c0-.47-.04-.93-.1-1.38l2.13-1.65-2-3.46-2.49.96c-.7-.6-1.5-1.08-2.4-1.38L14.5 2.5h-4l-.14 2.59c-.9.3-1.7.78-2.4 1.38l-2.49-.96-2 3.46 2.13 1.65c-.06.45-.1.91-.1 1.38s.04.93.1 1.38l-2.13 1.65 2 3.46 2.49-.96c.7.6 1.5 1.08 2.4 1.38l.14 2.59h4l.14-2.59c.9-.3 1.7-.78 2.4-1.38l2.49.96 2-3.46-2.13-1.65c.06-.45.1-.91.1-1.38zM12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
+                            />
+                        </svg>
+
+                        {/* Decorated title */}
+                        <div className="flex flex-col items-center gap-1 w-full">
+                            <div className="flex items-center gap-2 w-full">
+                                <span className="flex-1 h-px bg-amber-800/50" />
+                                <span className="text-sm font-bold tracking-[0.35em] text-amber-400 uppercase drop-shadow-[1px_1px_0px_#000]">
+                                    Settings
+                                </span>
+                                <span className="flex-1 h-px bg-amber-800/50" />
+                            </div>
+                            <div className="text-[8px] tracking-[0.3em] text-stone-500 uppercase">— paused —</div>
                         </div>
 
                         <div className="flex w-full flex-col gap-2">

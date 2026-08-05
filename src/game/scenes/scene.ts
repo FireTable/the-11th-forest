@@ -419,7 +419,13 @@ export class LoadScene extends Phaser.Scene {
             }
         });
 
+        // Inject the player's luck so applyBulletDamage uses the correct
+        // crit chance from scene start. Defaults to 1 (10 % floor) when
+        // the character spec omits luck.
+        this.monsterSystem.setPlayerLuck(this.assets.character.luck ?? 1);
+
         // Wire AudioController (subscribes to EventBus sfx:*/music:* events).
+
         this.audio = new AudioController(
             this,
             this.assets.sfxSpecs.values(),
@@ -570,6 +576,7 @@ export class LoadScene extends Phaser.Scene {
                     },
                 );
                 this.monsterSystem.setPlayerBody(this.character.body);
+                this.monsterSystem.setPlayerLuck(pickedSpec.luck ?? 1);
                 this.dropSystem.setCharacter(this.character);
                 useGameStore.getState().setHubsVisible(true);
                 // tavernCleared is already true from the previous run.
@@ -620,6 +627,7 @@ export class LoadScene extends Phaser.Scene {
                         // callbacks. Both were captured against the
                         // placeholder.
                         this.monsterSystem.setPlayerBody(this.character.body);
+                        this.monsterSystem.setPlayerLuck(selectedSpec.luck ?? 1);
                         this.dropSystem.setCharacter(this.character);
                         // Phase 1 hidden the React HUDs
                         // (CharacterHud.setVisible → setHubsVisible

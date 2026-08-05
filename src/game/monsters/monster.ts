@@ -24,6 +24,8 @@ import {
     CAT,
     PROJECTILE_MONSTER_MASK,
     COMBAT_PLAYER_DAMAGE_COOLDOWN_MS,
+    COMBAT_CRIT_MULTIPLIER,
+    COMBAT_CRIT_DAMAGE_MULTIPLIER,
     MONSTER_DEATH_FADE_MS,
     SFX_EVENT,
 } from '@/lib/constants';
@@ -383,6 +385,9 @@ export class MonsterController {
     /** Last attack timestamp per monster — independently tracked to avoid
      *  interleaved races when two monsters fire on the same frame. */
     private lastDamageAt = 0;
+    /** Player's luck stat (1–10). Drives crit chance = luck/10.
+     *  Injected via setPlayerLuck() after the character spec is loaded. */
+    private playerLuck = 1;
 
     /** Trigger-gated monster spawns awaiting their fire condition. Pairs the
      *  pure `PendingSpawn` (consumed by `advanceSpawnQueue`) with the heavy
@@ -953,6 +958,12 @@ export class MonsterController {
         }
     }
 
+    /** Inject the player character's luck stat so crit calculations use
+     *  the correct value after a character swap (tavern phase 2). */
+    setPlayerLuck(luck: number): void {
+        this.playerLuck = Math.max(1, Math.min(10, Math.floor(luck)));
+    }
+
     /** Apply damage from a player bullet to a specific monster (or AoE later). */
     applyBulletDamage(bulletDamage: number, hitBody: MatterJS.BodyType): void {
         // Find monster whose main body or compound parts match hitBody
@@ -969,10 +980,17 @@ export class MonsterController {
             }) ?? pickClosestMonster(hitBody.position, this.monsters, 200);
 
         if (target && target.state !== 'dying') {
-            const finalDamage = getCheats().oneHitKill ? 999999 : bulletDamage;
+            // Crit: (luck/10) * COMBAT_CRIT_MULTIPLIER probability,
+            // COMBAT_CRIT_DAMAGE_MULTIPLIER × damage, gold floating number.
+            const isCrit = !getCheats().oneHitKill && Math.random() < (this.playerLuck / 10) * COMBAT_CRIT_MULTIPLIER;
+            const finalDamage = getCheats().oneHitKill
+                ? 999999
+                : isCrit
+                  ? bulletDamage * COMBAT_CRIT_DAMAGE_MULTIPLIER
+                  : bulletDamage;
             target.hp -= finalDamage;
             target.lastHitAt = this.scene.time.now;
-            target.statusHud.showFloatingNumber(finalDamage, 'damage');
+            target.statusHud.showFloatingNumber(finalDamage, isCrit ? 'crit' : 'damage');
             EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'), {
                 key: `monster:${target.spec.id}`,
                 throttleMs: target.spec.sfx?.throttleMs,

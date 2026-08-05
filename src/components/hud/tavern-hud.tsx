@@ -28,7 +28,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Heart, Zap, Swords, Gauge, Layers } from 'lucide-react';
+import { Heart, Zap, Swords, Gauge, Layers, Sparkles } from 'lucide-react';
 
 import { EventBus } from '@/lib/events/bus';
 import type { TavernFocusPayload } from '@/game/scenes/tavern-controller';
@@ -209,6 +209,7 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                     fill="none"
                     stroke="#1c1917"
                     strokeWidth="1"
+                    strokeOpacity="0.4"
                     strokeDasharray="2 2"
                 />
                 {/* Outer ring (max, strongest character) */}
@@ -217,6 +218,7 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                     fill="none"
                     stroke="#44403c"
                     strokeWidth="1"
+                    strokeOpacity="0.4"
                 />
                 {/* Half ring (50%) */}
                 <polygon
@@ -224,6 +226,7 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                     fill="none"
                     stroke="#1c1917"
                     strokeWidth="1"
+                    strokeOpacity="0.4"
                     strokeDasharray="2 2"
                 />
                 {/* Axis lines */}
@@ -238,6 +241,7 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                             y2={p.y}
                             stroke="#1c1917"
                             strokeWidth="1"
+                            strokeOpacity="0.4"
                         />
                     );
                 })}
@@ -318,7 +322,8 @@ function isSameFocusContent(a: TavernFocusPayload | null, b: TavernFocusPayload 
             aStats.hp === bStats.hp &&
             aStats.sp === bStats.sp &&
             aStats.moveSpeed === bStats.moveSpeed &&
-            aStats.weaponMax === bStats.weaponMax);
+            aStats.weaponMax === bStats.weaponMax &&
+            aStats.luck === bStats.luck);
     if (!statsEq) return false;
 
     const aRange = a.statRange;
@@ -334,7 +339,9 @@ function isSameFocusContent(a: TavernFocusPayload | null, b: TavernFocusPayload 
             aRange.moveSpeed.min === bRange.moveSpeed.min &&
             aRange.moveSpeed.max === bRange.moveSpeed.max &&
             aRange.weaponMax.min === bRange.weaponMax.min &&
-            aRange.weaponMax.max === bRange.weaponMax.max);
+            aRange.weaponMax.max === bRange.weaponMax.max &&
+            aRange.luck.min === bRange.luck.min &&
+            aRange.luck.max === bRange.luck.max);
     return rangeEq;
 }
 
@@ -471,7 +478,7 @@ export const TavernHud: React.FC = () => {
                                     right column radar polygon + STR/AGI/VIT/SPI */}
                                 <div className="flex gap-5 mb-3">
                                     {/* Left column: numerical stats with icons */}
-                                    <div className="flex flex-col justify-center gap-2.5 flex-1 min-w-0">
+                                    <div className="flex flex-col justify-center gap-2 flex-1 min-w-0">
                                         <StatRow
                                             icon={<Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />}
                                             label="HP"
@@ -484,6 +491,13 @@ export const TavernHud: React.FC = () => {
                                             value={focus.sp}
                                             subValue={`${spRegenToSec(focus.spRegenMs)}s`}
                                             color="text-sky-400"
+                                        />
+                                        <StatRow
+                                            icon={<Sparkles className="w-3.5 h-3.5 text-yellow-300" />}
+                                            label="LCK"
+                                            value={focus.stats?.luck ?? 1}
+                                            suffix="/10"
+                                            color="text-yellow-300"
                                         />
                                         <StatRow
                                             icon={<Gauge className="w-3.5 h-3.5" />}
@@ -538,8 +552,16 @@ export const TavernHud: React.FC = () => {
                                                         icon: <Layers className="w-2.5 h-2.5" />,
                                                         iconColor: 'text-orange-300',
                                                     },
+                                                    {
+                                                        value: focus.stats.luck,
+                                                        min: focus.statRange.luck.min,
+                                                        max: focus.statRange.luck.max,
+                                                        label: 'LCK',
+                                                        icon: <Sparkles className="w-2.5 h-2.5 text-yellow-300" />,
+                                                        iconColor: 'text-yellow-300',
+                                                    },
                                                 ]}
-                                                size={110}
+                                                size={125}
                                             />
                                         </div>
                                     )}

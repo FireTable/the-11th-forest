@@ -101,6 +101,7 @@ prompt: |
     in the character; any color that would be lost in chroma keying.
 hp: 100
 sp: 60
+luck: 5         # Nomadic wanderer — average luck, survives by skill
 moveSpeed: 4
 spRegenMs: 5000
 gender: female

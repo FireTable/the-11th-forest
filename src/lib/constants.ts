@@ -196,6 +196,18 @@ export const HUD_STATUS_LABEL_OFFSET_Y = -2;
  *  brush-by contact from stacking to death in a single frame. */
 export const COMBAT_PLAYER_DAMAGE_COOLDOWN_MS = 100;
 
+/** Global scale factor applied to per-character crit chance.
+ *  critChance = (luck / 10) * COMBAT_CRIT_MULTIPLIER
+ *  At 0.5: luck=10 → 50 %, luck=5 → 25 %, luck=1 → 5 %.
+ *  Tune this to adjust overall crit frequency without
+ *  touching individual character YAML files. */
+export const COMBAT_CRIT_MULTIPLIER = 0.5;
+
+/** Damage multiplier applied when a hit is a critical strike.
+ *  finalDamage = baseDamage * COMBAT_CRIT_DAMAGE_MULTIPLIER.
+ *  Default 2 = double damage on crit. */
+export const COMBAT_CRIT_DAMAGE_MULTIPLIER = 2;
+
 /** How long a monster's death animation lingers in a fade-out tween
  *  before the body is destroyed and dropped items are released.
  *  Long enough for the player to register the kill, short enough to

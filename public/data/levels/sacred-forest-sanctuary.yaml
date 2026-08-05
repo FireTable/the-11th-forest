@@ -442,17 +442,17 @@ airWalls:
         - 588
       - - 1179
         - 970
-      - - 1199
-        - 1022
-      - - 1556
+      - - 1179
+        - 1015
+      - - 1561
         - 1020
-      - - 1574
-        - 972
+      - - 1562
+        - 970
       - - 1568
         - 606
-      - - 1546
+      - - 1568
         - 556
-      - - 1199
+      - - 1179
         - 554
 music: forest-ambient
 characterSpawn:
@@ -480,23 +480,23 @@ monsters:
       kind: time
       delayMs: 5000
   - type: drone
-    x: 300
-    'y': 200
+    x: 2000
+    'y': 660
     waveId: wave-3
     trigger:
       kind: clear
       delayMs: 2000
       waveId: wave-2
   - type: stalker
-    x: 700
-    'y': 250
+    x: 1000
+    'y': 650
     waveId: wave-3
     trigger:
       kind: clear
       delayMs: 2000
       waveId: wave-2
   - type: sniper
-    x: 500
+    x: 1300
     'y': 450
     waveId: wave-3
     trigger:

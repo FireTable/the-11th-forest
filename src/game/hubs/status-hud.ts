@@ -142,11 +142,12 @@ export class StatusHud extends BaseHud {
     /**
      * Display damage/heal numbers floating upwards on the RIGHT side.
      */
-    showFloatingNumber(amount: number, type: 'damage' | 'heal'): void {
+    showFloatingNumber(amount: number, type: 'damage' | 'heal' | 'crit'): void {
         const isHeal = type === 'heal';
+        const isCrit = type === 'crit';
         const absVal = Math.abs(amount);
-        const textStr = isHeal ? `+${absVal}` : `-${absVal}`;
-        const colorStr = isHeal ? '#34d399' : '#f87171'; // Green for heal, Red for damage
+        const textStr = isHeal ? `+${absVal}` : isCrit ? `-${absVal}` : `-${absVal}`;
+        const colorStr = isHeal ? '#34d399' : isCrit ? '#fbbf24' : '#f87171'; // Green / Gold / Red
 
         // Floating offset to the right side of status bar, jittered per hit
         // so high-frequency damage doesn't pile into a single unreadable blob.
@@ -155,11 +156,11 @@ export class StatusHud extends BaseHud {
         const textObj = this.scene.add
             .text(startX, startY, textStr, {
                 fontFamily: 'monospace',
-                fontSize: isHeal ? '12px' : '14px',
+                fontSize: isHeal ? '12px' : isCrit ? '18px' : '14px',
                 color: colorStr,
                 fontStyle: 'bold',
                 stroke: '#000000',
-                strokeThickness: 2,
+                strokeThickness: isCrit ? 3 : 2,
                 shadow: {
                     offsetX: 1,
                     offsetY: 1,
@@ -179,9 +180,10 @@ export class StatusHud extends BaseHud {
             startX,
             startY,
             createdAt: this.scene.time.now,
-            durationMs: 800,
+            durationMs: isCrit ? 1100 : 800,
         });
     }
+
 
     /**
      * Reposition above body (hitbox top) + draw.

@@ -138,6 +138,11 @@ export const CharacterSpecSchema = z
          *  Phase-2 tavern pickups are gated by this value; the
          *  `tavernWeaponCount` HUD reads it directly from the spec. */
         weaponMax: z.number().int().gt(0).lte(8).optional(),
+        /** Critical hit chance driver. Range 1–10; maps linearly to
+         *  critChance = luck/10 (10 % – 100 %). Applied in
+         *  `MonsterController.applyBulletDamage` when the player hits a
+         *  monster. Defaults to 1 at runtime when omitted. */
+        luck: z.number().int().gte(1).lte(10).optional(),
         /** Per-character audio identity — SFX ids + tuning knobs for
          *  dodge / hurt / footstep / low-HP heartbeat. All optional. */
         sfx: CharacterSfxSchema.optional(),

@@ -283,10 +283,10 @@ npcSpawns:
       'y': 800
     - characterId: bunny-girl
       x: 1000
-      'y': 900
+      'y': 870
     - characterId: kitty
       x: 1200
-      'y': 900
+      'y': 930
     - characterId: wanderer
       x: 1400
       'y': 900

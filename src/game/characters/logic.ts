@@ -207,7 +207,7 @@ export interface WeaponHudLike {
  *  (above the character's head — currently shows reload progress). */
 export interface StatusHudLike {
     update(state: StatusHudState, time: number, halfH: number): void;
-    showFloatingNumber?(amount: number, type: 'damage' | 'heal'): void;
+    showFloatingNumber?(amount: number, type: 'damage' | 'heal' | 'crit'): void;
 }
 
 /** Subset of weapon-slot state StatusHud needs. */

@@ -87,8 +87,9 @@ prompt: |
     - No purple, magenta, or pink in the character body itself. The pink
       sweater and pink sneakers are desaturated dusty rose, never full
       magenta. The background is the only place magenta appears.
-hp: 85
-sp: 90
+hp: 90
+sp: 70
+luck: 5         # Cats have nine lives — moderate crit chance
 moveSpeed: 5
 spRegenMs: 4000
 gender: female

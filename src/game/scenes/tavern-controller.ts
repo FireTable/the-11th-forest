@@ -47,7 +47,7 @@ export interface TavernFocusPayload {
     /** Free-form description from the character spec — lore / role.
      *  Shown on the tavern HUD below the name. */
     description?: string;
-    stats?: { hp: number; sp: number; moveSpeed: number; weaponMax: number };
+    stats?: { hp: number; sp: number; moveSpeed: number; weaponMax: number; luck: number };
     /**
      * Per-stat [min, max] range across every loaded character. The
      * tavern HUD's radar polygon uses these as the inner ring (min)
@@ -60,6 +60,7 @@ export interface TavernFocusPayload {
         sp: { min: number; max: number };
         moveSpeed: { min: number; max: number };
         weaponMax: { min: number; max: number };
+        luck: { min: number; max: number };
     };
     phase: Phase;
     weaponCount: number;
@@ -354,7 +355,7 @@ export class TavernController {
             moveSpeed: s.moveSpeed,
             spRegenMs: s.spRegenMs,
             description: s.description,
-            stats: { hp: s.hp, sp: s.sp, moveSpeed: s.moveSpeed, weaponMax: s.weaponMax ?? TAVERN_WEAPON_MAX },
+            stats: { hp: s.hp, sp: s.sp, moveSpeed: s.moveSpeed, weaponMax: s.weaponMax ?? TAVERN_WEAPON_MAX, luck: s.luck ?? 1 },
             statRange: this.statRange,
             phase: this.phase,
             weaponCount: this.weaponCount,
@@ -383,16 +384,19 @@ export class TavernController {
         sp: { min: number; max: number };
         moveSpeed: { min: number; max: number };
         weaponMax: { min: number; max: number };
+        luck: { min: number; max: number };
     } {
         const result = {
             hp: { min: Infinity, max: -Infinity },
             sp: { min: Infinity, max: -Infinity },
             moveSpeed: { min: Infinity, max: -Infinity },
             weaponMax: { min: Infinity, max: -Infinity },
+            luck: { min: Infinity, max: -Infinity },
         };
         for (const npc of this.npcs) {
             const s = npc.spec;
             const wm = s.weaponMax ?? TAVERN_WEAPON_MAX;
+            const lk = s.luck ?? 1;
             if (s.hp < result.hp.min) result.hp.min = s.hp;
             if (s.hp > result.hp.max) result.hp.max = s.hp;
             if (s.sp < result.sp.min) result.sp.min = s.sp;
@@ -401,6 +405,8 @@ export class TavernController {
             if (s.moveSpeed > result.moveSpeed.max) result.moveSpeed.max = s.moveSpeed;
             if (wm < result.weaponMax.min) result.weaponMax.min = wm;
             if (wm > result.weaponMax.max) result.weaponMax.max = wm;
+            if (lk < result.luck.min) result.luck.min = lk;
+            if (lk > result.luck.max) result.luck.max = lk;
         }
         // Fallback when no NPC is loaded — guard against Infinity.
         const safe = (r: { min: number; max: number }) => ({
@@ -412,6 +418,7 @@ export class TavernController {
             sp: safe(result.sp),
             moveSpeed: safe(result.moveSpeed),
             weaponMax: safe(result.weaponMax),
+            luck: safe(result.luck),
         };
     }
 

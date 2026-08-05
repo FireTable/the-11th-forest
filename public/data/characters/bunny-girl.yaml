@@ -92,6 +92,7 @@ prompt: |
       only place magenta appears.
 hp: 90
 sp: 80
+luck: 7         # Bunny assassin precision — high crit chance
 moveSpeed: 5
 spRegenMs: 4500
 gender: female

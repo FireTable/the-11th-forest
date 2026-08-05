@@ -86,6 +86,7 @@ prompt: |
     - No purple, magenta, or pink in the character body itself.
 hp: 100
 sp: 60
+luck: 3         # Reluctant bookish shut-in — low crit chance
 moveSpeed: 4
 spRegenMs: 5000
 gender: male
