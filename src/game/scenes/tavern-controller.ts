@@ -525,6 +525,9 @@ export class TavernController {
                 if (!this.fHolding) {
                     this.fHolding = true;
                     this.holdElapsed = 0;
+                    // Edge-trigger the charge SFX exactly once when the
+                    // hold starts — not every frame F is down.
+                    EventBus.emit(SFX_EVENT('tavern-charge'));
                 }
                 this.holdElapsed += delta;
                 if (this.holdElapsed >= HOLD_MS) {

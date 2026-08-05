@@ -33,6 +33,7 @@ interface MonsterTypeInfo {
     id: string;
     name: string;
     texture: string;
+    url: string;
     cols: number;
     rows: number;
     idleCount: number;
@@ -82,6 +83,7 @@ export function MonsterCanvas({ level, active = true, onSpawnMove }: Props) {
                                 id: t,
                                 name: t,
                                 texture: `assets/image/monsters/${t}.png`,
+                                url: `/assets/image/monsters/${t}.png`,
                                 cols: 4,
                                 rows: 4,
                                 idleCount: 4,
@@ -89,11 +91,13 @@ export function MonsterCanvas({ level, active = true, onSpawnMove }: Props) {
                             };
                         }
                         const o = t as Partial<MonsterTypeInfo>;
+                        const texture =
+                            o.texture ?? `assets/image/monsters/${o.id ?? 'unknown'}.png`;
                         return {
                             id: o.id ?? '',
                             name: o.name ?? o.id ?? '',
-                            texture:
-                                o.texture ?? `assets/image/monsters/${o.id ?? 'unknown'}.png`,
+                            texture,
+                            url: o.url ?? `/${texture}`,
                             cols: o.cols ?? 4,
                             rows: o.rows ?? 4,
                             idleCount: o.idleCount ?? 4,
@@ -319,7 +323,7 @@ function DraggableMarker({
             >
                 {info && (
                     <img
-                        src={info.texture}
+                        src={info.url}
                         alt={info.name}
                         draggable={false}
                         width={sheetW}

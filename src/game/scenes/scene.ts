@@ -687,9 +687,11 @@ export class LoadScene extends Phaser.Scene {
                         // Trigger Victory! Scene keeps running so the
                         // player can walk to the teleporter and return
                         // to the tavern — the React overlay is just
-                        // confetti, not a modal.
+                        // confetti, not a modal. AudioController
+                        // subscribes to `sfx:victory-fanfare` and
+                        // fires once.
                         store.setVictory(true);
-                        EventBus.emit(SFX_EVENT('victory'));
+                        EventBus.emit(SFX_EVENT('victory-fanfare'));
                     }
                 }
             })

@@ -952,7 +952,12 @@ async function handleSaveMonsters(req, res) {
  * visual canvas overlay (which needs each monster's display name,
  * sprite texture path, sheet grid, and idle anim range to render a
  * single idle frame in the marker thumbnail). Each entry:
- *   { id, name, texture, cols, rows, idleCount, idleFrameRate }
+ *   { id, name, texture, url, cols, rows, idleCount, idleFrameRate }
+ *
+ * `texture` is the relative path from the monster spec (e.g.
+ * "assets/image/monsters/drone.png") — kept for round-tripping into
+ * level yamls. `url` is the absolute server-root path suitable for an
+ * <img src> or CSS background-image, with a leading "/".
  */
 async function handleListMonsterTypes(res) {
     try {
@@ -983,13 +988,15 @@ async function handleListMonsterTypes(res) {
                         : 4;
                 const idleFrameRate =
                     typeof idle?.frameRate === 'number' ? idle.frameRate : 6;
+                const texture =
+                    typeof spec?.sprite?.texture === 'string'
+                        ? spec.sprite.texture
+                        : `assets/image/monsters/${id}.png`;
                 types.push({
                     id,
                     name: typeof spec.name === 'string' ? spec.name : id,
-                    texture:
-                        typeof spec?.sprite?.texture === 'string'
-                            ? spec.sprite.texture
-                            : `assets/image/monsters/${id}.png`,
+                    texture,
+                    url: `/${texture}`,
                     cols,
                     rows,
                     idleCount,
@@ -1000,6 +1007,7 @@ async function handleListMonsterTypes(res) {
                     id,
                     name: id,
                     texture: `assets/image/monsters/${id}.png`,
+                    url: `/assets/image/monsters/${id}.png`,
                     cols: 4,
                     rows: 4,
                     idleCount: 4,
