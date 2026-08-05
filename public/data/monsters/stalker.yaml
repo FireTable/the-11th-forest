@@ -2,48 +2,48 @@ name: Bramble Stalker
 hp: 140
 moveSpeed: 4
 body:
-  halfW: 18
-  halfH: 18
+    halfW: 18
+    halfH: 18
 weaponId: vine-lash
 sfx:
-  hit: monster-hit
-  death: monster-death
-  aggro: monster-aggro
+    hit: monster-hit
+    death: monster-death
+    aggro: monster-aggro
 drops:
-  - dropId: hp-shard
-    chance: 0.45
-  - dropId: sp-fragment
-    chance: 0.25
-  - dropId: overcharge-core
-    chance: 0.10
+    - dropId: hp-shard
+      chance: 0.45
+    - dropId: sp-fragment
+      chance: 0.25
+    - dropId: overcharge-core
+      chance: 0.10
 
 sprite:
-  texture: assets/image/monsters/stalker.png
-  grid: { rows: 4, cols: 4 }
-  scale: 1.0
-  offset: { left: 0, bottom: 0 }
-  script:
-    downsample: 4
-    colors: 32
-    pad: 2
+    texture: assets/image/monsters/stalker.png
+    grid: { rows: 4, cols: 4 }
+    scale: 1.0
+    offset: { left: 0, bottom: 0 }
+    script:
+        downsample: 4
+        colors: 32
+        pad: 2
 
 anims:
-  idle:
-    frames: [0, 3]
-    frameRate: 6
-    repeat: -1
-  move:
-    frames: [4, 7]
-    frameRate: 10
-    repeat: -1
-  hit:
-    frames: [8, 11]
-    frameRate: 12
-    repeat: 0
-  death:
-    frames: [12, 14]
-    frameRate: 10
-    repeat: 0
+    idle:
+        frames: [0, 3]
+        frameRate: 6
+        repeat: -1
+    move:
+        frames: [4, 7]
+        frameRate: 10
+        repeat: -1
+    hit:
+        frames: [8, 11]
+        frameRate: 12
+        repeat: -1
+    death:
+        frames: [12, 14]
+        frameRate: 10
+        repeat: 0
 
 prompt: |
     The 11th Forest — Bramble Stalker sprite sheet

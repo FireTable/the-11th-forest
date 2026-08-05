@@ -41,7 +41,7 @@ anims:
     hit:
         frames: [8, 11]
         frameRate: 12
-        repeat: 0
+        repeat: -1
     death:
         frames: [12, 14]
         frameRate: 10
