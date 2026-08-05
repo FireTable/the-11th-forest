@@ -5,12 +5,13 @@
         <link rel="icon" type="image/png" href="/favicon.png" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>The 11th Forest</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap"
-            rel="stylesheet"
-        />
+        <!-- Fonts (Press Start 2P, Silkscreen 400/700) are loaded via
+             @fontsource from src/main.tsx — local woff2 under
+             node_modules/@fontsource, no remote Google Fonts call.
+             The #boot splash below uses 'Press Start 2P'; the font
+             is registered synchronously by the CSS imports before
+             React mounts, so the first paint is already the pixel
+             font, not a fallback monospace. -->
         <!-- Boot splash. Inline (not index.css) so it paints on the first
              HTML chunk — the main bundle carries Phaser and takes far
              longer than the app shell. PhaserGame removes #boot once the

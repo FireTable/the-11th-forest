@@ -44,6 +44,8 @@
         ]
     },
     "dependencies": {
+        "@fontsource/press-start-2p": "^5.3.0",
+        "@fontsource/silkscreen": "^5.3.0",
         "@radix-ui/react-dialog": "^1.1.23",
         "@tailwindcss/vite": "^4.3.3",
         "class-variance-authority": "^0.7.1",
