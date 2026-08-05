@@ -4,14 +4,14 @@ cooldownMs: 750
 range: 480
 visual:
     texture: assets/image/weapons/rune-shield.png
-    scale: 0.8
+    scale: 0.9
     orbitRadius: 0
     anchor: [0.5, 0.5]
     swingAngle: 140
 bullet:
     texture: assets/image/weapons/rune-shard.png
     type: projectile
-    scale: 0.8
+    scale: 0.9
     anchor: [0.5, 0.5]
 projectile:
     speed: 15
