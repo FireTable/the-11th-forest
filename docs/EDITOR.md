@@ -17,7 +17,7 @@ Click the **Editor** button (bottom-left of the canvas) to toggle the side panel
 │ Scenes │ Chars │ Drops │ Mobs │ Weaps │ Audio            │
 ├─ Scene sub-tabs (only when Scenes is selected) ───────────┤
 │ Scenes │ Background │ Settings │ Monsters │ Air walls │  │
-│ Materials                                                │
+│ Teleporters │ Materials                                  │
 ├─ Body ────────────────────────────────────────────────────┤
 │ (selected section UI)                                    │
 └───────────────────────────────────────────────────────────┘
@@ -52,6 +52,10 @@ Sortable list of `MonsterSpawn` rows. Per row: type (dropdown from `data/monster
 #### Air walls sub-tab
 
 Polygon wall editor. Toggle "Draw on canvas" then click vertices on the Konva overlay; clicking the first vertex closes the polygon. Per-wall kind dropdown (tall/short) and delete.
+
+#### Teleporters sub-tab
+
+Configurable list of `TeleporterSpec` entries for scene transitions. Per row: x/y coordinates, radius (trigger circle size), targetScene dropdown (selectable levels from `index.yaml`), targetSpawn placement, and delete/add operations.
 
 #### Materials sub-tab
 

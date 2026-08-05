@@ -10,10 +10,19 @@ A top-down, anime-styled pixel art shooter built on Phaser 4. Fight through curs
 
 **The 11th Forest** is a top-down shooter with a hand-crafted pixel aesthetic and a moody, gothic-garden setting. You play a lone hunter drawn into a forest that shouldn't exist — a place where roses shoot back and the trees remember every name spoken under their shade.
 
-- **Genre:** Top-down shooter / Roguelite (planned)
-- **Art:** Anime-styled pixel art
-- **Camera:** Top-down, locked or follow
-- **Status:** Pre-production / early prototype
+- **Genre:** Top-down action shooter / Roguelite
+- **Art:** Gothic garden anime pixel art
+- **Camera:** Top-down, dynamic camera follow & lock
+- **Status:** Alpha / Core gameplay systems & level editor complete
+
+## Key Features
+
+- **Data-Driven Architecture:** Levels, characters, monster AI, weapons/projectiles, drop items, and audio triggers are entirely driven by strictly validated YAML files.
+- **Character Selection & Tavern Scene:** Multi-character support with unique voice lines and damage routing, tavern scene switching, and persistent save states.
+- **Combat & AI Mechanics:** Matter.js physics integration, monster pathfinding using foot-based BodyBox offsets, knockback/stagger state machine, and custom weapon Z-depth layering.
+- **Seamless Teleporter System:** Inter-scene travel handled via configurable Teleporters.
+- **In-Browser Visual Level Editor:** Comprehensive built-in editor supporting air walls, monster placement, teleporter configuration, tile map module composition, and sprite animation slicing with direct local YAML file save API.
+- **Integrated AI Generation Pipeline:** MiniMax AI audio/music generation and Google Gemini 3 Pro Image (Nano-banana 2) pixel art asset generation.
 
 ## Tech Stack
 
