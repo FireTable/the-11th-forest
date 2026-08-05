@@ -5,9 +5,9 @@
  * in `level.monsters` at its image-space (x, y) so the designer can see
  * the wave layout over the actual scene background. Each marker shows:
  *
- *   - one idle frame from the sprite-sheet (rendered by clipping a
- *     full-sheet <img> through an overflow-hidden box — no
- *     background-position tricks, no animation)
+ *   - one frame from the sprite-sheet, rendered as a CSS
+ *     background-image at native sheet size; the MARKER_W × MARKER_W
+ *     div shows only the chosen cell via background-position
  *   - the wave id badge (color-coded per wave so multiple waves are
  *     easy to tell apart at a glance)
  *   - the monster's display name
@@ -37,6 +37,7 @@ interface MonsterTypeInfo {
     cols: number;
     rows: number;
     idleCount: number;
+    idleStart: number;
     idleFrameRate: number;
 }
 
@@ -86,6 +87,7 @@ export function MonsterCanvas({ level, active = true, onSpawnMove }: Props) {
                                 url: `/assets/image/monsters/${t}.png`,
                                 cols: 4,
                                 rows: 4,
+                                idleStart: 0,
                                 idleCount: 4,
                                 idleFrameRate: 6,
                             };
@@ -100,6 +102,7 @@ export function MonsterCanvas({ level, active = true, onSpawnMove }: Props) {
                             url: o.url ?? `/${texture}`,
                             cols: o.cols ?? 4,
                             rows: o.rows ?? 4,
+                            idleStart: o.idleStart ?? 0,
                             idleCount: o.idleCount ?? 4,
                             idleFrameRate: o.idleFrameRate ?? 6,
                         };
@@ -274,15 +277,24 @@ function DraggableMarker({
     const displayLeft = dragOffset ? left + dragOffset.dx : left;
     const displayTop = dragOffset ? top + dragOffset.dy : top;
 
-    // Pick the middle idle frame as a natural-looking still pose —
-    // frame 0 of an idle anim is often a stretch/transition frame.
-    // Spritesheet frames are row-major: frameIdx = row * cols + col.
+    // Frame coordinates on the spritesheet. Spritesheets are row-major:
+    //   frameIdx = row * cols + col
+    // Source pixel of the chosen frame's top-left corner:
+    //   sx = (frameIdx % cols) * MARKER_W
+    //   sy = floor(frameIdx / cols) * MARKER_W
+    // Rendered as a CSS background-image at native sheet size. The
+    // thumbnail div is MARKER_W × MARKER_W and `background-position`
+    // pulls the chosen frame into the visible window. No <img>, no
+    // overflow-hidden, no offset on a positioned child element.
     const cols = info?.cols ?? 4;
     const rows = info?.rows ?? 4;
+    const idleStart = info?.idleStart ?? 0;
     const idleCount = info?.idleCount ?? 4;
-    const middleFrame = Math.floor(idleCount / 2);
-    const frameRow = Math.floor(middleFrame / cols);
-    const frameCol = middleFrame % cols;
+    void idleCount;
+    void rows;
+    const frameIdx = idleStart;
+    const frameCol = frameIdx % cols;
+    const frameRow = Math.floor(frameIdx / cols);
     const sheetW = cols * MARKER_W;
     const sheetH = rows * MARKER_W;
 
@@ -297,7 +309,7 @@ function DraggableMarker({
         >
             {/* Pin dot at exact spawn point */}
             <div
-                className="absolute size-2 rounded-full bg-red-500 ring-2 ring-red-300/80 shadow-[0_0_6px_rgba(239,68,68,0.9)]"
+                className="absolute size-2 rounded-full bg-red-500 ring-2 ring-red-300/80 shadow-[0_0_6px_rgba(239,68,68,0.9)] z-10"
                 style={{
                     left: MARKER_W / 2 - 4,
                     top: MARKER_W / 2 - 4,
@@ -309,11 +321,18 @@ function DraggableMarker({
                 sheet <img> clips to the chosen cell — no
                 background-position math, no animation. */}
             <div
-                className={`relative overflow-hidden border-2 ${palette} rounded ${onMove ? 'cursor-grab active:cursor-grabbing' : ''} pointer-events-auto`}
+                className={`relative border-2 ${palette} rounded ${onMove ? 'cursor-grab active:cursor-grabbing' : ''} pointer-events-auto`}
                 style={{
                     width: MARKER_W,
                     height: MARKER_W,
                     touchAction: 'none',
+                    ...(info && {
+                        backgroundImage: `url(${info.url})`,
+                        backgroundSize: `${sheetW}px ${sheetH}px`,
+                        backgroundPosition: `-${frameCol * MARKER_W}px -${frameRow * MARKER_W}px`,
+                        backgroundRepeat: 'no-repeat',
+                        imageRendering: 'pixelated',
+                    }),
                 }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
@@ -321,22 +340,6 @@ function DraggableMarker({
                 onPointerCancel={onPointerUp}
                 title={info?.name ?? spawn.type}
             >
-                {info && (
-                    <img
-                        src={info.url}
-                        alt={info.name}
-                        draggable={false}
-                        width={sheetW}
-                        height={sheetH}
-                        style={{
-                            position: 'absolute',
-                            left: -frameCol * MARKER_W,
-                            top: -frameRow * MARKER_W,
-                            imageRendering: 'pixelated',
-                            pointerEvents: 'none',
-                        }}
-                    />
-                )}
                 {!info && (
                     <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-neutral-300 leading-none text-center px-1">
                         {spawn.type}
