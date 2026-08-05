@@ -6,8 +6,6 @@ weapons:
     - shotgun
     - arcana-staff
     - rocket-launcher
-    - drone-claws
-    - gunner-blast
     # Monster weapons (level-2 Rusted Hollow Citadel)
     - thorn-scythe-claws
     - moss-bark-rifle
@@ -16,7 +14,3 @@ weapons:
     - branch-sweep
     - bramble-knuckles
     - thorn-bolt
-    - vine-tip
-    - rune-shard
-    - sap-drop
-    - thorn-orb
