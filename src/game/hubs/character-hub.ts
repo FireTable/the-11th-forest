@@ -16,6 +16,7 @@ export class CharacterHud {
                 sp: initialSp,
                 maxSp: spec.sp,
             });
+            useGameStore.getState().setWeaponMax(spec.weaponMax ?? 3);
         }
     }
 
@@ -27,6 +28,7 @@ export class CharacterHud {
             sp,
             maxSp: spec.sp,
         });
+        useGameStore.getState().setWeaponMax(spec.weaponMax ?? 3);
     }
 
     setVisible(visible: boolean): void {
