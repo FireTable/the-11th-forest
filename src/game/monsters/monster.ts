@@ -645,7 +645,12 @@ export class MonsterController {
 
             // ── AI transitions ─────────────────────────────────────────
             const prevState = m.state;
-            m.state = decideAIState(dist, m.weapon.range);
+            // Pass prev state so decideAIState can apply hysteresis —
+            // without it, distance jitter around `attackRange` flips
+            // chase ↔ attack every frame and the idle/move animation
+            // strobes with it.
+            const prevAiState: 'chase' | 'attack' = prevState === 'attack' ? 'attack' : 'chase';
+            m.state = decideAIState(dist, m.weapon.range, prevAiState);
             // One-shot aggro growl on the first idle → chase transition.
             if (!m.hasAggroed && prevState === 'idle' && m.state === 'chase') {
                 m.hasAggroed = true;
