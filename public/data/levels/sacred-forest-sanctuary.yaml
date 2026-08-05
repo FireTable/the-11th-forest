@@ -462,11 +462,11 @@ characterSpawn:
 monsters:
   - type: drone
     x: 800
-    'y': 800
+    'y': 1250
     waveId: wave-1
   - type: drone
     x: 1100
-    'y': 800
+    'y': 1200
     waveId: wave-2
     trigger:
       kind: clear

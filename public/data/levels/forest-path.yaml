@@ -292,24 +292,25 @@ characterSpawn:
   'y': 200
   facing: right
 monsters:
-  # wave-1 — left + right of player path, no spawn cluster.
+  # wave-1 — inside the corridor between wall-1 (left) and wall-2 (right).
+  # Wall-1 right edge at y≈460 is x≈985; wall-2 left edge is x≈1837.
   - type: drone
-    x: 700
+    x: 1150
     'y': 460
     waveId: wave-1
     trigger:
       kind: time
       delayMs: 1500
   - type: drone
-    x: 1900
+    x: 1650
     'y': 520
     waveId: wave-1
     trigger:
       kind: time
       delayMs: 1500
-  # wave-2 — opposite corners so player must travel across the map.
+  # wave-2 — corridor widens here (wall-1 ≈740, wall-2 ≈2060).
   - type: stalker
-    x: 2050
+    x: 1050
     'y': 740
     waveId: wave-2
     trigger:
@@ -317,16 +318,17 @@ monsters:
       delayMs: 500
       waveId: wave-1
   - type: sniper
-    x: 350
+    x: 1750
     'y': 780
     waveId: wave-2
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-1
-  # wave-3 — three spread positions: far-right heavy, mid, far-left burst.
+  # wave-3 — corridor is widest here (wall-1 ≈620, wall-2 ≈2290).
+  # Three spread positions: left, center, right — forced side-to-side.
   - type: keeper
-    x: 2150
+    x: 950
     'y': 980
     waveId: wave-3
     trigger:
@@ -334,7 +336,7 @@ monsters:
       delayMs: 500
       waveId: wave-2
   - type: stalker
-    x: 1300
+    x: 1400
     'y': 1020
     waveId: wave-3
     trigger:
@@ -342,16 +344,16 @@ monsters:
       delayMs: 500
       waveId: wave-2
   - type: drone-ultra
-    x: 400
+    x: 1900
     'y': 1040
     waveId: wave-3
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-2
-  # wave-4 — pre-boss gauntlet, mirrored spread for final repositioning.
+  # wave-4 — pre-boss gauntlet, corridor narrows (wall-1 ≈770, wall-2 ≈2050).
   - type: gunner
-    x: 2200
+    x: 1050
     'y': 1240
     waveId: wave-4
     trigger:
@@ -359,7 +361,7 @@ monsters:
       delayMs: 500
       waveId: wave-3
   - type: sniper
-    x: 1100
+    x: 1500
     'y': 1280
     waveId: wave-4
     trigger:
@@ -367,7 +369,7 @@ monsters:
       delayMs: 500
       waveId: wave-3
   - type: drone-ultra
-    x: 300
+    x: 1800
     'y': 1260
     waveId: wave-4
     trigger:

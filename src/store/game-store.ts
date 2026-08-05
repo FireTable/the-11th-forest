@@ -84,6 +84,9 @@ export interface GameUIState {
     // Phaser scene pauses until the user clicks Restart.
     isDead: boolean;
 
+    // Victory state — true when the final level's waves and monsters are all cleared.
+    isVictory: boolean;
+
     // Tavern / character selection state
     /** Persisted id of the character the player selected in the tavern.
      *  null = never selected (tavern not yet completed). */
@@ -125,6 +128,7 @@ export interface GameUIState {
     }) => void;
     setHubsVisible: (visible: boolean) => void;
     setDead: (dead: boolean) => void;
+    setVictory: (victory: boolean) => void;
     resetLevelProgress: (levelId: string) => void;
     /**
      * Clear per-scene entity snapshots only (player/monster/drop
@@ -165,6 +169,7 @@ export const initialGameState = {
 
     hubsVisible: true,
     isDead: false,
+    isVictory: false,
 
     selectedCharacterId: null as string | null,
     tavernCleared: false,
@@ -235,6 +240,8 @@ export const useGameStore = create<GameUIState>()(
             setHubsVisible: (visible) => set({ hubsVisible: visible }),
 
             setDead: (dead) => set({ isDead: dead }),
+
+            setVictory: (victory) => set({ isVictory: victory }),
 
             resetLevelProgress: (levelId) =>
                 set((state) => {

@@ -947,15 +947,41 @@ async function handleSaveMonsters(req, res) {
 }
 
 /**
- * List every monster id from public/data/monsters/index.yaml. The
- * Monsters sub-tab uses this to populate its type dropdown.
+ * List every monster type from public/data/monsters/index.yaml. The
+ * Monsters sub-tab uses this to populate its type dropdown AND the
+ * visual canvas overlay (which needs each monster's display name and
+ * sprite texture path). Each entry: { id, name, texture }.
  */
 async function handleListMonsterTypes(res) {
     try {
         const indexPath = path.join(PUBLIC_DIR, 'data/monsters/index.yaml');
         const text = await readFile(indexPath, 'utf8');
         const idx = parseYaml(text) || {};
-        const types = Array.isArray(idx.monsters) ? idx.monsters : [];
+        const ids = Array.isArray(idx.monsters) ? idx.monsters : [];
+        const types = [];
+        for (const id of ids) {
+            try {
+                const specText = await readFile(
+                    path.join(PUBLIC_DIR, 'data/monsters', `${id}.yaml`),
+                    'utf8',
+                );
+                const spec = parseYaml(specText) || {};
+                types.push({
+                    id,
+                    name: typeof spec.name === 'string' ? spec.name : id,
+                    texture:
+                        typeof spec?.sprite?.texture === 'string'
+                            ? spec.sprite.texture
+                            : `assets/image/monsters/${id}.png`,
+                });
+            } catch {
+                types.push({
+                    id,
+                    name: id,
+                    texture: `assets/image/monsters/${id}.png`,
+                });
+            }
+        }
         return sendJson(res, 200, { types });
     } catch {
         return sendJson(res, 200, { types: [] });

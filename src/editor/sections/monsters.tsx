@@ -38,7 +38,9 @@ interface Props {
 const TRIGGER_KINDS: MonsterTrigger['kind'][] = ['time', 'clear'];
 
 export function MonstersSection({ sceneId, level, setLevel }: Props) {
-    const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+    const [availableTypes, setAvailableTypes] = useState<
+        Array<{ id: string; name: string; texture: string } | string>
+    >([]);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
@@ -59,7 +61,8 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
     function addSpawn() {
         const last = monsters[monsters.length - 1];
         const nextWaveId = last?.waveId ?? 'wave-1';
-        const fallbackType = availableTypes[0] ?? 'drone';
+        const first = availableTypes[0];
+        const fallbackType = typeof first === 'string' ? first : first?.id ?? 'drone';
         const newSpawn: MonsterSpawn = {
             type: fallbackType,
             x: Math.round(level.imageSize.width / 2),
@@ -181,7 +184,7 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
 interface RowProps {
     index: number;
     spawn: MonsterSpawn;
-    availableTypes: string[];
+    availableTypes: Array<{ id: string; name: string; texture: string } | string>;
     onMove: (idx: number, delta: number) => void;
     onRemove: (idx: number) => void;
     onPatch: (idx: number, p: Partial<MonsterSpawn>) => void;
@@ -217,11 +220,17 @@ function MonsterRow({
                         {availableTypes.length === 0 && (
                             <SelectItem value={spawn.type}>{spawn.type}</SelectItem>
                         )}
-                        {availableTypes.map((t) => (
-                            <SelectItem key={t} value={t}>
-                                {t}
-                            </SelectItem>
-                        ))}
+                        {availableTypes.map((t) => {
+                            // Backwards-compat: API used to return string ids,
+                            // now returns { id, name, texture }.
+                            const id = typeof t === 'string' ? t : t.id;
+                            const label = typeof t === 'string' ? t : t.name || t.id;
+                            return (
+                                <SelectItem key={id} value={id}>
+                                    {label}
+                                </SelectItem>
+                            );
+                        })}
                     </SelectContent>
                 </Select>
                 <Button

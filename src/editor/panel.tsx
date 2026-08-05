@@ -24,6 +24,7 @@ import {
 import { MonstersSection } from './sections/monsters';
 import { ScenesListSection } from './sections/scenes-list';
 import { WallCanvas } from './wall-canvas';
+import { MonsterCanvas } from './monster-canvas';
 
 interface ScenePayload {
     id: string;
@@ -378,6 +379,24 @@ export function EditorPanel() {
                         active={sceneSubTab === 'air-walls'}
                         onLevelChange={handleLevelChange}
                         onAirWallDrawn={handleAirWallDrawn}
+                    />,
+                    overlayTarget,
+                )}
+            {level &&
+                overlayTarget &&
+                open &&
+                topTab === 'scenes' &&
+                sceneSubTab === 'monsters' &&
+                createPortal(
+                    <MonsterCanvas
+                        level={level}
+                        active
+                        onSpawnMove={(index, x, y) => {
+                            const next = (level.monsters ?? []).map((m, i) =>
+                                i === index ? { ...m, x, y } : m,
+                            );
+                            handleLevelChange({ ...level, monsters: next });
+                        }}
                     />,
                     overlayTarget,
                 )}

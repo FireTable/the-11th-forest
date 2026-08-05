@@ -39,9 +39,10 @@ import {
     createPathDebugOverlay,
     type PathDebugOverlayHandles,
 } from '@/game/monsters/path-debug-overlay';
-import { DEPTH, MUSIC_EVENT, MUSIC_STOP, PIXEL_LIGHTING_CONFIG } from '@/lib/constants';
+import { DEPTH, MUSIC_EVENT, MUSIC_STOP, PIXEL_LIGHTING_CONFIG, SFX_EVENT } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
+import { fetchLevelIndex } from '@/lib/levels/loader';
 import { useGameStore } from '@/store/game-store';
 import type { MusicSpec, SfxSpec, SoundSpec } from '@/lib/audios';
 import type { CharacterSpec } from '@/lib/characters';
@@ -512,6 +513,10 @@ export class LoadScene extends Phaser.Scene {
             }
             // Persist clock + entity snapshots to the UI store (1Hz).
             this.tickSaveState();
+
+            // Victory check: if this level is the final level in index.yaml,
+            // and all monsters + pending waves are cleared, trigger victory!
+            this.checkVictory();
         });
 
         // Tell the editor panel which scene this is. Both the EventBus
@@ -664,6 +669,31 @@ export class LoadScene extends Phaser.Scene {
         this.teleporterSystem?.destroy();
         this.audio?.destroy();
         this.pathDebugOverlay?.destroy();
+    }
+
+    private checkVictory(): void {
+        const store = useGameStore.getState();
+        if (store.isVictory || store.isDead) return;
+        if (this.level.tavern) return;
+
+        // Verify if this is the final level in index.yaml
+        fetchLevelIndex()
+            .then((indexManifest) => {
+                const levels = indexManifest.levels;
+                if (!levels || levels.length === 0) return;
+                const lastLevelId = levels[levels.length - 1];
+                if (this.id === lastLevelId) {
+                    if (this.monsterSystem.isAllCleared()) {
+                        // Trigger Victory!
+                        store.setVictory(true);
+                        EventBus.emit(SFX_EVENT('victory'));
+                        this.scene.pause();
+                    }
+                }
+            })
+            .catch(() => {
+                /* ignore manifest fetch error */
+            });
     }
 
     /**
