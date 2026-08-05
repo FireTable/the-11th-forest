@@ -596,7 +596,7 @@ export class LoadScene extends Phaser.Scene {
                     this,
                     this.level,
                     this.assets,
-                    (selectedSpec: CharacterSpec) => {
+                    (selectedSpec: CharacterSpec, spawnPos: { x: number; y: number }) => {
                         this.character.destroy();
                         (this.assets as any).character = selectedSpec;
                         if (selectedSpec.sprite) {
@@ -610,7 +610,7 @@ export class LoadScene extends Phaser.Scene {
                             this.level,
                             selectedSpec,
                             this.assets.weapons,
-                            { weaponsById: this.assets.weaponsById },
+                            { weaponsById: this.assets.weaponsById, spawnOverride: spawnPos },
                         );
                         // Rewire subsystems to the freshly-spawned
                         // character's body / runtime. monsterSystem

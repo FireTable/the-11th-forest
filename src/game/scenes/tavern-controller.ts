@@ -134,7 +134,10 @@ export class TavernController {
          * self-destroys after this fires. Ignored when `startPhase`
          * is `'pickup'` — the selection UI doesn't run in that mode.
          */
-        private readonly onConfirm: (selectedSpec: CharacterSpec) => void,
+        private readonly onConfirm: (
+            selectedSpec: CharacterSpec,
+            spawnPos: { x: number; y: number },
+        ) => void,
         /**
          * Initial phase. `'selection'` (default) spawns NPC sprites
          * for the F-hold selection UI; `'pickup'` skips NPC spawn
@@ -453,6 +456,7 @@ export class TavernController {
         if (!entry) return;
 
         const spec = entry.spec;
+        const spawnPos = { x: entry.x, y: entry.y };
         useGameStore.getState().setSelectedCharacterId(spec.id);
 
         // Destroy NPC visuals (the selection arrow now lives in the React HUD)
@@ -471,8 +475,10 @@ export class TavernController {
         // Hand control back to LoadScene — it swaps the character to
         // the picked spec. The phase 2 weapon cap is tracked here and
         // gated through tryAcceptWeapon() called by LoadScene's drop
-        // onWeaponPickup callback.
-        this.onConfirm(spec);
+        // onWeaponPickup callback. spawnPos is the NPC's last world
+        // position so the real character materialises where the
+        // player last saw them (no teleport-to-center jolt).
+        this.onConfirm(spec, spawnPos);
     }
 
     // ─── Per-frame ───────────────────────────────────────────────────────

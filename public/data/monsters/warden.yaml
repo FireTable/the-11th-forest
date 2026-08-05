@@ -1,6 +1,6 @@
 name: Iron Warden
-hp: 420
-moveSpeed: 2.5
+hp: 1500
+moveSpeed: 3
 body:
   halfW: 38
   halfH: 32

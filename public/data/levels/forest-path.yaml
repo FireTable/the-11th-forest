@@ -292,22 +292,24 @@ characterSpawn:
   'y': 200
   facing: right
 monsters:
+  # wave-1 — left + right of player path, no spawn cluster.
   - type: drone
-    x: 1280
-    'y': 480
+    x: 700
+    'y': 460
     waveId: wave-1
     trigger:
       kind: time
       delayMs: 1500
   - type: drone
-    x: 1400
-    'y': 540
+    x: 1900
+    'y': 520
     waveId: wave-1
     trigger:
       kind: time
       delayMs: 1500
+  # wave-2 — opposite corners so player must travel across the map.
   - type: stalker
-    x: 1280
+    x: 2050
     'y': 740
     waveId: wave-2
     trigger:
@@ -315,55 +317,57 @@ monsters:
       delayMs: 500
       waveId: wave-1
   - type: sniper
-    x: 1400
+    x: 350
     'y': 780
     waveId: wave-2
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-1
+  # wave-3 — three spread positions: far-right heavy, mid, far-left burst.
   - type: keeper
-    x: 1280
-    'y': 960
-    waveId: wave-3
-    trigger:
-      kind: clear
-      delayMs: 500
-      waveId: wave-2
-  - type: stalker
-    x: 1400
+    x: 2150
     'y': 980
     waveId: wave-3
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-2
-  - type: drone-ultra
-    x: 1340
+  - type: stalker
+    x: 1300
     'y': 1020
     waveId: wave-3
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-2
+  - type: drone-ultra
+    x: 400
+    'y': 1040
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-2
+  # wave-4 — pre-boss gauntlet, mirrored spread for final repositioning.
   - type: gunner
-    x: 1280
-    'y': 1200
+    x: 2200
+    'y': 1240
     waveId: wave-4
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-3
   - type: sniper
-    x: 1400
-    'y': 1220
+    x: 1100
+    'y': 1280
     waveId: wave-4
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-3
   - type: drone-ultra
-    x: 1340
+    x: 300
     'y': 1260
     waveId: wave-4
     trigger:

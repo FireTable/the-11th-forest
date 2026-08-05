@@ -310,22 +310,13 @@ characterSpawn:
   'y': 541
   facing: right
 monsters:
-  - type: keeper
-    x: 1376
-    'y': 820
+  - type: warden
+    x: 1100
+    'y': 1100
     waveId: boss
     trigger:
       kind: time
-      delayMs: 2000
-      waveId: wave-1
-  - type: warden
-    x: 1340
-    'y': 1420
-    waveId: boss
-    trigger:
-      kind: clear
       delayMs: 1500
-      waveId: wave-1
 dropSpawns: []
 materials: []
 teleporters: []

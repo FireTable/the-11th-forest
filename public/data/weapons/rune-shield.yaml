@@ -1,6 +1,6 @@
 name: Rune Shield Bash
-damage: 22
-cooldownMs: 1100
+damage: 28
+cooldownMs: 750
 range: 480
 visual:
     texture: assets/image/weapons/rune-shield.png
@@ -14,7 +14,7 @@ bullet:
     scale: 0.8
     anchor: [0.5, 0.5]
 projectile:
-    speed: 13
+    speed: 15
     visual:
         radius: 10
         width: 32

@@ -217,6 +217,11 @@ function resolveInitialWeapons(
 export interface LoadCharacterOptions {
     placeholder?: boolean;
     ignoreSavedPosition?: boolean;
+    /** Force the spawn position, bypassing the saved snapshot and the
+     *  level's `characterSpawn`. The tavern flow passes the chosen
+     *  NPC's world coords so the real character materialises where
+     *  the player last saw them — no teleport-to-center jolt. */
+    spawnOverride?: { x: number; y: number };
     /** Lookup used to re-hydrate persisted weapons when the character
      *  spec's `hotbar` is empty (tavern flow). When `weapons` is also
      *  empty but `useGameStore.slots` carries entries from a previous
@@ -256,12 +261,16 @@ export function loadCharacter(
     // character doesn't spawn wherever the placeholder used to be.
     const useSaved =
         !opts.placeholder && !opts.ignoreSavedPosition;
-    const spawnX = useSaved
+    // spawnOverride wins over everything — used by the tavern confirm
+    // flow to place the real character at the NPC the player picked.
+    const fallbackX = useSaved
         ? (savedPlayer?.x ?? level.characterSpawn?.x ?? level.imageSize.width / 2)
         : (level.characterSpawn?.x ?? level.imageSize.width / 2);
-    const spawnY = useSaved
+    const fallbackY = useSaved
         ? (savedPlayer?.y ?? level.characterSpawn?.y ?? level.imageSize.height / 2)
         : (level.characterSpawn?.y ?? level.imageSize.height / 2);
+    const spawnX = opts.spawnOverride?.x ?? fallbackX;
+    const spawnY = opts.spawnOverride?.y ?? fallbackY;
 
     if (opts.placeholder) {
         // Invisible sentinel for the tavern selection UI. Body is kept

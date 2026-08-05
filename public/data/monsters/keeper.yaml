@@ -1,5 +1,5 @@
 name: Forest Keeper
-hp: 1200
+hp: 600
 moveSpeed: 3
 body:
   halfW: 44
