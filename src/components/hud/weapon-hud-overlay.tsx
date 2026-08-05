@@ -19,7 +19,9 @@ import { CornerPixels } from './retro-box';
 
 const SLOT_PX = 56;
 const SLOT_GAP_PX = 6;
-const SLOT_BOTTOM_PX = 124;
+// Sits above the [DODGE][FIRE] cluster — leaves 168 − (24 + 96) = 48px
+// of breathing room between the strip bottom and the FIRE button top.
+const SLOT_BOTTOM_PX = 168;
 
 export const WeaponHUDOverlay: React.FC = () => {
     const {

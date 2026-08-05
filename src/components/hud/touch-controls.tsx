@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Flame, Zap } from 'lucide-react';
 
 import { EventBus } from '@/lib/events/bus';
-import { appRect, isMobileLike, toAppPoint } from '@/lib/mobile';
+import { isMobileLike, toAppPoint } from '@/lib/mobile';
 import { useHudScale } from '@/lib/use-hud-scale';
 
 /**
@@ -28,9 +29,9 @@ import { useHudScale } from '@/lib/use-hud-scale';
 
 const JOYSTICK_BASE_PX = 140;
 const JOYSTICK_KNOB_PX = 64;
-const FIRE_BUTTON_PX = 72;
-const DODGE_BUTTON_PX = 56;
-const CLUSTER_GAP_PX = 12;
+const FIRE_BUTTON_PX = 96;
+const DODGE_BUTTON_PX = 80;
+const CLUSTER_GAP_PX = 14;
 const CLUSTER_BOTTOM_PX = 24;
 const CLUSTER_RIGHT_PX = 16;
 const DEAD_ZONE = 0.12;
@@ -44,6 +45,14 @@ interface JoystickState {
 export const TouchControls: React.FC = () => {
     const [visible, setVisible] = useState<boolean>(false);
     const [knobOffset, setKnobOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    // Floating joystick: summoned wherever the player taps on the
+    // left half of the screen, hidden the moment they release. This
+    // matches the mobile-joystick convention (Genshin / PUBG) where
+    // the base is fixed only at the moment of contact, not anchored
+    // to the bottom-left corner — thumbs land naturally wherever
+    // the device is being held.
+    const [joystickActive, setJoystickActive] = useState<boolean>(false);
+    const [joystickPos, setJoystickPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const joystickRef = useRef<JoystickState | null>(null);
     const firingRef = useRef<boolean>(false);
     const dodgeRef = useRef<boolean>(false);
@@ -67,16 +76,34 @@ export const TouchControls: React.FC = () => {
     };
 
     const handleJoystickStart = (e: React.PointerEvent<HTMLDivElement>): void => {
-        // App space, not client space: the layer may be rotated 90° and
-        // is scaled, so both the centre and the pointer have to be read
-        // through the same transform for the delta to mean anything.
-        const rect = appRect(e.currentTarget as HTMLDivElement);
+        // Right half is reserved for the FIRE/DODGE cluster — ignore
+        // taps there so a stray press on the action buttons doesn't
+        // also summon a ghost joystick underneath them.
+        const layerX = e.clientX / scale;
+        if (layerX > (width / scale) / 2) return;
+
+        // Position the joystick centred on the touch point, then clamp
+        // so the full base fits inside the layer (touches near a screen
+        // edge would otherwise hang the ring off-canvas).
+        const radius = JOYSTICK_BASE_PX / 2;
+        const layerW = width / scale;
+        const layerH = height / scale;
+        const rawCx = layerX - radius;
+        const rawCy = e.clientY / scale - radius;
+        const cx = Math.max(8, Math.min(layerW - JOYSTICK_BASE_PX - 8, rawCx));
+        const cy = Math.max(8, Math.min(layerH - JOYSTICK_BASE_PX - 8, rawCy));
+
         joystickRef.current = {
             pointerId: e.pointerId,
-            centerX: rect.left + rect.width / 2,
-            centerY: rect.top + rect.height / 2,
+            // Store the original touch point in screen px so the move
+            // handler can delta against it without re-converting.
+            centerX: e.clientX,
+            centerY: e.clientY,
         };
-        (e.target as Element).setPointerCapture(e.pointerId);
+        setJoystickPos({ x: cx, y: cy });
+        setJoystickActive(true);
+        setKnobOffset({ x: 0, y: 0 });
+        e.currentTarget.setPointerCapture(e.pointerId);
     };
     const handleJoystickMove = (e: React.PointerEvent<HTMLDivElement>): void => {
         const js = joystickRef.current;
@@ -102,6 +129,7 @@ export const TouchControls: React.FC = () => {
         if (!js || js.pointerId !== e.pointerId) return;
         joystickRef.current = null;
         setKnobOffset({ x: 0, y: 0 });
+        setJoystickActive(false);
         EventBus.emit('mobile:move', null);
     };
 
@@ -153,43 +181,70 @@ export const TouchControls: React.FC = () => {
                 transformOrigin: 'top left',
             }}
         >
-            {/* Joystick — bottom-left */}
+            {/* Left-half catch zone — full-height strip that listens
+               for pointer-down anywhere the player might naturally
+               rest their thumb. Width is 50% of the layer (the right
+               half belongs to FIRE/DODGE); once a touch lands here
+               we capture the pointer so subsequent move/up events
+               keep flowing even if the thumb drifts outside. */}
             <div
                 className="absolute pointer-events-auto"
                 style={{
-                    bottom: 24,
-                    left: 24,
-                    width: JOYSTICK_BASE_PX,
-                    height: JOYSTICK_BASE_PX,
+                    left: 0,
+                    top: 0,
+                    width: (width / scale) / 2,
+                    height: height / scale,
+                    touchAction: 'none',
                 }}
                 onPointerDown={handleJoystickStart}
                 onPointerMove={handleJoystickMove}
                 onPointerUp={handleJoystickEnd}
                 onPointerCancel={handleJoystickEnd}
-                data-testid="touch-joystick"
-            >
-                <div
-                    className="absolute inset-0 rounded-full border-2 border-amber-400/60 bg-stone-950/30 backdrop-blur-sm"
-                    style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
-                />
-                <div
-                    className="absolute rounded-full bg-amber-400 border-2 border-amber-200"
-                    style={{
-                        width: JOYSTICK_KNOB_PX,
-                        height: JOYSTICK_KNOB_PX,
-                        left: JOYSTICK_BASE_PX / 2 - JOYSTICK_KNOB_PX / 2 + knobOffset.x,
-                        top: JOYSTICK_BASE_PX / 2 - JOYSTICK_KNOB_PX / 2 + knobOffset.y,
-                        transition: joystickRef.current ? 'none' : 'transform 0.15s ease-out',
-                        transform: 'translate(0,0)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                    }}
-                />
-            </div>
+                data-testid="touch-joystick-zone"
+            />
 
-            {/* DODGE — sky-blue, left of FIRE */}
+            {/* Floating joystick — invisible until the player taps
+               anywhere on the left half of the screen, then renders
+               centred on the touch point. pointer-events-none keeps
+               the base from re-triggering the summon on subsequent
+               events; the catch zone above handles the pointer stream
+               once it's been captured. */}
+            {joystickActive && (
+                <div
+                    className="absolute pointer-events-none"
+                    style={{
+                        left: joystickPos.x,
+                        top: joystickPos.y,
+                        width: JOYSTICK_BASE_PX,
+                        height: JOYSTICK_BASE_PX,
+                    }}
+                    data-testid="touch-joystick"
+                >
+                    <div
+                        className="absolute inset-0 rounded-full border-2 border-amber-400/60 bg-stone-950/30 backdrop-blur-sm"
+                        style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
+                    />
+                    <div
+                        className="absolute rounded-full bg-amber-400 border-2 border-amber-200"
+                        style={{
+                            width: JOYSTICK_KNOB_PX,
+                            height: JOYSTICK_KNOB_PX,
+                            left: JOYSTICK_BASE_PX / 2 - JOYSTICK_KNOB_PX / 2 + knobOffset.x,
+                            top: JOYSTICK_BASE_PX / 2 - JOYSTICK_KNOB_PX / 2 + knobOffset.y,
+                            transition: 'none',
+                            transform: 'translate(0,0)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                        }}
+                    />
+                </div>
+            )}
+
+            {/* DODGE — sky-blue, left of FIRE. Lightning glyph reads
+               as "dash / quick step" at a glance; size scales with
+               the larger button so the icon stays the visual anchor. */}
             <button
                 type="button"
-                className="absolute pointer-events-auto rounded-full border-2 border-sky-300 bg-sky-500/40 backdrop-blur-sm text-sky-100 font-['Silkscreen',monospace] text-[10px] font-bold flex items-center justify-center active:bg-sky-400/60"
+                className="absolute pointer-events-auto rounded-full border-2 border-sky-200 bg-gradient-to-b from-sky-400/60 to-sky-600/60 backdrop-blur-sm text-sky-50 flex items-center justify-center active:from-sky-300/70 active:to-sky-500/70 transition-colors"
                 style={makeBtnStyle(DODGE_BUTTON_PX, DODGE_BUTTON_PX, dodgeRight)}
                 onPointerDown={dodgeDown}
                 onPointerUp={dodgeUp}
@@ -197,13 +252,15 @@ export const TouchControls: React.FC = () => {
                 data-testid="touch-dodge"
                 aria-label="Dodge"
             >
-                DODGE
+                <Zap className="size-10 fill-sky-100 stroke-sky-50 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
             </button>
 
-            {/* FIRE — rightmost, primary attack */}
+            {/* FIRE — rightmost, primary attack. Flame glyph sells the
+               "primary action" weight; subtle gradient gives the
+               bigger circle more depth than a flat fill. */}
             <button
                 type="button"
-                className="absolute pointer-events-auto rounded-full border-2 border-red-300 bg-red-500/40 backdrop-blur-sm text-red-100 font-['Silkscreen',monospace] text-sm font-bold flex items-center justify-center active:bg-red-400/60"
+                className="absolute pointer-events-auto rounded-full border-2 border-red-200 bg-gradient-to-b from-red-400/60 to-red-600/60 backdrop-blur-sm text-red-50 flex items-center justify-center active:from-red-300/70 active:to-red-500/70 transition-colors"
                 style={makeBtnStyle(FIRE_BUTTON_PX, FIRE_BUTTON_PX, fireRight)}
                 onPointerDown={shootDown}
                 onPointerUp={shootUp}
@@ -211,7 +268,7 @@ export const TouchControls: React.FC = () => {
                 data-testid="touch-shoot"
                 aria-label="Fire"
             >
-                FIRE
+                <Flame className="size-12 fill-red-100 stroke-red-50 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]" />
             </button>
         </div>
     );
