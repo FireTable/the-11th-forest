@@ -49,37 +49,22 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
         throw new Error('Phaser game not initialised — setPhaserGame never called');
     }
 
-    // Wipe the per-run entity snapshots BEFORE the new scene's
-    // loadCharacter() reads them. Without this, the character spawns
-    // at the last position the player had in the previous scene
-    // (saved by tickSaveState every 1s and persisted to localStorage
-    // via zustand), not at the new scene's characterSpawn. Symptom:
-    // switching scenes via Jump shows the new background + air walls
-    // but the character is at a stale position from the prior scene
-    // — looks like "the scene didn't refresh".
-    //
-    // Use the snapshot-only clear (NOT resetLevelProgress which also
-    // wipes hp/sp/slots) — scene transitions must preserve the
-    // player's progress: picked-up weapons, current health, selected
-    // character. The snapshot triple is the only thing that should
-    // reset per-scene.
-    useGameStore.getState().clearSceneSnapshots();
-
-    // Drop every registered scene, not just `LoadScene:${resolved.id}`:
-    // a teleport starts the next level under a different key, so keying
-    // off the caller's id would leave the previous scene alive, ticking
-    // behind the new one. `scenes` is mutated by remove(), hence the copy.
-    //
-    // `remove()` destroys the scene outright. Do NOT call `scene.stop()`
-    // first: ScenePlugin.stop only *queues* an op against the scene KEY,
-    // and we immediately re-register that key — so the queued stop lands
-    // on the fresh scene one frame later and freezes it on arrival.
+    // Drop every registered scene: pause first to stop update loops,
+    // then remove to destroy them outright.
     for (const s of [...game.scene.scenes]) {
+        s.scene.pause();
         game.scene.remove(s.sys.settings.key);
     }
 
+    // Wipe the per-run entity snapshots AFTER old scenes are removed
+    // so no destroy/shutdown handlers write stale state back into store.
+    useGameStore.getState().clearSceneSnapshots();
+
     const key = `LoadScene:${resolved.id}`;
-    game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+    const newScene = game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+
+    // Ensure the newly added scene is active and unpaused
+    newScene?.scene.resume();
 }
 
 /**
@@ -98,30 +83,27 @@ export function restartCurrentLevel(): void {
 }
 
 /**
- * Restart from the tavern — a full reset. Used by the death
- * overlay and the settings panel as the "back to the beginning"
- * path. `clearSaveData` wipes the persisted localStorage and
- * resets the store to `initialGameState` in one shot (isDead →
- * false, selectedCharacterId → null, tavernCleared → false, slots
- * → [], all three entity snapshots → undefined, hp/sp/currentLevelId
- * → zero/empty), so the next page load lands in the tavern phase-1
- * NPC selection with no stale snapshot restoring mid-fight.
- *
- * Order matters: pause running scenes BEFORE clearSaveData. The
- * old scene's per-frame CharacterController.update() calls
- * weaponHud.draw() → setWeaponStats({ slots }) which writes the
- * previous run's weapons back into the store. If we clear first,
- * the next frame's HUD draw overwrites our clean state with stale
- * weapons. Pausing stops the writer loop; restartSceneWith below
- * removes the scenes outright (paused scenes are still destroyed
- * by scene.remove).
+ * Full reset: wipes store & localStorage, then loads fresh tavern scene.
  */
 export async function restartAtTavern(): Promise<void> {
-    const game = getPhaserGame();
-    game?.pause()
+    const resolved = await resolveScene('tavern');
+
+    // 1. Remove old scenes completely
+    if (game) {
+        for (const s of [...game.scene.scenes]) {
+            game.scene.remove(s.sys.settings.key);
+        }
+    }
+
+    // 2. Clear state ONLY AFTER old scenes are completely destroyed
     useGameStore.getState().clearSaveData();
-    // const resolved = await resolveScene('tavern');
-    // await restartSceneWith(resolved);
+
+    // 3. Start fresh tavern scene and force resume in case game was paused
+    if (game) {
+        const key = `LoadScene:${resolved.id}`;
+        const newScene = game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+        newScene?.scene.resume();
+    }
 }
 
 /**
