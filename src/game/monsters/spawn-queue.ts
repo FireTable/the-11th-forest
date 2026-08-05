@@ -40,6 +40,13 @@ export interface PendingSpawn {
     /** Internal: when the `clear` condition first became true. The reducer
      *  stamps this; callers should treat it as opaque. */
     clearReadyAt?: number;
+    /** Internal: true once the queue has observed at least one alive
+     *  monster in `trigger.waveId` since this spawn was registered. A
+     *  `clear` trigger cannot fire until this flips — without it, a
+     *  clear spawn racing an un-spawned predecessor wave fires the
+     *  moment the queue first advances (because the field is empty
+     *  by default), which collapses all waves into a single burst. */
+    hasSeenAlive?: boolean;
 }
 
 /** Snapshot of what's alive right now, grouped by waveId. */
@@ -71,6 +78,11 @@ export function spawnReady(pending: PendingSpawn, now: number, alive: AliveSnaps
     if (t.kind === 'time') return now >= t.delayMs;
     // kind === 'clear'
     if (aliveCount(alive, t.waveId) > 0) return false;
+    // Gate: must have observed the target wave alive at least once
+    // before the empty-field timer starts. Prevents a clear spawn from
+    // firing the very first advance tick (when byWave is empty by
+    // default) before its predecessor time-triggered wave has spawned.
+    if (!pending.hasSeenAlive) return false;
     // Field is empty for our filter — fire if the post-clear delay has elapsed.
     if (pending.clearReadyAt === undefined) return false;
     return now >= pending.clearReadyAt + t.delayMs;
@@ -97,13 +109,23 @@ export function advanceSpawnQueue(
         }
         // kind === 'clear'
         if (aliveCount(alive, t.waveId) > 0) {
-            // Field not empty — reset any prior clear stamp so the post-clear
-            // delay re-measures from the next time the field empties.
-            if (p.clearReadyAt !== undefined) remaining.push({ ...p, clearReadyAt: undefined });
-            else remaining.push(p);
+            // Field not empty — mark observed-alive so the post-clear
+            // timer is allowed to start later. Reset any prior stamp so
+            // it re-measures from the next time the field empties.
+            const seen = { ...p, hasSeenAlive: true };
+            if (p.clearReadyAt !== undefined) remaining.push({ ...seen, clearReadyAt: undefined });
+            else remaining.push(seen);
             continue;
         }
         // Field empty for our filter.
+        if (!p.hasSeenAlive) {
+            // Never saw the target wave alive (still waiting on its
+            // time trigger, or the time trigger hasn't elapsed yet).
+            // Don't stamp — that would collapse all waves into one
+            // burst when the very first advance tick runs.
+            remaining.push(p);
+            continue;
+        }
         const readyAt = p.clearReadyAt ?? now;
         if (now >= readyAt + t.delayMs) {
             fired.push(p);

@@ -1210,7 +1210,15 @@ export class MonsterController {
                 return false;
             }
             const refreshed = remainingByIndex.get(q.pending.index);
-            if (refreshed) q.pending.clearReadyAt = refreshed.clearReadyAt;
+            // Mirror back every field the queue may have updated. The
+            // queue returns fresh spread copies; without this both
+            // clearReadyAt AND hasSeenAlive stay frozen on the original
+            // pending object, which breaks clear-trigger gating
+            // (hasSeenAlive never flips → clear spawns never fire).
+            if (refreshed) {
+                q.pending.clearReadyAt = refreshed.clearReadyAt;
+                q.pending.hasSeenAlive = refreshed.hasSeenAlive;
+            }
             return true;
         });
 

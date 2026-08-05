@@ -436,20 +436,20 @@ airWalls:
       - - 2748
         - 1535
   - id: wall-12
-    kind: tall
+    kind: short
     points:
-      - - 1174
-        - 576
-      - - 1176
-        - 992
-      - - 1194
-        - 1017
-      - - 1546
+      - - 1179
+        - 588
+      - - 1179
+        - 970
+      - - 1199
+        - 1022
+      - - 1556
         - 1020
-      - - 1571
-        - 995
-      - - 1566
-        - 584
+      - - 1574
+        - 972
+      - - 1568
+        - 606
       - - 1546
         - 556
       - - 1199
@@ -477,8 +477,31 @@ monsters:
     'y': 600
     waveId: boss
     trigger:
-      kind: clear
+      kind: time
       delayMs: 5000
+  - type: drone
+    x: 300
+    'y': 300
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 2000
+      waveId: wave-2
+  - type: stalker
+    x: 450
+    'y': 400
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 2000
+      waveId: wave-2
+  - type: sniper
+    x: 350
+    'y': 550
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 2000
       waveId: wave-2
 materials:
   - id: mat-ms66o299

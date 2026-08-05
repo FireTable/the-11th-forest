@@ -100,11 +100,14 @@ export function SettingsOverlay() {
                         only by default; the path elements carry their
                         own stroke attribute so props can't override
                         it). Inline SVG with fill-rule="evenodd" draws
-                        a fully filled gear with a clean central hole. */}
+                        a fully filled gear with a clean central hole.
+                        size-6 (24px) to match the github mark's visual
+                        weight — gear teeth leave whitespace so the
+                        same px size reads smaller than the octocat. */}
                     <svg
                         viewBox="0 0 24 24"
                         fill="currentColor"
-                        className="size-5"
+                        className="size-6"
                         aria-hidden="true"
                     >
                         <path

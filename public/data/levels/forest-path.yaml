@@ -292,59 +292,89 @@ characterSpawn:
   'y': 200
   facing: right
 monsters:
-    # debug — single wave spawning one of each monster type, time-triggered
-    # 1500 ms after level start. Spread vertically down the middle of the
-    # play area (player spawns at 1349,200 facing right) so all types are
-    # visible at once for visual / behaviour debugging.
-    - type: keeper
-      x: 1340
-      y: 400
-      trigger:
-        kind: time
-        delayMs: 1500
-      waveId: debug
-    - type: warden
-      x: 1340
-      y: 550
-      trigger:
-        kind: time
-        delayMs: 1500
-      waveId: debug
-    - type: drone-ultra
-      x: 1340
-      y: 720
-      trigger:
-        kind: time
-        delayMs: 1500
-      waveId: debug
-    - type: drone
-      x: 1340
-      y: 870
-      trigger:
-        kind: time
-        delayMs: 1500
-      waveId: debug
-    - type: stalker
-      x: 1340
-      y: 1020
-      trigger:
-        kind: time
-        delayMs: 1500
-      waveId: debug
-    - type: gunner
-      x: 1340
-      y: 1170
-      trigger:
-        kind: time
-        delayMs: 1500
-      waveId: debug
-    - type: sniper
-      x: 1340
-      y: 1320
-      trigger:
-        kind: time
-        delayMs: 1500
-      waveId: debug
+  - type: drone
+    x: 1280
+    'y': 480
+    waveId: wave-1
+    trigger:
+      kind: time
+      delayMs: 1500
+  - type: drone
+    x: 1400
+    'y': 540
+    waveId: wave-1
+    trigger:
+      kind: time
+      delayMs: 1500
+  - type: stalker
+    x: 1280
+    'y': 740
+    waveId: wave-2
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-1
+  - type: sniper
+    x: 1400
+    'y': 780
+    waveId: wave-2
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-1
+  - type: keeper
+    x: 1280
+    'y': 960
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-2
+  - type: stalker
+    x: 1400
+    'y': 980
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-2
+  - type: drone-ultra
+    x: 1340
+    'y': 1020
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-2
+  - type: gunner
+    x: 1280
+    'y': 1200
+    waveId: wave-4
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-3
+  - type: sniper
+    x: 1400
+    'y': 1220
+    waveId: wave-4
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-3
+  - type: drone-ultra
+    x: 1340
+    'y': 1260
+    waveId: wave-4
+    trigger:
+      kind: clear
+      delayMs: 500
+      waveId: wave-3
 dropSpawns: []
 materials: []
-teleporters: []
+teleporters:
+  - id: teleporter-msfmft58
+    x: 1396
+    'y': 1433
+    targetScene: sunlit-henge
+    radius: 60
