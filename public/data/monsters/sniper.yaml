@@ -1,14 +1,13 @@
 name: Spore Sniper
 # NOTE: spec pairs this monster with spore-shot, which was removed from
-# the AI sheet and replaced by bramble-knuckles. Reuses moss-bark-rifle
-# (the only ranged forest weapon) until a sniper-specific ranged weapon
-# is generated.
+# the AI sheet and replaced by bramble-knuckles. Reuses thorn-bolt
+# (ranged) for now — moss-bark-rifle moved to the gunner-only slot.
 hp: 90
 moveSpeed: 2.5
 body:
   halfW: 22
   halfH: 22
-weaponId: moss-bark-rifle
+weaponId: thorn-bolt
 sfx:
   hit: monster-hit
   death: monster-death

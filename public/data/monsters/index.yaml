@@ -1,5 +1,6 @@
 monsters:
   - drone
+  - drone-ultra
   - gunner
   - stalker
   - sniper

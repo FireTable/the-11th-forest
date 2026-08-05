@@ -1,7 +1,7 @@
 name: Thorn Scythe Claws
 damage: 14
 cooldownMs: 600
-range: 60
+range: 100
 hitWidth: 120
 hitHeight: 120
 visual:
