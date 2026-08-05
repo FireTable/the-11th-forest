@@ -9,24 +9,17 @@ import { CornerPixels } from './retro-box';
 /**
  * Weapon HUD.
  *
- * - Desktop: poker-fan of cards at bottom-right. Every slot up to
- *   the character's `weaponMax` is shown — empty placeholders included
- *   so the player can read the carry cap at a glance. Fan is shallow
- *   (7° per slot) and spread horizontally (28 px xShift per slot) so
- *   adjacent cards sit side-by-side instead of fully overlapping.
- * - Mobile: horizontal slot strip above the [DODGE][FIRE] cluster.
- *   Same placeholder logic; empty slots are dim outline-only tiles.
+ * - Desktop: full retro box with weapon name, ammo, reload progress,
+ *   and the 1/2/3/... slot hotbar at bottom-right (single column).
+ * - Mobile: horizontal slot strip above the [DODGE][FIRE] cluster —
+ *   each slot shows the weapon's thumbnail + name + ammo badge,
+ *   tappable to switch. Same visual language as the desktop slot bar
+ *   so the player isn't relearning the hotbar on a phone.
  */
 
 const SLOT_PX = 56;
 const SLOT_GAP_PX = 6;
 const SLOT_BOTTOM_PX = 124;
-
-/** Shape used in the render loop. Empty placeholders carry `slot: null`
- *  so the renderer knows to draw a dim outline tile instead of a card. */
-type DisplaySlot =
-    | { kind: 'filled'; slot: ReturnType<typeof useGameStore.getState>['slots'][number] }
-    | { kind: 'empty'; slot: null };
 
 export const WeaponHUDOverlay: React.FC = () => {
     const {
@@ -35,7 +28,6 @@ export const WeaponHUDOverlay: React.FC = () => {
         isReloading,
         reloadProgress,
         slots,
-        weaponMax,
         hubsVisible,
     } = useGameStore();
     const mobile = useIsMobile();
@@ -45,24 +37,11 @@ export const WeaponHUDOverlay: React.FC = () => {
     // case naturally short-circuits on `slots.length === 0`.
     if (!hubsVisible || !activeWeaponName || slots.length === 0) return null;
 
-    // Always show at least `slots.length` cards; if `weaponMax` was
-    // pushed (it is, by CharacterHud after loadCharacter), pad with
-    // placeholder tiles up to the cap so the carry limit reads at a
-    // glance. `weaponMax === 0` falls back to slots.length.
-    const displayCount = Math.max(slots.length, weaponMax);
-    const display: DisplaySlot[] = [
-        ...slots.map((slot) => ({ kind: 'filled' as const, slot })),
-        ...Array.from({ length: displayCount - slots.length }, () => ({
-            kind: 'empty' as const,
-            slot: null,
-        })),
-    ];
-
     if (mobile) {
         const handleSwitch = (index: number): void => {
             EventBus.emit('mobile:weapon:switch', { index });
         };
-        const stripWidth = displayCount * SLOT_PX + (displayCount - 1) * SLOT_GAP_PX;
+        const stripWidth = slots.length * SLOT_PX + (slots.length - 1) * SLOT_GAP_PX;
         return (
             <div
                 className="absolute z-20 select-none font-['Silkscreen',monospace] flex items-end"
@@ -74,24 +53,7 @@ export const WeaponHUDOverlay: React.FC = () => {
                 }}
                 data-testid="weapon-slot-strip"
             >
-                {display.map((entry, index) => {
-                    if (entry.kind === 'empty') {
-                        return (
-                            <div
-                                key={`empty-${index}`}
-                                data-testid={`weapon-slot-${index}-empty`}
-                                aria-hidden="true"
-                                className="border-2 border-dashed border-stone-700/60 bg-stone-950/30 pointer-events-none"
-                                style={{ width: SLOT_PX, height: SLOT_PX }}
-                            >
-                                <CornerPixels />
-                                <span className="absolute inset-0 flex items-center justify-center text-stone-600 text-lg leading-none select-none">
-                                    +
-                                </span>
-                            </div>
-                        );
-                    }
-                    const slot = entry.slot;
+                {slots.map((slot, index) => {
                     const isActive = index === activeWeaponIndex;
                     const showReloading = isActive && isReloading;
                     return (
@@ -165,58 +127,31 @@ export const WeaponHUDOverlay: React.FC = () => {
     }
 
     return (
-        <div className="absolute bottom-6 right-6 z-20 pointer-events-none select-none font-['Silkscreen',monospace] w-[440px]">
-            {/* Spread poker fan: 7° per offset (was 12°) so the curve
-             *  reads as a gentle hand rather than a tight bouquet.
-             *  Horizontal xShift of 28px per slot staggers adjacent
-             *  cards side-by-side; the rotation pivot at bottom-centre
-             *  keeps them anchored like a wrist. The active card lifts
-             *  -20px so it pops in front of its neighbours; cards
-             *  further from active index sit lower and dimmer. Empty
-             *  placeholders ride the same fan so the cap reads as one
-             *  uniform layout. z-index decreases with |offset| so
-             *  closer cards overlap farther ones, the same way a hand
-             *  stacks. */}
+        <div className="absolute bottom-6 right-6 z-20 pointer-events-none select-none font-['Silkscreen',monospace] w-[300px]">
+            {/* Pure-rotation poker fan: every card pivots around its
+             *  bottom-centre and fans out by `offset * 12°` of
+             *  rotation, with no manual xShift. The pivot at the
+             *  bottom edge + the card's own height naturally creates
+             *  the spread — the top corners swing outward as the card
+             *  tilts, while the bottom corners stay anchored. This
+             *  matches a real card hand where cards overlap at the
+             *  pivot and fan open at the top. The active card is the
+             *  centre (rotate 0°) and lifted 20px so it visually
+             *  pops in front of the others. z-index decreases with
+             *  |offset| so closer cards overlap farther ones, the
+             *  same way a hand stacks. */}
             <div className="relative h-[200px]">
-                {display.map((entry, index) => {
-                    const offset = index - activeWeaponIndex;
-                    const angle = offset * 7;
-                    const xShift = offset * 28;
-                    const active = index === activeWeaponIndex;
-                    const yShift = active ? -20 : Math.abs(offset) * 4;
-                    const z = active ? 50 : 40 - Math.abs(offset);
-
-                    if (entry.kind === 'empty') {
-                        return (
-                            <div
-                                key={`empty-${index}`}
-                                data-testid={`desktop-weapon-slot-${index}-empty`}
-                                aria-hidden="true"
-                                style={{
-                                    zIndex: z - 1,
-                                    transformOrigin: '50% 100%',
-                                    transform: `translate(${xShift}px, ${yShift}px) rotate(${angle}deg)`,
-                                    bottom: 0,
-                                    left: '50%',
-                                    marginLeft: -45,
-                                }}
-                                className="absolute w-[90px] h-[150px] border-2 border-dashed border-stone-700/50 bg-stone-950/30 pointer-events-none"
-                            >
-                                <CornerPixels />
-                                <span className="absolute inset-0 flex items-center justify-center text-stone-600 text-3xl leading-none select-none">
-                                    +
-                                </span>
-                            </div>
-                        );
-                    }
-
-                    const slot = entry.slot;
-                    const isActive = active;
+                {slots.map((slot, index) => {
+                    const isActive = index === activeWeaponIndex;
                     const showReloading = isActive && isReloading;
                     const ammoFrac =
                         slot.clipSize > 0
                             ? Math.max(0, Math.min(100, (slot.ammo / slot.clipSize) * 100))
                             : 100;
+                    const offset = index - activeWeaponIndex;
+                    const angle = offset * 12;
+                    const yShift = isActive ? -20 : Math.abs(offset) * 4;
+                    const z = isActive ? 50 : 40 - Math.abs(offset);
                     return (
                         <button
                             key={slot.id || index}
@@ -230,7 +165,7 @@ export const WeaponHUDOverlay: React.FC = () => {
                             style={{
                                 zIndex: z,
                                 transformOrigin: '50% 100%',
-                                transform: `translate(${xShift}px, ${yShift}px) rotate(${angle}deg)`,
+                                transform: `translateY(${yShift}px) rotate(${angle}deg)`,
                                 bottom: 0,
                                 left: '50%',
                                 marginLeft: -45,

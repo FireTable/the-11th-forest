@@ -94,11 +94,6 @@ export interface GameUIState {
     /** How many weapons the player has picked up in the current tavern
      *  session. Not persisted — resets each time the tavern scene loads. */
     tavernWeaponCount: number;
-    /** Per-character cap on hotbar size (mirrors `CharacterSpec.weaponMax`).
-     *  Pushed by `CharacterHud` after loadCharacter so the React HUD can
-     *  reserve empty placeholder slots up to the cap. 0 = not set yet
-     *  (HUD falls back to `slots.length`). */
-    weaponMax: number;
 
     // Setters
     setLevelTitle: (title: string) => void;
@@ -142,7 +137,6 @@ export interface GameUIState {
     setSelectedCharacterId: (id: string | null) => void;
     setTavernCleared: (cleared: boolean) => void;
     setTavernWeaponCount: (n: number) => void;
-    setWeaponMax: (n: number) => void;
 }
 
 export const initialGameState = {
@@ -175,7 +169,6 @@ export const initialGameState = {
     selectedCharacterId: null as string | null,
     tavernCleared: false,
     tavernWeaponCount: 0,
-    weaponMax: 0,
 };
 
 export const useGameStore = create<GameUIState>()(
@@ -285,7 +278,6 @@ export const useGameStore = create<GameUIState>()(
             setSelectedCharacterId: (id) => set({ selectedCharacterId: id }),
             setTavernCleared: (cleared) => set({ tavernCleared: cleared }),
             setTavernWeaponCount: (n) => set({ tavernWeaponCount: n }),
-            setWeaponMax: (n) => set({ weaponMax: n }),
         }),
         {
             name: '11th_forest_save_v1',
@@ -299,7 +291,6 @@ export const useGameStore = create<GameUIState>()(
                 maxSp: state.maxSp,
                 slots: state.slots,
                 activeWeaponIndex: state.activeWeaponIndex,
-                weaponMax: state.weaponMax,
                 levelElapsedMs: state.levelElapsedMs,
                 playerSnapshot: state.playerSnapshot,
                 activeMonstersSnapshot: state.activeMonstersSnapshot,
