@@ -23,8 +23,10 @@
     "scripts": {
         "dev": "node log.js dev & vite --config vite/config.dev.mjs",
         "build": "node log.js build & vite build --config vite/config.prod.mjs",
+        "serve": "node log.js serve & vite preview --config vite/config.prod.mjs",
         "dev-nolog": "vite --config vite/config.dev.mjs",
         "build-nolog": "vite build --config vite/config.prod.mjs",
+        "serve-nolog": "vite preview --config vite/config.prod.mjs",
         "test": "vitest run --passWithNoTests",
         "test:watch": "vitest",
         "type-check": "tsc --noEmit",
