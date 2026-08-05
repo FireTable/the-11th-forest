@@ -243,3 +243,32 @@
 .animate-crosshair-breathe {
     animation: crosshairBreathe 1.2s ease-in-out infinite;
 }
+
+/* Thin scrollbars app-wide. The native 17px scrollbar chunks the
+   editor aside and drops a horizontal bar over rows that just fit;
+   the 6px track + 2px thumb keeps the chrome out of the way while
+   still readable on hover.
+
+   - `scrollbar-width: thin` is the Firefox / modern standard.
+   - `::-webkit-scrollbar` covers WebKit / Blink (Chromium, Safari)
+     which is the editor's main runtime. The `display: none` zero-
+     length variant avoids drawing the track on elements with no
+     overflow. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.4 0 0) transparent;
+}
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background-color: oklch(0.4 0 0);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(0.55 0 0);
+}
