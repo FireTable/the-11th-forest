@@ -79,7 +79,8 @@ src/game/main.ts:resolveScene()
       6. DropController   — self-spawns from level.dropSpawns + death rolls
       7. Bullet→monster damage hook (matter collisionstart)
       8. AudioController — subscribes to sfx:*/music:* events
-      9. emit MUSIC_EVENT(level.music)   ← cross-fade into the level's music
+      9. emit MUSIC_EVENT(level.music) or MUSIC_STOP (when level.music unset)
+         — see AUDIOS.md § "The BGM singleton"
      10. Camera center + MaterialManager + optional PointLight + Pixelate/Quantize FX
      11. per-frame: monsterSystem.update / dropSystem.update / material.update /
                     teleporterSystem.update / tickSaveState (1 Hz — clock + snapshots)
@@ -143,6 +144,14 @@ characterSpawn: # optional — where + which way the player starts
     facing: left | right
     x: number
     y: number
+tavern:
+    boolean # optional — when true, LoadScene enters tavern mode
+    #   (NPCs render for selection; no monsters; weapon cap from
+    #   character.weaponMax). The Forest Tavern scene sets this.
+npcSpawns: # tavern-mode only — per-character NPC standing positions
+    - characterId: string # id from public/data/characters/index.yaml
+      x: number
+      y: number
 
 airWalls: # polygon obstacles in image pixel space
     - id: string # unique within the level
@@ -151,6 +160,8 @@ airWalls: # polygon obstacles in image pixel space
           # short: blocks character only (bullets pass over)
       points: # polygon, implicitly closed; ≥3 vertices
           - [number, number] # rectangle = 4 vertices
+      # Legacy form (still parsed and migrated to points):
+      # x, y, width, height — converted to 4-vertex polygon by the schema
 
 monsters: # optional — list of monster spawns
     - type: string # id from public/data/monsters/index.yaml
@@ -168,6 +179,9 @@ dropSpawns: # optional — static drops placed in the level
     - type: string # id from public/data/drops/index.yaml
       x: number
       y: number
+      weaponId: # optional — when type='weapon-drop', the real weapon
+          # to grant. Lets the generic weapon-drop spec serve every
+          # weapon in the game from one yaml. See DROPS.md.
 
 materials: # optional — decorative props (trees, rocks, …)
     - id: string # unique within the level
@@ -301,8 +315,11 @@ Both reset on shutdown via `setLevelElapsedMs(0)` when the next scene boots.
 | --------------------- | ----------------------------------------- | ------------------------------ |
 | `level-loaded`        | `{ id, level }`                           | end of `create()`              |
 | `current-scene-ready` | `this` (the scene)                        | end of `create()`              |
-| `music:<id>`          | —                                         | if `level.music` set           |
+| `character-position`  | `{ x, y }`                                | per-frame while alive — tavern weapon-replace hub listens |
+| `music:<id>` or `music:stop` | —                                   | if `level.music` set, or `MUSIC_STOP` if unset |
 | `editor-open`         | listened by the scene (not emitted by it) | toggles HUD + debug rectangles |
+
+The `music` event is **not** auto-emitted on every scene; it is only emitted by `LoadScene.create()` based on `level.music`. See [`AUDIOS.md`](./AUDIOS.md#the-bgm-singleton-cross-scene-cross-fade) for the singleton semantics that prevent two scenes from stacking BGM.
 
 ## Validation
 

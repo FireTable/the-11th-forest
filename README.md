@@ -83,6 +83,8 @@ There is no per-level scene class — `LoadScene` renders every level from its
 YAML. To add a level, write `public/data/levels/<id>.yaml` and list the id in
 `index.yaml`; see [`docs/SCENES.md`](./docs/SCENES.md) for the full walkthrough.
 
+For day-to-day work on game data — adding a character, tuning monster HP, regenerating audio — see [`docs/SKILL.md`](./docs/SKILL.md). It walks the schema-first workflow, balance numbers, and the AI asset pipeline end to end.
+
 ## Documentation
 
 Long-form design, mechanics, art, and tooling docs live in [`docs/`](./docs/), one topic per `UPPERCASE-ENGLISH.md` file. See [`docs/README.md`](./docs/README.md) for the full index.
@@ -91,6 +93,7 @@ Start with:
 
 - [`docs/SCENES.md`](./docs/SCENES.md) — how a scene is loaded (file layout, `handle-fetch`, adding a new scene, monster spawn triggers, HUD bridge).
 - [`docs/MODULES.md`](./docs/MODULES.md) — the yaml → schema → parser → loader → logic pattern every data-driven module follows.
+- [`docs/SKILL.md`](./docs/SKILL.md) — how to maintain `public/data/` (schemas, balance, AI regen).
 
 Per-module references:
 

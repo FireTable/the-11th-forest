@@ -6,7 +6,7 @@ Player-held weapons and monster weapons. One yaml per weapon id; the controller 
 
 ```
 src/lib/weapons/
-├── schema.ts      # Zod schema (source of truth)
+├── schema.ts      # Zod schema (source of truth) — WeaponSpecSchema, superRefine kind check
 ├── types.ts       # WeaponSpec, WeaponIndex (z.infer)
 ├── parser.ts      # parseWeaponYaml(text, id) → WeaponSpec
 ├── loader.ts      # async fetchWeapon(id) using handle-fetch
@@ -20,72 +20,74 @@ src/game/weapons/
 
 public/data/weapons/
 ├── index.yaml
-├── assault-rifle.yaml
-├── shotgun.yaml
-├── laser-cannon.yaml
-├── rocket-launcher.yaml
-├── arcana-staff.yaml
-├── plasma-sword.yaml
-├── drone-claws.yaml          # monster melee
-└── gunner-blast.yaml         # legacy (no longer used post-swap)
+└── <id>.yaml      # one per weapon (player + monster melee/ranged)
 ```
+
+The shipped set includes the player's six weapons plus the level-1
+(`drone-claws`, `gunner-blast`) and level-2 Rusted Hollow Citadel
+monster weapons (`thorn-scythe-claws`, `moss-bark-rifle`, `vine-lash`,
+`rune-shield`, `branch-sweep`, `bramble-knuckles`, `thorn-bolt`,
+`vine-tip`, `rune-shard`, `sap-drop`, `thorn-orb`). `gunner-blast` is
+kept as a legacy entry that the controller currently never references.
 
 ## YAML schema — `public/data/weapons/<id>.yaml`
 
-Ranged vs melee is decided by whether `projectile` is set. Exactly one of them is required (`superRefine` enforces).
+Ranged vs melee is decided by whether `projectile` is set. Exactly one of them is required (`superRefine` enforces). `clipSize` / `reloadTimeMs` / `bulletsPerShot` are player-only; monster weapons omit them (cooldown alone gates monster fire).
 
 ```yaml
 id: assault-rifle # optional; loader overwrites with filename
 name: Assault Rifle
-damage: 8
-cooldownMs: 250
-range: 600
+damage: 2
+cooldownMs: 100 # ms between shots
+range: 550 # max travel distance for projectiles / hitbox radius for melee
 
 visual: # floating sprite that orbits the holder
-    texture: assets/image/weapons/assault-rifle.png
-    scale: 0.4
-    orbitRadius: 16
-    anchor: [0.45, 0.5] # grip point relative to texture
-    muzzleOffset: [22, 0] # bullet spawn point in weapon-local space
-    recoilDistance: 6
-    recoilDuration: 80
-    swingAngle: 90 # for melee only
-    rotationOffset: 0 # degrees
+    texture: assets/image/weapons/assault-rifle.png # optional; debug rect if absent
+    scale: 0.16 # default 0.16
+    orbitRadius: 18 # default 16
+    anchor: [0.45, 0.5] # default [0.2, 0.5] — grip point relative to texture
+    muzzleOffset: 400 # default 400 — bullet spawn point in weapon-local space
+    recoilDistance: 6 # default 6
+    recoilDuration: 80 # default 80 (ms)
+    swingAngle: 200 # default 120 (melee only)
+    rotationOffset: 0 # default 0 (degrees)
 
-bullet: # one per fire; can repeat via bulletsPerShot
+bullet: # sprite / beam / melee-hitbox — one per fire (repeats per bulletsPerShot)
     texture: assets/image/weapons/assault-bullet.png
     type: projectile # 'projectile' | 'beam' | 'melee'
-    speed: 14
-    scale: 0.3
-    color: 0xE0C071 # fallback color if no texture
+    speed: 700 # optional for melee (defaults to projectile.speed)
+    scale: 0.08 # default 1
+    color: 0xE0C071 # fallback tint when no texture (string per schema)
     beamWidth: 8 # beam only
-    beamDuration: 300 # beam only
-    anchor: [0.5, 0.5]
-    rotationOffset: 0
-    spawnOffset: [0, 0] # extra offset from muzzle
+    beamDuration: 300 # beam only (ms)
+    anchor: [0.5, 0.5] # optional
+    rotationOffset: 0 # optional
+    spawnOffset: [10, -10] # extra offset from muzzle
 
-projectile: # REQUIRED for ranged (no `bullet` then ranged via projectile)
-    speed: 14
-    visual: # legacy shape; newer code uses `bullet` + `spawnOffset`
+projectile: # REQUIRED for ranged (defines speed + collision shape)
+    speed: 24
+    visual: # legacy shape; newer code uses `bullet.texture`
         radius: 4
-        width: 8
-        height: 8
-        color: 0xE0C071
+        width: 2
+        height: 2
+        color: 0x23C9D0
 
-clipSize: 30 # player-only magazine (optional)
+# ─── Player-only (omit on monster weapons) ─────────────────────
+clipSize: 30
 reloadTimeMs: 1500
 bulletsPerShot: 1
-hitWidth: 80 # melee only — sensor width
-hitHeight: 80 # melee only — sensor height
 
-sfx:
-    shoot: assault-rifle-shoot # optional override; default falls back
-    dryFire: dry-fire # to bullet-wall, weapon-switch, etc.
+# ─── Melee-only (omit on ranged weapons) ──────────────────────
+hitWidth: 120 # sensor width
+hitHeight: 120 # sensor height
+
+sfx: # all optional — controller falls back to global ids
+    shoot: assault-rifle-shoot # falls back to 'player-shoot' (player) or 'monster-shoot' (monster)
+    dryFire: dry-fire
     bulletWall: bullet-wall
     reloadStart: reload-start
     reloadFinish: reload-finish
-
-prompt: Heavy anime assault rifle shot, low punchy burst # AI regen prompt (used by scripts/elevenlabs-sfx.ts if ElevenLabs provider)
+    throttleMs: 80 # min gap between bulletWall plays for this weapon id
 ```
 
 ## Public API (`src/lib/weapons/index.ts`)
@@ -153,13 +155,13 @@ destroyBulletVisual(scene, bullet)
 
 ## Events emitted
 
-| Event                                    | When                                                                                   |
-| ---------------------------------------- | -------------------------------------------------------------------------------------- |
-| `sfx:weapon-switch`                      | hotbar swap                                                                            |
-| `sfx:reload-start` / `sfx:reload-finish` | manual reload lifecycle                                                                |
-| `sfx:dry-fire`                           | trigger with empty magazine                                                            |
-| `sfx:bullet-wall`                        | bullet hit tall wall                                                                   |
-| `sfx:<weapon>.shoot`                     | ranged fire (uses `weapon.sfx?.shoot` or falls back to `weapon-switch` path for melee) |
+| Event                                    | When                                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `sfx:weapon-switch`                      | hotbar swap                                                                                       |
+| `sfx:reload-start` / `sfx:reload-finish` | manual reload lifecycle (falls back to global `reload-start`/`reload-finish` if spec omits sfx)   |
+| `sfx:dry-fire`                           | trigger with empty magazine                                                                       |
+| `sfx:bullet-wall`                        | bullet hit tall wall (throttled per weapon by `sfx.throttleMs`)                                   |
+| `sfx:<weapon>.shoot` or `sfx:player-shoot` / `sfx:monster-shoot` | ranged fire (uses `weapon.sfx?.shoot` or falls back by holder) |
 
 ## Events subscribed
 
@@ -169,17 +171,18 @@ None — weapons are pure emitters.
 
 - **One yaml per weapon id.** No sub-types in shared yaml files.
 - **No `id` field** in yaml; the loader overwrites `spec.id` with the filename basename.
-- **`bullet.texture` wins over `projectile.visual`** for rendered bullets. The legacy `projectile` block is kept for older weapons without a sprite; new weapons should fill `bullet.texture`.
+- **`bullet.texture` wins over `projectile.visual`** for rendered bullets. The legacy `projectile` block is kept for collision-shape data; new weapons should fill `bullet.texture` for visible projectiles.
 - **Player ammo** lives in `WeaponController` (per-slot). Monster ammo is infinite — `cooldownMs` is the only gate.
 - **Aim assist** is in `WeaponController.update` (constants in `src/lib/constants.ts → AIM_ASSIST`). It pulls the cursor toward monsters inside `INITIAL_SNAP_RADIUS`, then sticks to one within `STICKY_TETHER_RADIUS`.
 - **Hit detection** — projectiles use Matter sensor bodies (`isSensor: true`) for collision events; melee uses the sensor + `body.collisionFilter` to limit what it overlaps.
+- **SFX throttling** — every SFX field can carry an optional `throttleMs` to stop overlapping instances during sustained fire. Keyed per-weapon so different weapons fire independently.
 
 ## Adding a new weapon
 
 1. Generate the sprite sheet + idle animation via `scripts/split-sheet.ts` + `scripts/generate-image.ts` (see [`SCENES.md`](./SCENES.md) for the pattern; weapons use the same prompt-based flow).
 2. Write `public/data/weapons/<id>.yaml` matching the schema above.
 3. Append `<id>` to `public/data/weapons/index.yaml`.
-4. (If it's a player weapon) Append `<id>` to `public/data/characters/wanderer.yaml → hotbar`.
+4. (If it's a player weapon) The character's `hotbar: []` is empty by default — players pick weapons up in the tavern via `weapon-drop` (see [`DROPS.md`](./DROPS.md)). Adding to `hotbar` makes it a starting weapon.
 5. No TS code changes — `WeaponController` picks it up.
 
 ## Adding a new weapon trigger (rare)

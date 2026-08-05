@@ -83,6 +83,8 @@ VITE_GEMINI_MODEL=gemini-3-pro-image
 `public/data/levels/<id>.yaml` 并把 id 加进 `index.yaml`,完整流程见
 [`docs/SCENES.md`](./docs/SCENES.md)。
 
+日常维护游戏数据(新增角色、调整怪物数值、重新生成音效),见 [`docs/SKILL.md`](./docs/SKILL.md),里面讲了 schema 优先的工作流、平衡性参考值以及 AI 资产生成管线。
+
 ## 文档
 
 详细的设计、机制、美术与工具文档存放在 [`docs/`](./docs/),每个主题一个 `UPPERCASE-ENGLISH.md` 文件。完整索引见 [`docs/README.md`](./docs/README.md)。
@@ -91,6 +93,7 @@ VITE_GEMINI_MODEL=gemini-3-pro-image
 
 - [`docs/SCENES.md`](./docs/SCENES.md) — 场景如何被加载(文件结构、`handle-fetch`、如何添加新场景、怪物刷新触发条件、HUD 桥接)。
 - [`docs/MODULES.md`](./docs/MODULES.md) — 每个数据驱动模块都遵循的 `yaml → schema → parser → loader → logic` 模式。
+- [`docs/SKILL.md`](./docs/SKILL.md) — 如何维护 `public/data/` 目录(schema、平衡性、AI 资产生成)。
 
 各模块参考:
 

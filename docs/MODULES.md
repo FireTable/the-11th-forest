@@ -105,3 +105,5 @@ Rule of thumb: **add a yaml field before adding a code path.** Tweak the schema,
 | `pnpm tsx scripts/validate-levels.ts` | every `index.yaml` entry has a matching data file; `level.imageSize` matches the prompt yaml |
 
 Most modules don't have a validator — Zod `.safeParse` at parse time is enough. Add a validator only for cross-file invariants (like level↔prompt alignment).
+
+For day-to-day data work — adding a character, tuning monster HP, regenerating SFX — see [`SKILL.md`](./SKILL.md). It walks the schema-first workflow, balance numbers, and the AI asset pipeline end to end.

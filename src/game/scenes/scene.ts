@@ -39,7 +39,7 @@ import {
     createPathDebugOverlay,
     type PathDebugOverlayHandles,
 } from '@/game/monsters/path-debug-overlay';
-import { DEPTH, MUSIC_EVENT, PIXEL_LIGHTING_CONFIG } from '@/lib/constants';
+import { DEPTH, MUSIC_EVENT, MUSIC_STOP, PIXEL_LIGHTING_CONFIG } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { setCurrentLevel } from '@/lib/levels/current-level';
 import { useGameStore } from '@/store/game-store';
@@ -425,9 +425,14 @@ export class LoadScene extends Phaser.Scene {
             this.assets.sfxSpecs.values(),
             this.assets.musicSpecs.values(),
         );
-        // Honk the level's chosen music, if any.
+        // Honk the level's chosen music, if any. If the level has no music
+        // the global BGM from the previous scene is silenced — the
+        // singleton survives scene transitions, so without this stop
+        // any old music would keep playing into a silent scene.
         if (this.level.music) {
             EventBus.emit(MUSIC_EVENT(this.level.music));
+        } else {
+            EventBus.emit(MUSIC_STOP);
         }
 
         // Center camera on world so the viewport shows the middle of the
