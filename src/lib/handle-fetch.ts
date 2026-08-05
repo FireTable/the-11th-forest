@@ -3,9 +3,10 @@
  * --------------------------------------------------------------------------
  * Drop-in replacement for global `fetch` that handles the Node ↔ browser
  * path mismatch for `/data/*` URLs and provides automatic in-memory caching
- * for static `/data/*` GET requests across all data loaders.
+ * for static `/data/*` and `/assets/*` GET requests across all data loaders
+ * and preloader services.
  *
- * Browser: behaves like global `fetch` with in-memory caching for `/data/*`.
+ * Browser: behaves like global `fetch` with in-memory caching for static assets.
  * Node 22+: translates `/data/levels/X.yaml` → `file://.../public/data/levels/X.yaml`
  *
  * `node:fs` and `node:path` are dynamic-imported so they never enter the
@@ -18,7 +19,7 @@ const responseCache = new Map<string, Promise<Response>>();
 
 /**
  * Clear the in-memory fetch cache.
- * Useful when the editor modifies local YAML files and needs fresh data.
+ * Useful when the editor modifies local YAML/asset files and needs fresh data.
  */
 export function clearFetchCache(url?: string): void {
     if (url) {
@@ -42,7 +43,7 @@ async function ensureNodeOverride(): Promise<void> {
                     : input instanceof URL
                       ? input.href
                       : (input as Request).url;
-            if (typeof url === 'string' && url.startsWith('/data/')) {
+            if (typeof url === 'string' && (url.startsWith('/data/') || url.startsWith('/assets/'))) {
                 const text = readFileSync(resolve('public' + url), 'utf8');
                 return Promise.resolve(new Response(text));
             }
@@ -53,10 +54,10 @@ async function ensureNodeOverride(): Promise<void> {
 }
 
 /**
- * Identical signature to global `fetch`. Use this everywhere `/data/*`
+ * Identical signature to global `fetch`. Use this everywhere `/data/*` & `/assets/*`
  * paths appear so Node scripts and browser code stay in sync.
  *
- * Automatically caches GET responses for `/data/*` URLs so repeat reads
+ * Automatically caches GET responses for `/data/*` and `/assets/*` URLs so repeat reads
  * return cloned responses without network overhead.
  */
 export async function fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -69,7 +70,10 @@ export async function fetch(input: RequestInfo | URL, init?: RequestInit): Promi
               ? input.href
               : (input as Request).url;
     const method = init?.method?.toUpperCase() ?? 'GET';
-    const isCacheable = method === 'GET' && typeof url === 'string' && url.startsWith('/data/');
+    const isCacheable =
+        method === 'GET' &&
+        typeof url === 'string' &&
+        (url.startsWith('/data/') || url.startsWith('/assets/'));
 
     if (isCacheable && responseCache.has(url)) {
         const cached = await responseCache.get(url)!;
