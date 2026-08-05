@@ -33,13 +33,13 @@ Beyond the core combat systems, the project features an **in-browser visual leve
 ## 🖼️ Screenshots
 
 <p align="center">
-  <img src="screenshots/tavern.png" width="100%" alt="Tavern Character Selection" /><br/>
+  <img src="screenshots/tavern-v1.png" width="100%" alt="Tavern Character Selection" /><br/>
   <i>Tavern — multi-character selection & radar stats</i>
 </p>
 
 <p align="center">
-  <img src="screenshots/combat.png" width="48%" alt="Combat Level Screenshot" />
-  <img src="screenshots/editor.png" width="48%" alt="In-Browser Level Editor" /><br/>
+  <img src="screenshots/combat-v1.png" width="48%" alt="Combat Level Screenshot" />
+  <img src="screenshots/editor-v1.png" width="48%" alt="In-Browser Level Editor" /><br/>
   <i>Left: In-game combat and projectile dynamics &nbsp;&nbsp;|&nbsp;&nbsp; Right: In-browser visual level editor</i>
 </p>
 

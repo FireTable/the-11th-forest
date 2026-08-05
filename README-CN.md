@@ -33,13 +33,13 @@
 ## 🖼️ 游戏与编辑器截图 (Screenshots)
 
 <p align="center">
-  <img src="screenshots/tavern.png" width="100%" alt="酒馆选角界面" /><br/>
+  <img src="screenshots/tavern-v1.png" width="100%" alt="酒馆选角界面" /><br/>
   <i>酒馆 — 多角色选角与属性雷达</i>
 </p>
 
 <p align="center">
-  <img src="screenshots/combat.png" width="48%" alt="战斗关卡截图" />
-  <img src="screenshots/editor.png" width="48%" alt="可视化关卡编辑器" /><br/>
+  <img src="screenshots/combat-v1.png" width="48%" alt="战斗关卡截图" />
+  <img src="screenshots/editor-v1.png" width="48%" alt="可视化关卡编辑器" /><br/>
   <i>左：关卡战斗与弹道层级 &nbsp;&nbsp;|&nbsp;&nbsp; 右：可视化在线关卡编辑器</i>
 </p>
 
