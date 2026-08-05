@@ -511,7 +511,7 @@ export const TavernHud: React.FC = () => {
                                                         min: focus.statRange.hp.min,
                                                         max: focus.statRange.hp.max,
                                                         label: 'HP',
-                                                        icon: <Heart className="w-2.5 h-2.5" />,
+                                                        icon: <Heart className="w-2.5 h-2.5 fill-red-500 text-red-400" />,
                                                         iconColor: 'text-red-400',
                                                     },
                                                     {
@@ -519,7 +519,7 @@ export const TavernHud: React.FC = () => {
                                                         min: focus.statRange.sp.min,
                                                         max: focus.statRange.sp.max,
                                                         label: 'SP',
-                                                        icon: <Zap className="w-2.5 h-2.5" />,
+                                                        icon: <Zap className="w-2.5 h-2.5 fill-sky-400 text-sky-300" />,
                                                         iconColor: 'text-sky-400',
                                                     },
                                                     {
