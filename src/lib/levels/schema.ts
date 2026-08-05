@@ -109,6 +109,25 @@ export const DropSpawnSchema = z
         type: z.string().min(1),
         x: z.number(),
         y: z.number(),
+        /** Override the weapon id for type='weapon' drops. Lets the level
+         *  YAML reuse a single generic drop spec for every weapon in the
+         *  game without needing one drop YAML per weapon. The scene
+         *  looks up the WeaponSpec by this id, uses its visual texture
+         *  for the drop sprite and its name for the HUD, and forwards
+         *  the id to the character on pickup. */
+        weaponId: z.string().min(1).optional(),
+    })
+    .strict()
+    .transform((v) => ({ ...v, x: Math.round(v.x), y: Math.round(v.y) }));
+
+// ─── NpcSpawn (tavern-mode only) ──────────────────────────────────────────
+
+/** A character NPC standing in the tavern for selection. */
+export const NpcSpawnSchema = z
+    .object({
+        characterId: z.string().min(1),
+        x: z.number(),
+        y: z.number(),
     })
     .strict()
     .transform((v) => ({ ...v, x: Math.round(v.x), y: Math.round(v.y) }));
@@ -162,9 +181,14 @@ export const LevelSchema = z
         prompt: z.string().optional(),
         music: z.string().min(1).optional(),
         pixelLighting: z.boolean().optional(),
+        /** When true, LoadScene enters tavern mode: character NPCs are
+         *  rendered for selection; no monsters; weapon pick-up capped at 3. */
+        tavern: z.boolean().optional(),
         airWalls: z.array(AirWallSchema),
         character: z.string().min(1).optional(),
         characterSpawn: CharacterSpawnSchema.optional(),
+        /** Tavern-mode only: per-character NPC standing positions. */
+        npcSpawns: z.array(NpcSpawnSchema).optional(),
         monsters: z.array(MonsterSpawnSchema).optional(),
         dropSpawns: z.array(DropSpawnSchema).optional(),
         materials: z.array(PlacedMaterialSchema).optional(),
@@ -181,8 +205,10 @@ export const LevelSchema = z
             ...(v.prompt !== undefined ? { prompt: v.prompt } : {}),
             ...(v.music !== undefined ? { music: v.music } : {}),
             ...(v.pixelLighting !== undefined ? { pixelLighting: v.pixelLighting } : {}),
+            ...(v.tavern !== undefined ? { tavern: v.tavern } : {}),
             ...(v.character !== undefined ? { character: v.character } : {}),
             ...(v.characterSpawn !== undefined ? { characterSpawn: v.characterSpawn } : {}),
+            ...(v.npcSpawns !== undefined ? { npcSpawns: v.npcSpawns } : {}),
             ...(v.monsters !== undefined ? { monsters: v.monsters } : {}),
             ...(v.dropSpawns !== undefined ? { dropSpawns: v.dropSpawns } : {}),
             ...(v.materials !== undefined ? { materials: v.materials } : {}),

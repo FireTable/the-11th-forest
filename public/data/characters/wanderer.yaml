@@ -1,5 +1,10 @@
 id: wanderer
 name: Wanderer
+description: |
+    A nomadic sailor-schoolgirl with a casual stride and a stubborn
+    refusal to sit still. Slowest stats on paper, but a spirited
+    attitude — survives by staying mobile, picking fights on her
+    own terms, and walking out of anything that looks like trouble.
 imageSize: 2048x2048
 prompt: |
     The 11th Forest — Wanderer sprite sheet
@@ -96,6 +101,7 @@ prompt: |
     in the character; any color that would be lost in chroma keying.
 hp: 100
 sp: 60
+luck: 5         # Nomadic wanderer — average luck, survives by skill
 moveSpeed: 4
 spRegenMs: 5000
 gender: female
@@ -107,13 +113,8 @@ dodge:
     speed: 14
     durationMs: 220
     cooldownMs: 600
-hotbar:
-    - assault-rifle
-    - laser-cannon
-    - plasma-sword
-    - shotgun
-    - arcana-staff
-    - rocket-launcher
+hotbar: []
+weaponMax: 3
 sfx:
     dodge: dodge
     hurtFemale: player-hurt-female

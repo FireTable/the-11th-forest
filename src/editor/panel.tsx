@@ -24,6 +24,7 @@ import {
 import { MonstersSection } from './sections/monsters';
 import { ScenesListSection } from './sections/scenes-list';
 import { WallCanvas } from './wall-canvas';
+import { MonsterCanvas } from './monster-canvas';
 
 interface ScenePayload {
     id: string;
@@ -59,6 +60,38 @@ export function EditorPanel() {
     if (!isDev() || isMobileLike()) return null;
 
     const [open, setOpen] = useState(false);
+
+    // Phaser's keyboard plugin attaches a bubble-phase window listener
+    // that calls preventDefault on game keys (W/A/S/D, arrows, R, H,
+    // S, space, etc.) before the browser's default action runs. When an
+    // editor input is focused and the user types one of those letters,
+    // the character never gets inserted. Register a capture-phase
+    // window keydown listener for the duration the editor is open and
+    // stopPropagation on the input case — capture phase fires before
+    // the input's own listeners and before the default action, so the
+    // input still receives the key (target phase is unaffected) but
+    // Phaser's bubble listener never sees it. For non-input targets
+    // we leave the event alone so browser shortcuts (Cmd+Tab, F12)
+    // still work.
+    useEffect(() => {
+        const swallow = (e: KeyboardEvent) => {
+            const t = e.target as HTMLElement | null;
+            if (!t) return;
+            if (
+                t.tagName === 'INPUT' ||
+                t.tagName === 'TEXTAREA' ||
+                t.isContentEditable
+            ) {
+                e.stopPropagation();
+            }
+        };
+        if (open) {
+            window.addEventListener('keydown', swallow, true);
+        }
+        return () => {
+            window.removeEventListener('keydown', swallow, true);
+        };
+    }, [open]);
     const [sceneId, setSceneId] = useState<string | null>(null);
     const [level, setLevel] = useState<Level | null>(null);
     const [topTab, setTopTab] = useState<TopTab>('scenes');
@@ -234,7 +267,7 @@ export function EditorPanel() {
                 )}
             </Button>
             <aside
-                className="w-[360px] h-screen shrink-0 bg-neutral-900 border-l border-neutral-800 text-neutral-100 flex flex-col font-sans text-[13px]"
+                className="w-[518px] h-screen shrink-0 bg-neutral-900 border-l border-neutral-800 text-neutral-100 flex flex-col font-sans text-[13px] relative z-[60]"
                 hidden={!open}
             >
                 <nav className="flex border-b border-neutral-800">
@@ -243,28 +276,26 @@ export function EditorPanel() {
                             key={t.id}
                             variant="ghost"
                             onClick={() => setTopTab(t.id)}
-                            className={`flex-1 rounded-none border-b-2 ${
-                                topTab === t.id
-                                    ? 'border-cyan-400 text-cyan-400'
-                                    : 'border-transparent text-neutral-500 hover:text-neutral-300'
-                            }`}
+                            className={`flex-1 rounded-none border-b-2 ${topTab === t.id
+                                ? 'border-cyan-400 text-cyan-400'
+                                : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                                }`}
                         >
                             {t.label}
                         </Button>
                     ))}
                 </nav>
                 {topTab === 'scenes' && (
-                    <nav className="flex border-b border-neutral-800 bg-neutral-900/60 overflow-x-auto">
+                    <nav className="flex border-b border-neutral-800 bg-neutral-900/60 overflow-x-auto mx-3 mt-3">
                         {SCENE_SUB_TABS.map((t) => (
                             <Button
                                 key={t.id}
                                 variant="ghost"
                                 onClick={() => setSceneSubTab(t.id)}
-                                className={`flex-shrink-0 rounded-none border-b-2 px-3 ${
-                                    sceneSubTab === t.id
-                                        ? 'border-cyan-400 text-cyan-400'
-                                        : 'border-transparent text-neutral-500 hover:text-neutral-300'
-                                }`}
+                                className={`flex-shrink-0 rounded-none border-b-2 px-3 ${sceneSubTab === t.id
+                                    ? 'border-cyan-400 text-cyan-400'
+                                    : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                                    }`}
                             >
                                 {t.label}
                             </Button>
@@ -348,6 +379,24 @@ export function EditorPanel() {
                         active={sceneSubTab === 'air-walls'}
                         onLevelChange={handleLevelChange}
                         onAirWallDrawn={handleAirWallDrawn}
+                    />,
+                    overlayTarget,
+                )}
+            {level &&
+                overlayTarget &&
+                open &&
+                topTab === 'scenes' &&
+                sceneSubTab === 'monsters' &&
+                createPortal(
+                    <MonsterCanvas
+                        level={level}
+                        active
+                        onSpawnMove={(index, x, y) => {
+                            const next = (level.monsters ?? []).map((m, i) =>
+                                i === index ? { ...m, x, y } : m,
+                            );
+                            handleLevelChange({ ...level, monsters: next });
+                        }}
                     />,
                     overlayTarget,
                 )}

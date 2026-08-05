@@ -1,0 +1,149 @@
+name: Spore Sniper
+# NOTE: spec pairs this monster with spore-shot, which was removed from
+# the AI sheet and replaced by bramble-knuckles. Reuses thorn-bolt
+# (ranged) for now — moss-bark-rifle moved to the gunner-only slot.
+hp: 90
+moveSpeed: 2.5
+body:
+  halfW: 22
+  halfH: 22
+weaponId: thorn-bolt
+sfx:
+  hit: monster-hit
+  death: monster-death
+  aggro: monster-aggro
+drops:
+  - dropId: ammo-cache
+    chance: 0.5
+  - dropId: hp-shard
+    chance: 0.2
+
+sprite:
+  texture: assets/image/monsters/sniper.png
+  grid: { rows: 4, cols: 4 }
+  scale: 1.0
+  offset: { left: 0, bottom: 0 }
+  script:
+    downsample: 4
+    colors: 32
+    pad: 2
+
+anims:
+  idle:
+    frames: [0, 3]
+    frameRate: 6
+    repeat: -1
+  move:
+    frames: [4, 7]
+    frameRate: 10
+    repeat: -1
+  hit:
+    frames: [8, 11]
+    frameRate: 12
+    repeat: 0
+  death:
+    frames: [12, 14]
+    frameRate: 10
+    repeat: 0
+
+prompt: |
+    The 11th Forest — Spore Sniper sprite sheet
+
+    HARD NEGATIVE PROMPTS (must NOT appear in the image):
+      - No visible grid, no dividers, no borders, no ground, no scene,
+        no text, no logo, no watermark.
+      - No grid lines, no cell borders, no cell separators, no dividers
+        of any kind between the 4×4 frames.
+      - No guide marks, no reference crosses, no axis labels, no frame
+        numbers, no "Frame N" text, no index annotations.
+      - No checkerboard pattern, no tile outline overlays, no debug
+        visualizations.
+      - No watermarks, no logos, no signatures, no UI elements.
+      - The 4×4 layout is COMPLETELY IMPLIED by the character's position
+        — the magenta background is one continuous flat field everywhere
+        except where the character is drawn.
+
+    CRITICAL LAYOUT (must be EXACTLY this — 16 cells, no more, no less,
+    4 rows × 4 columns, every cell the same size):
+
+      ┌────┬────┬────┬────┐
+      │  0 │  1 │  2 │  3 │   row 1: idle (4 frames)
+      ├────┼────┼────┼────┤
+      │  4 │  5 │  6 │  7 │   row 2: move (4 frames)
+      ├────┼────┼────┼────┤
+      │  8 │  9 │ 10 │ 11 │   row 3: hit (4 frames)
+      ├────┼────┼────┼────┤
+      │ 12 │ 13 │ 14 │    │   row 4: death (3 frames; cell #15 empty)
+      └────┴────┴────┴────┘
+
+    The bottom-right cell (cell #15) MUST be empty magenta. Total:
+    exactly 15 frames + 1 empty cell.
+
+    Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
+    512×512 px. The monster is ~300×480 px in each cell, centered
+    horizontally. No overlapping between cells. The monster faces RIGHT in
+    every frame (its front = screen right).
+
+    Monster Concept (Spore Sniper - Ranged Poison Forest Archer):
+    A tall cloaked forest archer kneeling on one leg, wrapped in hanging
+    moss and spotted mushroom caps. Hands empty and held forward in an
+    invisible-drawn-bow pose — right hand pulled back to the cheek as
+    if releasing an arrow, left hand extended forward as if gripping an
+    invisible bow. Glowing yellow eyes under the hood. (The bow + arrow
+    are added in-game as a separate orbiting weapon sprite; the monster
+    sprite itself does NOT render them.)
+
+    Same monster in every frame — cloak, mushrooms, pose-hands, eyes are
+    identical. Only the pose/state changes.
+
+    15 frames in row order (left-to-right, top-to-bottom), distributed as:
+
+    Frames 0–3 (idle, 4 frames, row 1) — crouched aim hold:
+      Frame 0: Crouched low. Right hand pulled back to cheek in release
+               pose, left hand extended forward. Yellow eyes squinting in
+               concentration.
+      Frame 1: Same pose — subtle exhale, cloak tip swaying right.
+               Hands still held in drawn-bow position.
+      Frame 2: Right hand twitches — micro quiver release. Hand briefly
+               relaxes then re-draws. Left hand still extended.
+      Frame 3: Back to baseline drawn-bow pose. Holding for the perfect
+               shot. Eyes steady.
+
+    Frames 4–7 (move, 4 frames, row 2) — walk cycle:
+      Frame 4: LEFT foot planted forward, RIGHT foot trailing back
+               (extreme stride). Body weight fully on left leg. Cloak
+               swings back-left. Hands kept in drawn-bow pose.
+      Frame 5: Passing pose — RIGHT foot swinging forward, both legs
+               vertical. Body upright. Cloak settling. Bow arms stay
+               locked forward.
+      Frame 6: RIGHT foot planted forward, LEFT foot trailing back
+               (extreme stride, opposite leg). Weight on right leg.
+               Cloak swings forward.
+      Frame 7: Passing pose — LEFT foot swinging forward, both legs
+               vertical. Mid-stride return to neutral.
+
+    Frames 8–11 (hit, 4 frames, row 3) — knockback reveal:
+      Frame 8:  Initial impact — body jolts back-left. Hood flutters up.
+               Eyes dim briefly.
+      Frame 9:  Hood flies fully off, skull-like mask underneath revealed.
+               Knocked further left. Mushrooms wobble.
+      Frame 10: Mushroom caps shatter off shoulders, fragments flying.
+               Mask cracks. Arms flailing from recoil.
+      Frame 11: Settling in stun. Half-recovered stance. Hood hanging
+               limp. Eyes flickering.
+
+    Frames 12–14 (death, 3 frames, row 4) — spore collapse:
+      Frame 12: Cloak starts collapsing inward, knees buckling. Hands
+               fall to sides. Purple spores puffing out at seams.
+      Frame 13: Cloak pooling on ground. Stronger purple cloud.
+               Arms limp inside the folds.
+      Frame 14: Empty cloak puddle on ground. Faint purple spore cloud
+               drifting upward. Skull mask visible in the pile.
+
+    Style requirements:
+    - High-end handcrafted 16-bit RPG aesthetic.
+    - Inspired by Chrono Trigger, Eastward, Children of Morta, Hyper Light
+      Drifter, and premium modern indie pixel games.
+    - Hard clean pixel edges, no anti-aliasing on the silhouette.
+    - Limited muted color palette: ~32 colors total per character.
+    - No purple, magenta, or pink in the monster body itself.

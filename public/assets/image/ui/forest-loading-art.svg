@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" shape-rendering="crispEdges">
+  <!-- Sky Base & Gothic Night Gradient -->
+  <rect width="320" height="180" fill="#030509"/>
+
+  <!-- Moon Glow & Radial Fog -->
+  <circle cx="160" cy="50" r="45" fill="#0c232b" opacity="0.5"/>
+  <circle cx="160" cy="50" r="24" fill="#15424f" opacity="0.3"/>
+
+  <!-- Distant Mountain Silhouettes -->
+  <path d="M0 110l40-30 40 30 50-35 60 40 50-30 40 25v70H0z" fill="#050d12"/>
+
+  <!-- Layer 1: Background Pine Trees Silhouette -->
+  <path d="M20 70h6v70h-6zM12 85h22v20H12zM16 75h14v15H16zM21 65h4v12h-4z" fill="#07191e"/>
+  <path d="M65 55h6v85h-6zM53 73h30v25H53zM58 63h20v18H58zM64 50h8v16h-8z" fill="#092026"/>
+  <path d="M120 65h6v75h-6zM110 80h26v22h-26zM114 70h18v16h-18zM121 60h4v14h-4z" fill="#07191e"/>
+  <path d="M180 50h8v90h-8zM165 70h38v28h-38zM172 58h24v20h-24zM181 44h6v18h-6z" fill="#0a252b"/>
+  <path d="M240 60h6v80h-6zM228 75h30v22h-30zM233 65h20v16h-20zM241 54h4v14h-4z" fill="#081d22"/>
+  <path d="M295 70h6v70h-6zM287 85h22v20h-22zM291 75h14v15h-14zM296 65h4v12h-4z" fill="#07191e"/>
+
+  <!-- Layer 2: Midground Dense Forest Canopy (Deep Emerald & Teal) -->
+  <path d="M42 45h8v105h-8zM24 68h44v32H24zM31 54h30v22H31zM39 42h14v18H39zM44 38h4v8h-4z" fill="#0e3f43"/>
+  <path d="M95 38h8v115h-8zM75 62h48v35H75zM83 48h32v24H83zM91 35h16v20H91zM97 30h4v10h-4z" fill="#114b50"/>
+  <path d="M150 48h6v100h-6zM134 68h38v30h-38zM140 56h26v20h-26zM147 44h12v16h-12zM151 40h4v8h-4z" fill="#0d383b"/>
+  <path d="M210 35h8v120h-8zM190 60h48v35h-48zM198 46h32v24h-32zM206 32h16v20h-16zM212 28h4v8h-4z" fill="#135257"/>
+  <path d="M270 45h8v105h-8zM252 68h44v32h-44zM259 54h30v22h-30zM267 42h14v18h-26zM272 38h4v8h-4z" fill="#0e3f43"/>
+
+  <!-- Layer 3: Foreground Gothic Forest Trees & Rose Vines -->
+  <path d="M70 30h8v125h-8zM48 55h52v38H48zM56 40h36v25H56zM65 26h18v20H65zM72 20h4v10h-4z" fill="#17636a"/>
+  <path d="M240 28h8v130h-8zM218 53h52v38h-52zM226 38h36v25h-36zM235 24h18v20h-18zM242 18h4v10h-4z" fill="#17636a"/>
+
+  <!-- Mystical Glowing Spores / Fireflies -->
+  <rect x="35" y="48" width="2" height="2" fill="#71f6fd"/>
+  <rect x="88" y="24" width="2" height="2" fill="#38bdf8"/>
+  <rect x="155" y="32" width="2" height="2" fill="#71f6fd"/>
+  <rect x="225" y="20" width="2" height="2" fill="#38bdf8"/>
+  <rect x="280" y="40" width="2" height="2" fill="#71f6fd"/>
+  <rect x="62" y="85" width="2" height="2" fill="#fef08a"/>
+  <rect x="142" y="78" width="2" height="2" fill="#fef08a"/>
+  <rect x="205" y="82" width="2" height="2" fill="#fef08a"/>
+
+  <!-- Floating Rose Petal Accents -->
+  <rect x="105" y="95" width="3" height="2" fill="#f43f5e"/>
+  <rect x="178" y="105" width="3" height="2" fill="#f43f5e"/>
+  <rect x="255" y="90" width="3" height="2" fill="#f43f5e"/>
+
+  <!-- Forest Floor Ground Line -->
+  <path d="M0 160h320v20H0z" fill="#061317"/>
+  <path d="M0 156h320v4H0z" fill="#0c262c"/>
+</svg>

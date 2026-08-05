@@ -1,0 +1,146 @@
+id: kitty
+name: Kitty
+description: |
+    A calico cat-eared scout who left her forest post to investigate
+    rumours of corrupted energy in the eastern woods. Agile and
+    quick-witted, she relies on mobility and reach over brute
+    strength — outmanoeuvre enemies, then strike.
+imageSize: 2048x2048
+prompt: |
+    The 11th Forest — Kitty sprite sheet
+
+    HARD NEGATIVE PROMPTS (must NOT appear in the image):
+      - No visible grid, no dividers, no borders, no ground, no scene,
+        no text, no logo, no watermark.
+      - No grid lines, no cell borders, no cell separators, no dividers
+        of any kind between the 4×4 frames.
+      - No guide marks, no reference crosses, no axis labels, no frame
+        numbers, no "Frame N" text, no index annotations.
+      - No checkerboard pattern, no tile outline overlays, no debug
+        visualizations.
+      - No watermarks, no logos, no signatures, no UI elements.
+      - The 4×4 layout is COMPLETELY IMPLIED by the character's position
+        — the magenta background is one continuous flat field everywhere
+        except where the character is drawn.
+
+    CRITICAL LAYOUT (must be EXACTLY this — 16 cells, no more, no less,
+    4 rows × 4 columns, every cell the same size):
+
+      ┌────┬────┬────┬────┐
+      │  0 │  1 │  2 │  3 │   row 1: idle (4 frames)
+      ├────┼────┼────┼────┤
+      │  4 │  5 │  6 │  7 │   row 2: walk (4 frames)
+      ├────┼────┼────┼────┤
+      │  8 │  9 │ 10 │ 11 │   row 3: dodge (4 frames, includes a leap)
+      ├────┼────┼────┼────┤
+      │ 12 │ 13 │ 14 │    │   row 4: hit (3 frames; cell #15 empty)
+      └────┴────┴────┴────┘
+
+    The bottom-right cell (cell #15) MUST be empty magenta. Total:
+    exactly 15 frames + 1 empty cell.
+
+    Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
+    512×512 px. The character is ~340×460 px in each cell, centered
+    horizontally, with feet at ~85% cell height. No overlapping between
+    cells. The character faces RIGHT in every frame (her right side =
+    screen right); left-facing or back-facing poses are wrong.
+
+    Character: a chibi ragdoll cat girl. Round fluffy cream-and-brown
+    calico cat head with pink inner ears, large glossy blue eyes, a tiny
+    pink nose, soft whiskers, and a long curling brown-and-cream striped
+    tail. Wearing a pale pink knit sweater, a cream pleated skirt, white
+    knee-high socks, and pink sneakers. Anthropomorphic proportions with
+    a large head and small body. Chibi head-to-body ratio (~1:2). Outline:
+    1-pixel warm-brown outline, clean pixel-art shading with 2-3 tonal
+    steps per material (no smooth gradients).
+
+    Same character in every frame — face, ears, outfit, proportions are
+    identical. Only the pose changes.
+
+    15 frames in row order (left-to-right, top-to-bottom), distributed as:
+
+    Frames 0–3 (idle, 4 frames, row 1):
+      Standing still, paws clasped or one paw waving (frame 3). Tail
+      swaying gently. Slow body breathing. Ear twitches occasionally.
+
+    Frames 4–7 (walk, 4 frames, row 2):
+      A walk cycle. Legs alternate step-by-step; tail swings in
+      counter-rhythm. Body stays roughly upright. Slow, careful, cat-like
+      gait — not a run.
+
+    Frames 8–11 (dodge, 4 frames, row 3):
+      Frames 8–9 are quick scurry steps forward, frames 10–11 are a low
+      forward leap with the body extended and the tail streaming behind.
+      Fast, agile, feline.
+
+    Frames 12–14 (hit, 3 frames, row 4):
+      Frame 12 surprised/startled (eyes wide, paws up), frame 13
+      tumbling to the side (one paw raised, tail flailing), frame 14
+      crouching wince with one ear flattened.
+
+    Style requirements:
+    - High-end handcrafted 16-bit RPG aesthetic.
+    - Inspired by Chrono Trigger, Eastward, Children of Morta, Hyper Light
+      Drifter, and premium modern indie pixel games.
+    - Hard clean pixel edges, no anti-aliasing on the silhouette.
+    - Limited muted color palette: ~32 colors total per character.
+    - No purple, magenta, or pink in the character body itself. The pink
+      sweater and pink sneakers are desaturated dusty rose, never full
+      magenta. The background is the only place magenta appears.
+hp: 90
+sp: 70
+luck: 5         # Cats have nine lives — moderate crit chance
+moveSpeed: 5
+spRegenMs: 4000
+gender: female
+body:
+    halfW: 24
+    halfH: 24
+dodge:
+    spCost: 12
+    speed: 16
+    durationMs: 200
+    cooldownMs: 500
+hotbar: []
+weaponMax: 3
+sfx:
+    dodge: dodge
+    hurtFemale: player-hurt-female
+    throttleMs: 1200
+    footstep: footstep
+    footstepThrottleMs: 200
+    lowHpHeartbeat: low-hp-heartbeat
+    lowHpThreshold: 0.3
+    lowHpPulseMs: 900
+sprite:
+    texture: assets/image/characters/kitty.png
+    grid:
+        rows: 4
+        cols: 4
+    scale: 1.2
+    offset:
+        left: -14
+        bottom: -8
+    script:
+        downsample: 4
+        colors: 32
+        pad: 2
+anims:
+    idle:
+        frames:
+            - 0
+            - 2
+        frameRate: 6
+        repeat: -1
+    walk:
+        frames:
+            - 4
+            - 7
+        frameRate: 10
+        repeat: -1
+    dodge:
+        frames:
+            - 8
+            - 11
+        frameRate: 14
+        repeat: 0

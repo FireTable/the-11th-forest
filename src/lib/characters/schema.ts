@@ -116,6 +116,11 @@ export const CharacterSpecSchema = z
             .regex(/^\d+x\d+$/)
             .optional(),
         prompt: z.string().optional(),
+        /** Free-form description shown on the tavern character-select
+         *  HUD (a few sentences — who they are, lore, role). Pure UI;
+         *  not consumed by gameplay. Optional so existing characters
+         *  without one still load. */
+        description: z.string().min(1).optional(),
         hp: z.number().gte(0),
         sp: z.number().gte(0),
         moveSpeed: z.number().gt(0),
@@ -126,12 +131,38 @@ export const CharacterSpecSchema = z
         gender: z.enum(['male', 'female']).optional(),
         body: BodySchema,
         dodge: DodgeSchema,
-        hotbar: z.array(z.string().min(1)).min(1),
+        hotbar: z.array(z.string().min(1)),
+        /** Maximum weapons the character may carry at once. Defaults
+         *  to 3 when omitted — applied at runtime by the loadCharacter
+         *  consumer (not the parser, so the type stays `number | undefined`).
+         *  Phase-2 tavern pickups are gated by this value; the
+         *  `tavernWeaponCount` HUD reads it directly from the spec. */
+        weaponMax: z.number().int().gt(0).lte(8).optional(),
+        /** Critical hit chance driver. Range 1–10; maps linearly to
+         *  critChance = luck/10 (10 % – 100 %). Applied in
+         *  `MonsterController.applyBulletDamage` when the player hits a
+         *  monster. Defaults to 1 at runtime when omitted. */
+        luck: z.number().int().gte(1).lte(10).optional(),
         /** Per-character audio identity — SFX ids + tuning knobs for
          *  dodge / hurt / footstep / low-HP heartbeat. All optional. */
         sfx: CharacterSfxSchema.optional(),
         sprite: SpriteSchema.optional(),
         anims: AnimsSchema.optional(),
+        /** Display-only stats shown in the tavern character-selection HUD.
+         *  1–10 scale per dimension; do not affect gameplay values. */
+        stats: z
+            .object({
+                /** Physical attack power */
+                strength: z.number().int().gte(1).lte(10),
+                /** Movement and dodge speed */
+                agility: z.number().int().gte(1).lte(10),
+                /** Max HP and resilience */
+                vitality: z.number().int().gte(1).lte(10),
+                /** Max SP and skill potency */
+                spirit: z.number().int().gte(1).lte(10),
+            })
+            .strict()
+            .optional(),
     })
     .strict();
 

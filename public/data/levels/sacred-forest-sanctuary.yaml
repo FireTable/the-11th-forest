@@ -162,17 +162,6 @@ airWalls:
         - 1545
       - - 2752
         - 1540
-  - id: wall-4
-    kind: short
-    points:
-      - - 1173
-        - 559
-      - - 1564
-        - 558
-      - - 1566
-        - 1025
-      - - 1180
-        - 1023
   - id: wall-5
     kind: tall
     points:
@@ -446,6 +435,25 @@ airWalls:
         - 1533
       - - 2748
         - 1535
+  - id: wall-12
+    kind: short
+    points:
+      - - 1179
+        - 588
+      - - 1179
+        - 970
+      - - 1179
+        - 1015
+      - - 1561
+        - 1020
+      - - 1562
+        - 970
+      - - 1568
+        - 606
+      - - 1568
+        - 556
+      - - 1179
+        - 554
 music: forest-ambient
 characterSpawn:
   x: 2600
@@ -453,12 +461,12 @@ characterSpawn:
   facing: left
 monsters:
   - type: drone
-    x: 800
-    'y': 800
+    x: 1887
+    'y': 1043
     waveId: wave-1
   - type: drone
-    x: 1200
-    'y': 1000
+    x: 1198
+    'y': 1210
     waveId: wave-2
     trigger:
       kind: clear
@@ -467,10 +475,33 @@ monsters:
   - type: gunner
     x: 2000
     'y': 600
-    waveId: boss
+    waveId: Suprise
+    trigger:
+      kind: time
+      delayMs: 5000
+  - type: drone
+    x: 2071
+    'y': 883
+    waveId: wave-3
     trigger:
       kind: clear
-      delayMs: 5000
+      delayMs: 2000
+      waveId: wave-2
+  - type: stalker
+    x: 901
+    'y': 1117
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 2000
+      waveId: wave-2
+  - type: sniper
+    x: 1337
+    'y': 381
+    waveId: wave-3
+    trigger:
+      kind: clear
+      delayMs: 2000
       waveId: wave-2
 materials:
   - id: mat-ms66o299
@@ -487,6 +518,7 @@ materials:
     depthOffset: 0
 teleporters:
   - id: teleporter-msckzhf5
-    x: 1370
-    'y': 125
+    x: 1406
+    'y': 1428
+    targetScene: forest-path
     radius: 60

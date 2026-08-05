@@ -58,11 +58,31 @@ export function dirTo(
 }
 
 /**
- * Decide the monster's AI state from distance + attack range.
- * `attack` only fires when the player is within range; otherwise `chase`.
+ * Decide the monster's AI state from distance + attack range, with
+ * hysteresis on `prev` so the state doesn't strobe `chase ↔ attack`
+ * when `dist` jitters across `attackRange` (±2-3 px per frame from
+ * Matter integration + player input + separation force).
+ *
+ *   - prev was `chase`: switch to `attack` only after `dist` falls
+ *     below `attackRange - hysteresis` (i.e. clearly inside range)
+ *   - prev was `attack`: switch to `chase` only after `dist` rises
+ *     above `attackRange + hysteresis` (i.e. clearly outside range)
+ *
+ * `hysteresis` is in world px (default 8 — comfortably larger than
+ * the per-frame jitter, small enough that the player doesn't notice
+ * the leash).
  */
-export function decideAIState(dist: number, attackRange: number): MonsterAIState {
-    return dist <= attackRange ? 'attack' : 'chase';
+export function decideAIState(
+    dist: number,
+    attackRange: number,
+    prev: MonsterAIState,
+    hysteresis: number = 8,
+): MonsterAIState {
+    if (prev === 'attack') {
+        return dist > attackRange + hysteresis ? 'chase' : 'attack';
+    }
+    // prev === 'chase'
+    return dist <= attackRange - hysteresis ? 'attack' : 'chase';
 }
 
 /**

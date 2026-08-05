@@ -1,0 +1,15 @@
+kind: sfx
+id: victory-fanfare
+name: Victory Fanfare
+source: assets/audio/sfx/victory-fanfare.wav
+volume: 0.95
+# Anime-RPG victory fanfare: bright brassy stinger + choral swell that
+# resolves on a triumphant major chord, lasting about 2.5 seconds.
+# Plays once when the player clears the final boss (the React overlay's
+# Lottie confetti is the visual companion). Single hit, no tail — clean
+# fade-out so it doesn't clip into the tavern music on transition.
+#
+# Note: `duration` is an input for the ElevenLabs regen script only
+# (scripts/elevenlabs-sfx.ts → defaultDuration), not a runtime spec
+# field. The schema is .strict() and would reject it.
+prompt: Triumphant brass fanfare sting, short orchestral hit with trumpets, timpani drum roll, cymbal crash, victorious major chord, heroic RPG level clear jingle, 2-3 seconds, ending on triumphant resolution

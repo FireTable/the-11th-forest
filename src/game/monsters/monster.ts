@@ -24,6 +24,8 @@ import {
     CAT,
     PROJECTILE_MONSTER_MASK,
     COMBAT_PLAYER_DAMAGE_COOLDOWN_MS,
+    COMBAT_CRIT_MULTIPLIER,
+    COMBAT_CRIT_DAMAGE_MULTIPLIER,
     MONSTER_DEATH_FADE_MS,
     SFX_EVENT,
 } from '@/lib/constants';
@@ -337,9 +339,36 @@ export interface MonsterControllerCallbacks {
 /** Snapshot of a monster projectile — owns body + visual + damage. */
 export interface MonsterProjectile {
     body: MatterJS.BodyType;
-    rect: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+    rect:
+    | Phaser.GameObjects.Shape
+    | Phaser.GameObjects.Sprite
+    | Phaser.GameObjects.Image
+    | Phaser.GameObjects.Graphics;
     damage: number;
     monster: Monster;
+    /** Spawn point of the projectile (world coords). The per-frame
+     *  cleanup compares the bullet's current position against this to
+     *  retire ones that fly past their effective range instead of
+     *  lingering forever in the world. */
+    originX: number;
+    originY: number;
+    /** Effective range inherited from the firing weapon spec. The
+     *  bullet self-destructs once it's travelled this far from the
+     *  spawn point, mirroring how WeaponController cleans up
+     *  player bullets (logic.ts "speed < 1.0 || distSq >= maxDistance²"). */
+    maxDistance: number;
+    /** Foot-Y of the firing monster at spawn time. The per-frame sync
+     *  loop tracks the firing monster's *current* footY so the bullet
+     *  stays in its owner's depth slot as the monster moves; this
+     *  pinned value is the fallback once the monster dies or starts
+     *  dying mid-flight (no owner to track). */
+    fireFootY: number;
+    /** Mirror of BulletRecord.spawnAt / lifeMs — populated by the
+     *  ranged-path spawn call so the per-frame cleanup can expire
+     *  missed shots instead of waiting for Matter friction to drop
+     *  speed below the 1.0 px/frame threshold. */
+    spawnAt: number;
+    lifeMs: number;
 }
 
 export class MonsterController {
@@ -348,7 +377,7 @@ export class MonsterController {
     private readonly projectiles: MonsterProjectile[] = [];
     private readonly cb: MonsterControllerCallbacks;
     /** Cached for fast lookup in attack tests. */
-    private readonly playerBody: MatterJS.BodyType;
+    private playerBody: MatterJS.BodyType;
     private readonly matter: any;
     private readonly pathfinder?: PathfindingService;
     private lastPathCalcAt = 0;
@@ -356,6 +385,9 @@ export class MonsterController {
     /** Last attack timestamp per monster — independently tracked to avoid
      *  interleaved races when two monsters fire on the same frame. */
     private lastDamageAt = 0;
+    /** Player's luck stat (1–10). Drives crit chance = luck/10.
+     *  Injected via setPlayerLuck() after the character spec is loaded. */
+    private playerLuck = 1;
 
     /** Trigger-gated monster spawns awaiting their fire condition. Pairs the
      *  pure `PendingSpawn` (consumed by `advanceSpawnQueue`) with the heavy
@@ -448,6 +480,16 @@ export class MonsterController {
         this.bindCollisions();
     }
 
+    /**
+     * Swap the player body reference. Used by the tavern UI to rewire
+     * monsters / collisions to a freshly-spawned character after the
+     * player picks a new one — the `playerBody` field is otherwise
+     * captured once at construction.
+     */
+    public setPlayerBody(body: MatterJS.BodyType): void {
+        this.playerBody = body;
+    }
+
     /** Export fine-grained snapshot of active monsters and remaining pending spawn queue. */
     public getSnapshot(): MonsterSystemSnapshot {
         const activeMonsters = this.monsters
@@ -484,6 +526,21 @@ export class MonsterController {
     public isAllCleared(): boolean {
         const aliveCount = this.monsters.filter((m) => !m.dead && m.state !== 'dying').length;
         return aliveCount === 0 && this.pendingSpawns.length === 0;
+    }
+
+    /**
+     * Compute the monster's current foot-Y. Foot position is what the
+     * A* waypoints correspond to (rectangle bottom edge), not the body
+     * centre. Used as the Y-sort anchor for the sprite / shadow /
+     * weapon / bullet / melee stack — keeping the math in one place
+     * ensures every visual derives depth from the same value.
+     */
+    public static computeFootY(m: Monster): number {
+        const mp = m.body.position;
+        const monsterBodyHalfH = m.spec.body.halfH;
+        return Math.round(
+            mp.y + (m.sprite ? m.sprite.displayHeight / 2 - monsterBodyHalfH : 0),
+        );
     }
 
     /** Per-frame: AI tick + projectile sync + cleanup. */
@@ -532,9 +589,7 @@ export class MonsterController {
             // and the body bottom collides.
             const monsterBodyHalfH = m.spec.body.halfH;
             const footX = mp.x;
-            const footY = Math.round(
-                mp.y + (m.sprite ? m.sprite.displayHeight / 2 - monsterBodyHalfH : 0),
-            );
+            const footY = MonsterController.computeFootY(m);
             const footPos = { x: footX, y: footY - monsterBodyHalfH / 2 };
 
             // Per-monster Active Stuck Detector — 60ms window so escape fires
@@ -601,7 +656,12 @@ export class MonsterController {
 
             // ── AI transitions ─────────────────────────────────────────
             const prevState = m.state;
-            m.state = decideAIState(dist, m.weapon.range);
+            // Pass prev state so decideAIState can apply hysteresis —
+            // without it, distance jitter around `attackRange` flips
+            // chase ↔ attack every frame and the idle/move animation
+            // strobes with it.
+            const prevAiState: 'chase' | 'attack' = prevState === 'attack' ? 'attack' : 'chase';
+            m.state = decideAIState(dist, m.weapon.range, prevAiState);
             // One-shot aggro growl on the first idle → chase transition.
             if (!m.hasAggroed && prevState === 'idle' && m.state === 'chase') {
                 m.hasAggroed = true;
@@ -781,7 +841,7 @@ export class MonsterController {
 
             // ── Attack tick ──────────────────────────────────────────
             if (m.state === 'attack' && time - m.lastAttackAt >= m.weapon.cooldownMs) {
-                this.performAttack(m, dirToPlayer);
+                this.performAttack(m, dirToPlayer, footY);
                 m.lastAttackAt = time;
             }
 
@@ -846,23 +906,62 @@ export class MonsterController {
             // ── Weapon visual sync (Brotato-style floating attachment) ──
             // Aim the held weapon at the player the same way WeaponController
             // does for the player character. Mirrors player visual behaviour.
+            // Pass `footY + 20` (matches DEPTH.WEAPON - DEPTH.CHARACTER on
+            // the flat layer) so the weapon sits in front of the monster's
+            // bullet and body — sprite < bullet < weapon ordering, same as
+            // the player stack.
             if (m.weaponVisual) {
-                const halfH = m.spec.body.halfH;
                 const handX = mp.x;
-                const handY = mp.y - halfH;
+                const handY = mp.y;
                 const aimAngle = Math.atan2(dirToPlayer.y, dirToPlayer.x);
-                m.weaponVisual.update(handX, handY, footY, aimAngle);
+                m.weaponVisual.update(handX, handY, aimAngle, footY + 20);
             }
         }
 
-        // ── Projectile visual sync ────────────────────────────────────
-        for (const proj of this.projectiles) {
+        // ── Projectile visual sync + cleanup ──────────────────────────
+        // Mirrors WeaponController's bullet lifecycle: retire ranged
+        // bullets that have slowed below a small threshold (usually
+        // they hit something or slid to a stop against a tall wall) OR
+        // flown past their effective range from the spawn point. Without
+        // this, missed shots lingered in the world until something else
+        // killed them — eventually every level's projectile pool grew
+        // unbounded over a long run.
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const proj = this.projectiles[i];
             const bp = proj.body.position;
             const vel = proj.body.velocity;
+
+            // Bullet depth tracks the firing monster's current footY
+            // (sprite < bullet < weapon ordering, same as the player).
+            // When the owner dies or starts dying mid-flight we can't
+            // keep tracking it — pin to the fire-time depth instead so
+            // the bullet doesn't snap to depth 0 or stale.
+            const owner = proj.monster;
+            const ownerAlive = owner && !owner.dead && owner.state !== 'dying';
+            const bulletFootY = ownerAlive ? MonsterController.computeFootY(owner) : proj.fireFootY;
+            proj.rect.setDepth(bulletFootY + 10);
+
             proj.rect.setPosition(bp.x, bp.y);
-            proj.rect.setDepth(Math.round(bp.y));
             proj.rect.setRotation(Math.atan2(vel.y, vel.x));
+
+            const currentSpeed = Math.hypot(vel.x, vel.y);
+            const dx = bp.x - proj.originX;
+            const dy = bp.y - proj.originY;
+            const distSq = dx * dx + dy * dy;
+            // Hard cap on lifetime (per-weapon via projectile.lifeMs,
+            // default 1500ms) — kills missed shots that would otherwise
+            // linger ~4-10s while Matter friction decays speed.
+            const expired = time - proj.spawnAt >= proj.lifeMs;
+            if (expired || currentSpeed < 1.0 || distSq >= proj.maxDistance * proj.maxDistance) {
+                this.destroyProjectile(proj);
+            }
         }
+    }
+
+    /** Inject the player character's luck stat so crit calculations use
+     *  the correct value after a character swap (tavern phase 2). */
+    setPlayerLuck(luck: number): void {
+        this.playerLuck = Math.max(1, Math.min(10, Math.floor(luck)));
     }
 
     /** Apply damage from a player bullet to a specific monster (or AoE later). */
@@ -881,10 +980,17 @@ export class MonsterController {
             }) ?? pickClosestMonster(hitBody.position, this.monsters, 200);
 
         if (target && target.state !== 'dying') {
-            const finalDamage = getCheats().oneHitKill ? 999999 : bulletDamage;
+            // Crit: (luck/10) * COMBAT_CRIT_MULTIPLIER probability,
+            // COMBAT_CRIT_DAMAGE_MULTIPLIER × damage, gold floating number.
+            const isCrit = !getCheats().oneHitKill && Math.random() < (this.playerLuck / 10) * COMBAT_CRIT_MULTIPLIER;
+            const finalDamage = getCheats().oneHitKill
+                ? 999999
+                : isCrit
+                  ? bulletDamage * COMBAT_CRIT_DAMAGE_MULTIPLIER
+                  : bulletDamage;
             target.hp -= finalDamage;
             target.lastHitAt = this.scene.time.now;
-            target.statusHud.showFloatingNumber(finalDamage, 'damage');
+            target.statusHud.showFloatingNumber(finalDamage, isCrit ? 'crit' : 'damage');
             EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'), {
                 key: `monster:${target.spec.id}`,
                 throttleMs: target.spec.sfx?.throttleMs,
@@ -915,7 +1021,11 @@ export class MonsterController {
 
     // ─── internals ──────────────────────────────────────────────────────
 
-    private performAttack(m: Monster, dirToPlayer: { x: number; y: number }): void {
+    private performAttack(
+        m: Monster,
+        dirToPlayer: { x: number; y: number },
+        footY: number,
+    ): void {
         const weapon = m.weapon;
         const projectile = weapon.projectile;
         const isMelee = projectile === undefined;
@@ -947,10 +1057,17 @@ export class MonsterController {
                 texture: weapon.bullet?.texture,
                 scale: weapon.bullet?.scale ?? 0.2,
                 rotationOffset: weapon.bullet?.rotationOffset,
-                feetY: originY + (m.spec.body.halfH ?? 0),
+                swingAngle: weapon.visual?.swingAngle,
                 category: CAT.MONSTER_PROJECTILE,
                 mask: PROJECTILE_MONSTER_MASK,
                 label: 'monster-melee',
+                // Stack the swing in front of the monster's sprite
+                // (sprite < bullet < weapon, mirroring the player's
+                // CHARACTER < BULLET < WEAPON depth stack). The +10
+                // offset matches DEPTH.BULLET - DEPTH.CHARACTER for
+                // the flat layer so a melee arc never draws over its
+                // owner's body but always draws under the weapon.
+                depth: footY + 10,
             });
             return;
         }
@@ -981,9 +1098,21 @@ export class MonsterController {
                 scale: weapon.bullet?.scale,
                 anchor: weapon.bullet?.anchor,
                 rotationOffset: weapon.bullet?.rotationOffset,
+                // Hard cap on lifetime — per-weapon override or default
+                // (1500ms) applied in spawnProjectile. Prevents missed
+                // shots from lingering ~4-10s on screen while Matter
+                // friction decays speed below the cleanup threshold.
+                lifeMs: weapon.projectile?.lifeMs,
+                // Stack the bullet in front of the monster's sprite.
+                // The +10 offset matches DEPTH.BULLET - DEPTH.CHARACTER
+                // on the flat layer, so the per-frame sync can keep
+                // `bullet depth = owner footY + 10` and preserve the
+                // sprite < bullet < weapon ordering as the monster
+                // moves.
+                depth: footY + 10,
             },
         );
-        this.projectiles.push({ ...bullet, monster: m });
+        this.projectiles.push({ ...bullet, monster: m, fireFootY: footY });
     }
 
     private kill(m: Monster): void {
@@ -1099,7 +1228,15 @@ export class MonsterController {
                 return false;
             }
             const refreshed = remainingByIndex.get(q.pending.index);
-            if (refreshed) q.pending.clearReadyAt = refreshed.clearReadyAt;
+            // Mirror back every field the queue may have updated. The
+            // queue returns fresh spread copies; without this both
+            // clearReadyAt AND hasSeenAlive stay frozen on the original
+            // pending object, which breaks clear-trigger gating
+            // (hasSeenAlive never flips → clear spawns never fire).
+            if (refreshed) {
+                q.pending.clearReadyAt = refreshed.clearReadyAt;
+                q.pending.hasSeenAlive = refreshed.hasSeenAlive;
+            }
             return true;
         });
 

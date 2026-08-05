@@ -49,27 +49,30 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
         throw new Error('Phaser game not initialised — setPhaserGame never called');
     }
 
-    // Drop every registered scene, not just `LoadScene:${resolved.id}`:
-    // a teleport starts the next level under a different key, so keying
-    // off the caller's id would leave the previous scene alive, ticking
-    // behind the new one. `scenes` is mutated by remove(), hence the copy.
-    //
-    // `remove()` destroys the scene outright. Do NOT call `scene.stop()`
-    // first: ScenePlugin.stop only *queues* an op against the scene KEY,
-    // and we immediately re-register that key — so the queued stop lands
-    // on the fresh scene one frame later and freezes it on arrival.
+    // Drop every registered scene: pause first to stop update loops,
+    // then remove to destroy them outright.
     for (const s of [...game.scene.scenes]) {
+        s.scene.pause();
         game.scene.remove(s.sys.settings.key);
     }
 
+    // Wipe the per-run entity snapshots AFTER old scenes are removed
+    // so no destroy/shutdown handlers write stale state back into store.
+    useGameStore.getState().clearSceneSnapshots();
+
     const key = `LoadScene:${resolved.id}`;
-    game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+    const newScene = game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+
+    // Ensure the newly added scene is active and unpaused
+    newScene?.scene.resume();
 }
 
 /**
- * Restart the level the player is currently in, from a clean slate —
- * the shared path behind both the death overlay's and the settings
- * panel's Restart button.
+ * Restart the level the player is currently in, from a clean slate.
+ * Not currently wired to any UI button — both the death overlay and
+ * the settings panel route through `restartAtTavern` instead. Kept
+ * for a future "retry this level" option that preserves the chosen
+ * character + weapons while resetting combat state.
  */
 export function restartCurrentLevel(): void {
     const resolved = getCachedResolvedScene();
@@ -77,6 +80,30 @@ export function restartCurrentLevel(): void {
     useGameStore.getState().setDead(false);
     useGameStore.getState().resetLevelProgress(resolved.id);
     void restartSceneWith(resolved);
+}
+
+/**
+ * Full reset: wipes store & localStorage, then loads fresh tavern scene.
+ */
+export async function restartAtTavern(): Promise<void> {
+    const resolved = await resolveScene('tavern');
+
+    // 1. Remove old scenes completely
+    if (game) {
+        for (const s of [...game.scene.scenes]) {
+            game.scene.remove(s.sys.settings.key);
+        }
+    }
+
+    // 2. Clear state ONLY AFTER old scenes are completely destroyed
+    useGameStore.getState().clearSaveData();
+
+    // 3. Start fresh tavern scene and force resume in case game was paused
+    if (game) {
+        const key = `LoadScene:${resolved.id}`;
+        const newScene = game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+        newScene?.scene.resume();
+    }
 }
 
 /**

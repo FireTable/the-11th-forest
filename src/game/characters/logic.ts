@@ -181,13 +181,16 @@ export function pickNearestMonster<T extends { x: number; y: number }>(
 
 /** Structural shape the controller needs from the WeaponSystem. */
 export interface WeaponsLike {
-    update(time: number, tx: number, ty: number, fire: boolean, halfH: number): void;
+    update(time: number, tx: number, ty: number, fire: boolean, halfH: number, footY?: number): void;
     switchTo(index: number): void;
     cycleSlot(direction: 1 | -1): void;
     manualReload(): void;
     refillActiveAmmo(fraction: number): void;
     swapToWeapon(weaponId: string): boolean;
     getActiveSlotState(): StatusHudState;
+    tryPickupWeapon(spec: import('@/lib/weapons').WeaponSpec): 'added' | 'capped';
+    replaceSlot(slotIndex: number, spec: import('@/lib/weapons').WeaponSpec): void;
+    getMaxSlots(): number;
 }
 
 /** Structural shape the controller needs from the character HUD. */
@@ -204,7 +207,7 @@ export interface WeaponHudLike {
  *  (above the character's head — currently shows reload progress). */
 export interface StatusHudLike {
     update(state: StatusHudState, time: number, halfH: number): void;
-    showFloatingNumber?(amount: number, type: 'damage' | 'heal'): void;
+    showFloatingNumber?(amount: number, type: 'damage' | 'heal' | 'crit'): void;
 }
 
 /** Subset of weapon-slot state StatusHud needs. */
@@ -370,6 +373,40 @@ export class CharacterController {
         return this.parts.weapons.swapToWeapon(weaponId);
     }
 
+    /**
+     * Add a weapon (resolved from `weaponsById`) to the next empty
+     * slot. Returns `'added'` / `'capped'` / `'unknown'` so the caller
+     * (tavern pickup) can decide whether to consume the drop or show
+     * the replace-HUD.
+     */
+    tryPickupWeaponById(
+        weaponId: string,
+        weaponsById: ReadonlyMap<string, import('@/lib/weapons').WeaponSpec>,
+    ): 'added' | 'capped' | 'unknown' {
+        const spec = weaponsById.get(weaponId);
+        if (!spec) return 'unknown';
+        return this.parts.weapons.tryPickupWeapon(spec);
+    }
+
+    /** Replace the weapon in `slotIndex` with the spec resolved from
+     *  `weaponsById`. Returns false when the index is out of range or
+     *  the id is unknown. */
+    replaceWeaponSlot(
+        slotIndex: number,
+        weaponId: string,
+        weaponsById: ReadonlyMap<string, import('@/lib/weapons').WeaponSpec>,
+    ): boolean {
+        const spec = weaponsById.get(weaponId);
+        if (!spec) return false;
+        this.parts.weapons.replaceSlot(slotIndex, spec);
+        return true;
+    }
+
+    /** Maximum weapon slots this character can hold (from `weaponMax`). */
+    getWeaponMax(): number {
+        return this.parts.weapons.getMaxSlots();
+    }
+
     /** Tear down all bindings and visual resources. */
     destroy(): void {
         for (const fn of this.cleanupFns) fn();
@@ -440,23 +477,28 @@ export class CharacterController {
         const offX = rawX * (sprite.flipX ? -1 : 1);
         const offY = rawY;
         sprite.setPosition(pos.x + offX, pos.y + this.spec.body.halfH + offY);
-        // Dynamic Y-Sorting depth for character
-        const feetY = Math.round(pos.y + this.spec.body.halfH);
-        sprite.setDepth(feetY);
+        // Y-sort anchor for the player stack (sprite < shadow < bullets <
+        // weapon). Mirrors MonsterController.computeFootY so the player and
+        // monsters share one Y-sort layer — a monster at footY=900 no longer
+        // draws in front of a player at footY=200 just because 900 > 20.
+        const footY = Math.round(
+            pos.y + (sprite.displayHeight / 2 - this.spec.body.halfH),
+        );
+        sprite.setDepth(footY);
         if (this.parts.shadow) {
             this.parts.shadow.setPosition(pos.x, pos.y + this.spec.body.halfH);
-            this.parts.shadow.setDepth(feetY - 1);
+            this.parts.shadow.setDepth(footY - 1);
         }
         if (this.parts.debugBodyRect) {
             this.parts.debugBodyRect.setPosition(pos.x, pos.y);
-            this.parts.debugBodyRect.setDepth(feetY + 1);
+            this.parts.debugBodyRect.setDepth(footY + 1);
         }
         if (this.parts.debugHitboxRect) {
             this.parts.debugHitboxRect.setPosition(
                 pos.x,
                 pos.y + this.spec.body.halfH - sprite.displayHeight / 2,
             );
-            this.parts.debugHitboxRect.setDepth(feetY + 2);
+            this.parts.debugHitboxRect.setDepth(footY + 2);
         }
         // Sprite faces the cursor (mouse-aimed top-down shooter). The
         // controller already maintains `targetX` / `targetY` from pointer
@@ -518,6 +560,7 @@ export class CharacterController {
             this.targetY ?? defaultAimY,
             (this.firing || this.mobileFiring) && now >= this.dodgeActiveUntil,
             this.spec.body.halfH,
+            footY,
         );
 
         // ── HUD ─────────────────────────────────────────────────────

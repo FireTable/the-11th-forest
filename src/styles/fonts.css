@@ -1,0 +1,39 @@
+/*
+ * src/styles/fonts.css
+ * --------------------------------------------------------------------------
+ * Self-hosted pixel fonts. woff2 files live in public/assets/font/ and are
+ * served as static assets by Vite at build time — no remote Google Fonts
+ * call at runtime. Both families are SIL OFL 1.1; licenses shipped as
+ * OFL-PressStart2P.txt / OFL-Silkscreen.txt next to the woff2 files.
+ *
+ *   press-start-2p  - 400 weight only (the family has no other weights)
+ *   silkscreen      - 400 + 700 weights
+ *
+ * `font-display: swap` lets the boot splash / HUDs render with the
+ * fallback monospace immediately; the pixel font swaps in once the
+ * woff2 decodes. Same trade-off as the previous Google Fonts CSS link.
+ */
+
+@font-face {
+    font-family: 'Press Start 2P';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/assets/font/press-start-2p-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Silkscreen';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/assets/font/silkscreen-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Silkscreen';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/assets/font/silkscreen-latin-700.woff2') format('woff2');
+}

@@ -19,11 +19,21 @@ export { resolveScene } from '@/game/resolve-scene';
 export type { ResolvedScene } from '@/game/resolve-scene';
 
 const StartGame = async (parent: string): Promise<Phaser.Game> => {
-    const savedLevelId = useGameStore.getState().currentLevelId;
+    const { tavernCleared, currentLevelId } = useGameStore.getState();
+
     let scene;
-    if (savedLevelId) {
+    if (!tavernCleared) {
+        // First launch or after a full reset: always start in the tavern.
         try {
-            scene = await resolveScene(savedLevelId);
+            scene = await resolveScene('tavern');
+        } catch {
+            // Tavern YAML not yet created — fall back to normal flow.
+            const defaultId = await resolveDefaultSceneId();
+            scene = await resolveScene(defaultId);
+        }
+    } else if (currentLevelId) {
+        try {
+            scene = await resolveScene(currentLevelId);
         } catch {
             const defaultId = await resolveDefaultSceneId();
             scene = await resolveScene(defaultId);
@@ -32,6 +42,7 @@ const StartGame = async (parent: string): Promise<Phaser.Game> => {
         const defaultId = await resolveDefaultSceneId();
         scene = await resolveScene(defaultId);
     }
+
     useGameStore.getState().setCurrentLevelId(scene.id);
     // Cache so the death overlay's Restart can replay without a second
     // YAML round-trip.

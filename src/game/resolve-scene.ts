@@ -26,6 +26,8 @@ import { fetchMonster } from '@/lib/monsters';
 import type { WeaponSpec } from '@/lib/weapons';
 import { fetchWeapon } from '@/lib/weapons';
 
+import { useGameStore } from '@/store/game-store';
+
 export interface ResolvedScene {
     id: string;
     level: Awaited<ReturnType<typeof fetchLevel>>;
@@ -40,6 +42,17 @@ export interface ResolvedScene {
     drops: Map<string, DropSpec>;
     sfx: Map<string, SfxSpec>;
     music: Map<string, MusicSpec>;
+    /** Weapon ids referenced by monster specs in this level. Their
+     *  `visual.texture` is NOT loaded — only `bullet.texture` is.
+     *  Scene uses this set to call `loadWeaponAssets` with
+     *  `loadVisualTexture: false` for monster weapons. */
+    monsterWeaponIds: Set<string>;
+    /** Weapon ids the player can hold / see rendered: character hotbar
+     *  + tavern dropSpawn entries. These get the full visual+bullet
+     *  texture load. */
+    playerWeaponIds: Set<string>;
+    /** Tavern mode only: all available characters for NPC display + selection. */
+    allCharacters?: CharacterSpec[];
 }
 
 /** Most-recently-resolved scene bundle. Set by main.ts after the initial
@@ -76,7 +89,15 @@ export async function resolveScene(
     const id = sceneId;
     const level = await deps.fetchLevelId(id);
 
-    const characterId = level.character ?? (await deps.fetchFirstCharacterId());
+    // Pick the character for this scene, in priority order:
+    //   1. Player's tavern selection (persisted) — survives into every
+    //      non-tavern scene so the picked character follows the player.
+    //   2. The level's `character:` field — author override per level.
+    //   3. First character in index.yaml — fall-back for fresh starts
+    //      before the player has picked anyone.
+    const selectedCharacterId = useGameStore.getState().selectedCharacterId;
+    const characterId =
+        selectedCharacterId ?? level.character ?? (await deps.fetchFirstCharacterId());
     if (!characterId) {
         throw new Error('No character available — add one to public/data/characters/index.yaml');
     }
@@ -98,7 +119,39 @@ export async function resolveScene(
         [...dropIds].map(async (did) => [did, await fetchDrop(did)] as const),
     );
 
-    const allWeaponIds = new Set<string>([...character.hotbar, ...monsterWeaponIds]);
+    // Weapon ids come from three sources:
+    //   1. character.hotbar (starting weapons, normally empty in tavern)
+    //   2. monster weapon ids (monster AI uses these)
+    //   3. dropSpawn entries with a weaponId override (tavern pickups)
+    //      — these are static-spawn weapon drops, not monster drops.
+    //      Without collecting them here the WeaponSpec lookup map
+    //      would be empty for the tavern and DropController couldn't
+    //      resolve the spawn's `weaponId` to a spec.
+    //   4. savedSlots weapon ids — weapons the player picked up in
+    //      a previous tavern session and persisted via the zustand
+    //      store. Without these the in-hand weapon visual has no
+    //      texture to render after a scene transition into a
+    //      non-tavern level.
+    const spawnWeaponIds = new Set<string>();
+    level.dropSpawns?.forEach((d) => {
+        if (d.weaponId) spawnWeaponIds.add(d.weaponId);
+    });
+    const savedSlotIds = new Set<string>(
+        (useGameStore.getState().slots ?? []).map((s) => s.id),
+    );
+    // Player-pickupable weapons: spec hotbar + tavern dropSpawn ids +
+    // persisted player pickups. These get their in-hand texture
+    // loaded because the player holds them and they're rendered as
+    // drops on the ground.
+    const playerWeaponIds = new Set<string>([
+        ...character.hotbar,
+        ...spawnWeaponIds,
+        ...savedSlotIds,
+    ]);
+    // Monster weapons: only need their bullet texture loaded, never
+    // held by the player. Kept out of the player set so the loader
+    // skips `visual.texture` for them.
+    const allWeaponIds = new Set<string>([...playerWeaponIds, ...monsterWeaponIds]);
     const allWeaponEntries = await Promise.all(
         [...allWeaponIds].map(async (wid) => [wid, await fetchWeapon(wid)] as const),
     );
@@ -117,6 +170,16 @@ export async function resolveScene(
 
     const spriteCell = await getSpriteCellDims(character);
 
+    // Tavern mode: also load every available character so NPC sprites
+    // can be spawned for selection. fetchCharacterIndex is cheap (cached
+    // by the browser after the first call).
+    let allCharacters: CharacterSpec[] | undefined;
+    if (level.tavern) {
+        const charIndex = await fetchCharacterIndex();
+        const specs = await Promise.all(charIndex.characters.map((cid) => fetchCharacter(cid)));
+        allCharacters = specs;
+    }
+
     return {
         id,
         level,
@@ -128,6 +191,9 @@ export async function resolveScene(
         drops: new Map(dropEntries),
         sfx,
         music,
+        monsterWeaponIds,
+        playerWeaponIds,
+        ...(allCharacters ? { allCharacters } : {}),
     };
 }
 
@@ -191,5 +257,8 @@ export function toSceneAssets(resolved: ResolvedScene): SceneAssets {
         dropSpecs: resolved.drops,
         sfxSpecs: resolved.sfx,
         musicSpecs: resolved.music,
+        monsterWeaponIds: resolved.monsterWeaponIds,
+        playerWeaponIds: resolved.playerWeaponIds,
+        ...(resolved.allCharacters ? { allCharacters: resolved.allCharacters } : {}),
     };
 }

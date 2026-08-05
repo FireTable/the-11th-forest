@@ -19,7 +19,7 @@ import { SFX_EVENT } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import { fetchLevelIndex } from '@/lib/levels/loader';
 import type { Teleporter } from '@/lib/levels/types';
-import { resolveAndRestart } from '@/lib/phaser-game';
+import { resolveAndRestart, restartAtTavern } from '@/lib/phaser-game';
 import { useGameStore } from '@/store/game-store';
 
 interface SingleTeleporterView {
@@ -143,7 +143,7 @@ export class TeleporterController {
         // of the lower half and behind the upper half, like a real
         // ground decal. Depth = spec.y (the portal's center y in image
         // pixel space), which lives in the same range characters use
-        // for their feetY-based depth.
+        // for their flat-depth slot.
         const teleporterDepth = Math.round(spec.y);
 
         glow.setPosition(spec.x, spec.y);
@@ -632,7 +632,15 @@ export class TeleporterController {
         this.scene.cameras.main.fadeOut(400, 0, 0, 0);
 
         this.scene.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-            void resolveAndRestart(nextSceneId!);
+            // Teleporter into the tavern = full reset (clears save data,
+            // returns selectedCharacterId to null so the NPC phase-1
+            // selection screen appears). Anywhere else just resolves
+            // and swaps scenes, preserving picked-up weapons + HP.
+            if (nextSceneId === 'tavern') {
+                void restartAtTavern();
+            } else {
+                void resolveAndRestart(nextSceneId!);
+            }
         });
     }
 

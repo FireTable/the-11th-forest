@@ -7,8 +7,8 @@
  * validation happens server-side on save.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { Plus, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronRight, Play, Plus, Square } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +30,13 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Field, NumberField, Section } from './fields';
+import {
+    AnimsEditor,
+    SpriteUploader,
+    type SpriteSpec,
+    type AnimSpec,
+} from './sprite-editor';
 
 type ModuleSlug = 'drops' | 'monsters' | 'weapons' | 'audios-sfx' | 'audios-music';
 
@@ -499,6 +506,18 @@ export function MonstersSectionEditor({
                 body: { halfW: 14, halfH: 14 },
                 weaponId: 'monster-default',
                 drops: [],
+                sprite: {
+                    texture: `assets/image/monsters/${id}.png`,
+                    grid: { rows: 4, cols: 4 },
+                    scale: 1.0,
+                    offset: { left: 0, bottom: 0 },
+                },
+                anims: {
+                    idle: { frames: [0, 1], frameRate: 6, repeat: -1 },
+                    move: { frames: [2, 3], frameRate: 10, repeat: -1 },
+                    hit: { frames: [4, 5], frameRate: 12, repeat: 0 },
+                    death: { frames: [6, 6], frameRate: 10, repeat: 0 },
+                },
             })}
             renderForm={(spec, patch) => <MonsterForm spec={spec} patch={patch} />}
         />
@@ -506,6 +525,39 @@ export function MonstersSectionEditor({
 }
 
 function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
+    // Backfill sprite + anims on the fly so older YAMLs (created before
+    // these were added to newTemplate) keep saving without a Zod error.
+    // The patch only fires once when the field is absent — subsequent
+    // edits stay user-controlled.
+    const defaultedRef = useRef(false);
+    useEffect(() => {
+        if (defaultedRef.current) return;
+        if (!spec?.id) return;
+        const needsSprite = !spec.sprite || typeof spec.sprite.texture !== 'string';
+        const needsAnims = !spec.anims;
+        if (!needsSprite && !needsAnims) return;
+        defaultedRef.current = true;
+        const id = spec.id;
+        patch({
+            ...(needsSprite && {
+                sprite: {
+                    texture: `assets/image/monsters/${id}.png`,
+                    grid: { rows: 4, cols: 4 },
+                    scale: 1.0,
+                    offset: { left: 0, bottom: 0 },
+                },
+            }),
+            ...(needsAnims && {
+                anims: {
+                    idle: { frames: [0, 1], frameRate: 6, repeat: -1 },
+                    move: { frames: [2, 3], frameRate: 10, repeat: -1 },
+                    hit: { frames: [4, 5], frameRate: 12, repeat: 0 },
+                    death: { frames: [6, 7], frameRate: 10, repeat: 0 },
+                },
+            }),
+        });
+    }, [spec, patch]);
+
     return (
         <div className="flex flex-col gap-2">
             <Section title="Identity">
@@ -577,6 +629,29 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
             <Section title="Drops">
                 <DropsEditor drops={spec.drops ?? []} onChange={(d) => patch({ drops: d })} />
             </Section>
+            <Section title="Sprite">
+                <SpriteUploader
+                    id={spec.id}
+                    sprite={spec.sprite as SpriteSpec | undefined}
+                    onSpriteChange={(s) => patch({ sprite: s })}
+                    uploadEndpoint="/api/editor/upload-monster-sprite"
+                    defaults={{
+                        grid: { rows: 4, cols: 4 },
+                        scale: 1.0,
+                        offset: { left: 0, bottom: 0 },
+                    }}
+                    spriteFolder="monsters"
+                    altLabel="monster"
+                />
+            </Section>
+
+            <Section title="Anims">
+                <AnimsEditor
+                    anims={(spec.anims ?? {}) as Record<string, AnimSpec>}
+                    onChange={(a) => patch({ anims: a })}
+                    sprite={spec.sprite as SpriteSpec | undefined}
+                />
+            </Section>
             <Section title="AI prompt (regen)">
                 <Textarea
                     value={spec.prompt ?? ''}
@@ -589,6 +664,7 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
         </div>
     );
 }
+
 
 function DropsEditor({
     drops,
@@ -1058,20 +1134,22 @@ function WeaponForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                 </Field>
             </Section>
             <Section title="Weapon visual">
-                <Field label="texture">
-                    <SpritePicker
-                        folder="weapons"
-                        value={spec.visual?.texture ?? ''}
-                        onChange={(v) =>
-                            patch({
-                                visual: {
-                                    ...(spec.visual ?? {}),
-                                    texture: v || undefined,
-                                },
-                            })
-                        }
-                    />
-                </Field>
+                <div className="col-span-2">
+                    <Field label="texture">
+                        <SpritePicker
+                            folder="weapons"
+                            value={spec.visual?.texture ?? ''}
+                            onChange={(v) =>
+                                patch({
+                                    visual: {
+                                        ...(spec.visual ?? {}),
+                                        texture: v || undefined,
+                                    },
+                                })
+                            }
+                        />
+                    </Field>
+                </div>
                 <NumberField
                     label="scale"
                     value={spec.visual?.scale ?? 0.16}
@@ -1256,14 +1334,14 @@ export function AudiosSection({
     const [tab, setTab] = useState<'sfx' | 'music'>('sfx');
     return (
         <div className="flex flex-col gap-2">
-            <nav className="flex border-b border-neutral-800">
+            <nav className="flex border-b border-neutral-800 bg-neutral-900/60 overflow-x-auto">
                 <Button
                     variant="ghost"
                     onClick={() => setTab('sfx')}
-                    className={`flex-1 rounded-none border-b-2 ${
+                    className={`flex-shrink-0 rounded-none border-b-2 px-3 ${
                         tab === 'sfx'
                             ? 'border-cyan-400 text-cyan-400'
-                            : 'border-transparent text-neutral-500'
+                            : 'border-transparent text-neutral-500 hover:text-neutral-300'
                     }`}
                 >
                     SFX
@@ -1271,10 +1349,10 @@ export function AudiosSection({
                 <Button
                     variant="ghost"
                     onClick={() => setTab('music')}
-                    className={`flex-1 rounded-none border-b-2 ${
+                    className={`flex-shrink-0 rounded-none border-b-2 px-3 ${
                         tab === 'music'
                             ? 'border-cyan-400 text-cyan-400'
-                            : 'border-transparent text-neutral-500'
+                            : 'border-transparent text-neutral-500 hover:text-neutral-300'
                     }`}
                 >
                     Music
@@ -1347,11 +1425,14 @@ function AudioForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
                     />
                 </Field>
                 <Field label="Source">
-                    <Input
-                        value={spec.source}
-                        onChange={(e) => patch({ source: e.target.value })}
-                        className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono"
-                    />
+                    <div className="flex gap-1.5 col-span-2">
+                        <Input
+                            value={spec.source}
+                            onChange={(e) => patch({ source: e.target.value })}
+                            className="h-7 text-xs bg-neutral-950 border-neutral-700 font-mono flex-1 min-w-0"
+                        />
+                        <AudioPreviewButton source={spec.source} />
+                    </div>
                 </Field>
             </Section>
             <Section title="Playback">
@@ -1416,56 +1497,73 @@ function AudioForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
     );
 }
 
+/**
+ * In-editor preview for an audio spec's `source` path. Spins up a
+ * transient HTMLAudioElement (Phaser audio isn't available outside a
+ * running scene) and toggles Play / Stop on click. Used in the Audio
+ * tab's form next to the Source field so designers can audition an
+ * sfx/music clip before saving. Cleans up the audio element on
+ * unmount so closing the editor mid-playback doesn't leave a stale
+ * instance pinging the AudioContext.
+ */
+function AudioPreviewButton({ source }: { source: string }) {
+    const [playing, setPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Source is stored relative to the public root (e.g.
+    // "assets/audio/sfx/dry-fire.wav"); leading slash makes it
+    // resolvable from any route (the editor lives at /editor).
+    const url = source.startsWith('/') ? source : `/${source}`;
+
+    const stop = (): void => {
+        const audio = audioRef.current;
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+        setPlaying(false);
+    };
+
+    const preview = (): void => {
+        if (playing) {
+            stop();
+            return;
+        }
+        const audio = new Audio(url);
+        // ended only fires for non-looping audio; looped tracks keep
+        // going until the user clicks Stop again.
+        audio.addEventListener('ended', () => setPlaying(false));
+        audio.addEventListener('error', () => setPlaying(false));
+        audioRef.current = audio;
+        // .play() returns a Promise that rejects on autoplay-policy
+        // violation or 404 — swallow + flip the button back to Stop
+        // state so the UI doesn't lie about an in-flight sound.
+        audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    };
+
+    useEffect(() => {
+        return () => {
+            audioRef.current?.pause();
+            audioRef.current = null;
+        };
+    }, []);
+
+    return (
+        <Button
+            variant="outline"
+            size="xs"
+            onClick={preview}
+            className="h-7 w-7 p-0 border-neutral-700 bg-neutral-950 text-cyan-400 hover:bg-neutral-800 hover:text-cyan-300 shrink-0"
+            title={playing ? 'Stop preview' : 'Play preview'}
+        >
+            {playing ? (
+                <Square className="size-3 fill-current" />
+            ) : (
+                <Play className="size-3 fill-current" />
+            )}
+        </Button>
+    );
+}
+
 // ─── Shared bits (duplicated from character.tsx for module-level reuse) ──
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div className="bg-neutral-900 border border-neutral-800 rounded p-2.5 flex flex-col gap-2">
-            <div className="font-semibold text-neutral-300 text-[11px] uppercase tracking-wider">
-                {title}
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">{children}</div>
-        </div>
-    );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div>
-            <Label className="text-[10px] text-neutral-400 leading-none font-normal mb-0.5">
-                {label}
-            </Label>
-            {children}
-        </div>
-    );
-}
-
-function NumberField({
-    label,
-    value,
-    onChange,
-    step,
-    min,
-    max,
-}: {
-    label: string;
-    value: number;
-    onChange: (v: number) => void;
-    step?: number;
-    min?: number;
-    max?: number;
-}) {
-    return (
-        <Field label={label}>
-            <Input
-                type="number"
-                value={value}
-                step={step}
-                min={min}
-                max={max}
-                onChange={(e) => onChange(Number(e.target.value))}
-                className="h-7 text-xs bg-neutral-950 border-neutral-700"
-            />
-        </Field>
-    );
-}

@@ -1,0 +1,26 @@
+name: Rune Shield Bash
+damage: 28
+cooldownMs: 750
+range: 480
+visual:
+    texture: assets/image/weapons/rune-shield.png
+    scale: 0.9
+    orbitRadius: 0
+    anchor: [0.5, 0.5]
+    swingAngle: 140
+bullet:
+    texture: assets/image/weapons/rune-shard.png
+    type: projectile
+    scale: 0.9
+    anchor: [0.5, 0.5]
+projectile:
+    speed: 15
+    visual:
+        radius: 10
+        width: 32
+        height: 32
+        color: 0x8b6db5
+    lifeMs: 1500
+sfx:
+    shoot: shotgun-shoot
+    bulletWall: bullet-wall

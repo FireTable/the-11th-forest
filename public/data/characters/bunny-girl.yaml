@@ -1,0 +1,149 @@
+id: bunny-girl
+name: Bunny
+description: |
+    A silver-haired leporid assassin with sharp reflexes and a longer
+    reach than her frame suggests. Trades raw durability for
+    precision — she slips past guard windows and ends fights
+    before the enemy knows she's there.
+imageSize: 2048x2048
+prompt: |
+    The 11th Forest — Bunny Girl sprite sheet
+
+    HARD NEGATIVE PROMPTS (must NOT appear in the image):
+      - No visible grid, no dividers, no borders, no ground, no scene,
+        no text, no logo, no watermark.
+      - No grid lines, no cell borders, no cell separators, no dividers
+        of any kind between the 4×4 frames.
+      - No guide marks, no reference crosses, no axis labels, no frame
+        numbers, no "Frame N" text, no index annotations.
+      - No checkerboard pattern, no tile outline overlays, no debug
+        visualizations.
+      - No watermarks, no logos, no signatures, no UI elements.
+      - The 4×4 layout is COMPLETELY IMPLIED by the character's position
+        — the magenta background is one continuous flat field everywhere
+        except where the character is drawn.
+
+    CRITICAL LAYOUT (must be EXACTLY this — 16 cells, no more, no less,
+    4 rows × 4 columns, every cell the same size):
+
+      ┌────┬────┬────┬────┐
+      │  0 │  1 │  2 │  3 │   row 1: idle (4 frames)
+      ├────┼────┼────┼────┤
+      │  4 │  5 │  6 │  7 │   row 2: walk (4 frames)
+      ├────┼────┼────┼────┤
+      │  8 │  9 │ 10 │ 11 │   row 3: run (4 frames)
+      ├────┼────┼────┼────┤
+      │ 12 │ 13 │ 14 │ 15 │   row 4: dodge (4 frames)
+      └────┴────┴────┴────┘
+
+    IMPORTANT — every cell must contain a frame. The AI in a previous
+    attempt left the bottom-right cell empty; this version must fill
+    cell #15 with the last dodge / recovery pose.
+
+    Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
+    512×512 px. The character is ~360×480 px in each cell, centered
+    horizontally, with feet at ~85% cell height. No overlapping between
+    cells. The character faces RIGHT in every frame (her right side =
+    screen right); left-facing or back-facing poses are wrong.
+
+    Character: a young woman with long silver hair tied in a high side
+    ponytail, tall white-and-pink rabbit ears rising from a black headband,
+    and bright magenta eyes. Wearing a strapless black leotard bodysuit
+    with white fur trim at the bust, white wrist cuffs with fluffy fur,
+    black sheer thigh-high stockings, and black stiletto-heeled boots.
+    A small round white bunny tail pokes out the back at hip level.
+    Chibi head-to-body ratio (~1:2). Outline: 1-pixel dark brown outline,
+    clean pixel-art shading with 2-3 tonal steps per material (no smooth
+    gradients).
+
+    Same character in every frame — face, hair, ears, outfit, proportions
+    are identical. Only the pose changes.
+
+    16 frames in row order (left-to-right, top-to-bottom), distributed as:
+
+    Frames 0–3 (idle, 4 frames, row 1):
+      Character standing still, one hand on hip, confident pose. Gentle
+      body sway, slow breathing, ears wiggling occasionally. Hair settles.
+      No leaning forward, no running.
+
+    Frames 4–7 (walk, 4 frames, row 2):
+      A single WALK CYCLE — the character walks in place. Legs alternate
+      step-by-step; arms swing in counter-rhythm. Body stays roughly
+      upright. Slow, controlled, graceful — not a run.
+
+    Frames 8–11 (run, 4 frames, row 3):
+      A sprint cycle. Body leaning forward, hair and ponytail flowing
+      backward. Legs extending in long strides. Arms pumping. Ears pinned
+      back from the wind. Faster, more dynamic than the walk.
+
+    Frames 12–15 (dodge, 4 frames, row 4):
+      A forward dive / leap. Body low and horizontal mid-air, hair and
+      ears streaming behind. Recovery frame 15 brings her back to a
+      half-crouched stance ready to spring again.
+
+    Style requirements:
+    - High-end handcrafted 16-bit RPG aesthetic.
+    - Inspired by Chrono Trigger, Eastward, Children of Morta, Hyper Light
+      Drifter, and premium modern indie pixel games.
+    - Hard clean pixel edges, no anti-aliasing on the silhouette.
+    - Limited muted color palette: ~32 colors total per character.
+    - No purple, magenta, or pink in the character body itself. Eyes may
+      be magenta-tinted but never full magenta. The background is the
+      only place magenta appears.
+hp: 90
+sp: 80
+luck: 7         # Bunny assassin precision — high crit chance
+moveSpeed: 5
+spRegenMs: 4500
+gender: female
+body:
+    halfW: 26
+    halfH: 26
+dodge:
+    spCost: 12
+    speed: 15
+    durationMs: 200
+    cooldownMs: 500
+hotbar: []
+weaponMax: 2
+sfx:
+    dodge: dodge
+    hurtFemale: player-hurt-female
+    throttleMs: 1200
+    footstep: footstep
+    footstepThrottleMs: 200
+    lowHpHeartbeat: low-hp-heartbeat
+    lowHpThreshold: 0.3
+    lowHpPulseMs: 900
+sprite:
+    texture: assets/image/characters/bunny-girl.png
+    grid:
+        rows: 4
+        cols: 4
+    scale: 1.35
+    offset:
+        left: -2
+        bottom: -4
+    script:
+        downsample: 4
+        colors: 32
+        pad: 2
+anims:
+    idle:
+        frames:
+            - 0
+            - 3
+        frameRate: 6
+        repeat: -1
+    walk:
+        frames:
+            - 4
+            - 7
+        frameRate: 10
+        repeat: -1
+    dodge:
+        frames:
+            - 12
+            - 15
+        frameRate: 14
+        repeat: 0

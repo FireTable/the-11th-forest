@@ -36,6 +36,9 @@ sfx:
     - footstep
     - low-hp-heartbeat
     - teleporter-activate
+    # Scene / flow
+    - victory-fanfare
+    - tavern-charge
 
 music:
     - forest-ambient

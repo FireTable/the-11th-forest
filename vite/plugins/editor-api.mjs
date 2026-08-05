@@ -72,6 +72,21 @@ const SaveLevelSchema = z
             })
             .strict()
             .optional(),
+        /** Tavern-mode flag: when true, LoadScene enters character-select
+         *  mode (NPCs rendered for selection; weapon pickup capped at 3). */
+        tavern: z.boolean().optional(),
+        /** Tavern-mode only: per-character NPC standing positions. */
+        npcSpawns: z
+            .array(
+                z
+                    .object({
+                        characterId: z.string().min(1),
+                        x: z.number(),
+                        y: z.number(),
+                    })
+                    .strict(),
+            )
+            .optional(),
         monsters: z
             .array(
                 z
@@ -99,6 +114,11 @@ const SaveLevelSchema = z
                         type: z.string().min(1),
                         x: z.number(),
                         y: z.number(),
+                        // Weapon-pickup override: lets one generic drop
+                        // spec (e.g. "weapon-drop") be reused per spawn
+                        // with a specific weapon id. Mirrors the TS
+                        // schema in src/lib/levels/schema.ts.
+                        weaponId: z.string().min(1).optional(),
                     })
                     .strict(),
             )
@@ -519,6 +539,8 @@ function serializeLevelYaml(level) {
     };
     if (level.music !== undefined) payload.music = level.music;
     if (level.character !== undefined) payload.character = level.character;
+    if (level.tavern !== undefined) payload.tavern = level.tavern;
+    if (level.npcSpawns !== undefined) payload.npcSpawns = level.npcSpawns;
     if (level.characterSpawn !== undefined) {
         payload.characterSpawn = {
             x: level.characterSpawn.x,
@@ -539,11 +561,11 @@ function serializeLevelYaml(level) {
         });
     }
     if (level.dropSpawns !== undefined) {
-        payload.dropSpawns = level.dropSpawns.map((d) => ({
-            type: d.type,
-            x: d.x,
-            y: d.y,
-        }));
+        payload.dropSpawns = level.dropSpawns.map((d) => {
+            const out = { type: d.type, x: d.x, y: d.y };
+            if (d.weaponId !== undefined) out.weaponId = d.weaponId;
+            return out;
+        });
     }
     if (level.materials !== undefined) payload.materials = level.materials;
     if (level.teleporters !== undefined) payload.teleporters = level.teleporters;
@@ -720,7 +742,7 @@ async function handleDeleteMaterialItem(req, res) {
     return sendJson(res, 200, { ok: true });
 }
 
-// ─── Scene management (list / create / replace bg / save monsters) ──────
+// ─── Scene management (list / create / replace bg ) ──────
 
 /**
  * Read every level yaml and return {id, title}. Cheap because the files
@@ -833,6 +855,75 @@ async function handleUploadSceneImage(req, res) {
 }
 
 /**
+ * Run scripts/split-sheet.ts against an uploaded monster sprite.
+ * Stash the raw PNG in tmp/editor-uploads, shell out to split-sheet.ts
+ * with --in-place (which copies the source to monsters/raws/<id>.png
+ * and writes the processed sheet to monsters/<id>.png, then cleans
+ * up frame-*.png + recomposed.png). Return the processed PNG's
+ * natural size so the editor can back-fill sprite.texture.
+ *
+ * `options` (all optional, passed through to split-sheet.ts):
+ *   { downsample: 4, colors: 32, pad: 2, outline: 2, dither: false }
+ */
+async function handleUploadMonsterSprite(req, res) {
+    const { id, fileData, options = {} } = await readJsonBody(req);
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
+        return sendJson(res, 400, { error: `invalid id: ${JSON.stringify(id)}` });
+    }
+    if (typeof fileData !== 'string' || !fileData.startsWith('data:image/')) {
+        return sendJson(res, 400, { error: 'invalid fileData (expected base64 data-URL)' });
+    }
+
+    const base64 = fileData.split(',', 2)[1];
+    const buffer = Buffer.from(base64, 'base64');
+
+    // Save upload to a temp location for split-sheet.ts.
+    const tmpDir = path.resolve(__dirname, '../../tmp/editor-uploads');
+    await mkdir(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, `${id}-${Date.now()}.png`);
+    await writeFile(tmpPath, buffer);
+
+    // Build the split-sheet.ts flags. Defaults match the wanderer
+    // production tuning so a fresh upload "just works".
+    const flags = [
+        '--in-place',
+        `--id=${id}`,
+        `--downsample=${options.downsample ?? 4}`,
+        `--colors=${options.colors ?? 32}`,
+        `--pad=${options.pad ?? 2}`,
+        `--outline=${options.outline ?? 2}`,
+    ];
+    if (options.dither) flags.push('--dither');
+
+    const projectRoot = path.resolve(__dirname, '../..');
+    const cmd = `pnpm tsx scripts/split-sheet.ts "${tmpPath}" "${path.join(PUBLIC_DIR, 'assets/image/monsters')}" ${flags.join(' ')}`;
+
+    const { exec } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execAsync = promisify(exec);
+
+    try {
+        await execAsync(cmd, { cwd: projectRoot, timeout: 120_000 });
+    } catch (e) {
+        // Clean up temp even on failure.
+        await import('node:fs/promises').then((fs) => fs.rm(tmpPath, { force: true }));
+        return sendJson(res, 500, { error: `split-sheet failed: ${String(e?.message ?? e)}` });
+    }
+    await import('node:fs/promises').then((fs) => fs.rm(tmpPath, { force: true }));
+
+    // Read the processed PNG for natural size.
+    const outPath = path.join(PUBLIC_DIR, 'assets/image/monsters', `${id}.png`);
+    const { PNG } = await import('pngjs');
+    const processed = PNG.sync.read(await readFile(outPath));
+
+    return sendJson(res, 200, {
+        ok: true,
+        path: `assets/image/monsters/${id}.png`,
+        naturalSize: { width: processed.width, height: processed.height },
+    });
+}
+
+/**
  * Replace just the `monsters:` array in a level yaml. Cheaper than the
  * full save-level round-trip — monster waves change often during level
  * design while the rest of the level is stable.
@@ -856,15 +947,81 @@ async function handleSaveMonsters(req, res) {
 }
 
 /**
- * List every monster id from public/data/monsters/index.yaml. The
- * Monsters sub-tab uses this to populate its type dropdown.
+ * List every monster type from public/data/monsters/index.yaml. The
+ * Monsters sub-tab uses this to populate its type dropdown AND the
+ * visual canvas overlay (which needs each monster's display name,
+ * sprite texture path, sheet grid, and idle anim range to render a
+ * single idle frame in the marker thumbnail). Each entry:
+ *   { id, name, texture, url, cols, rows, idleStart, idleCount, idleFrameRate }
+ *
+ * `texture` is the relative path from the monster spec (e.g.
+ * "assets/image/monsters/drone.png") — kept for round-tripping into
+ * level yamls. `url` is the absolute server-root path suitable for an
+ * <img src> or CSS background-image, with a leading "/".
  */
 async function handleListMonsterTypes(res) {
     try {
         const indexPath = path.join(PUBLIC_DIR, 'data/monsters/index.yaml');
         const text = await readFile(indexPath, 'utf8');
         const idx = parseYaml(text) || {};
-        const types = Array.isArray(idx.monsters) ? idx.monsters : [];
+        const ids = Array.isArray(idx.monsters) ? idx.monsters : [];
+        const types = [];
+        for (const id of ids) {
+            try {
+                const specText = await readFile(
+                    path.join(PUBLIC_DIR, 'data/monsters', `${id}.yaml`),
+                    'utf8',
+                );
+                const spec = parseYaml(specText) || {};
+                const cols =
+                    typeof spec?.sprite?.grid?.cols === 'number'
+                        ? spec.sprite.grid.cols
+                        : 4;
+                const rows =
+                    typeof spec?.sprite?.grid?.rows === 'number'
+                        ? spec.sprite.grid.rows
+                        : 4;
+                const idle = spec?.anims?.idle;
+                const idleFrames = Array.isArray(idle?.frames) ? idle.frames : null;
+                const idleStart =
+                    idleFrames && idleFrames.length >= 1 && typeof idleFrames[0] === 'number'
+                        ? idleFrames[0]
+                        : 0;
+                const idleCount =
+                    idleFrames && idleFrames.length === 2
+                        ? idleFrames[1] - idleFrames[0] + 1
+                        : 4;
+                const idleFrameRate =
+                    typeof idle?.frameRate === 'number' ? idle.frameRate : 6;
+                const texture =
+                    typeof spec?.sprite?.texture === 'string'
+                        ? spec.sprite.texture
+                        : `assets/image/monsters/${id}.png`;
+                types.push({
+                    id,
+                    name: typeof spec.name === 'string' ? spec.name : id,
+                    texture,
+                    url: `/${texture}`,
+                    cols,
+                    rows,
+                    idleStart,
+                    idleCount,
+                    idleFrameRate,
+                });
+            } catch {
+                types.push({
+                    id,
+                    name: id,
+                    texture: `assets/image/monsters/${id}.png`,
+                    url: `/assets/image/monsters/${id}.png`,
+                    cols: 4,
+                    rows: 4,
+                    idleStart: 0,
+                    idleCount: 4,
+                    idleFrameRate: 6,
+                });
+            }
+        }
         return sendJson(res, 200, { types });
     } catch {
         return sendJson(res, 200, { types: [] });
@@ -1210,6 +1367,14 @@ export function editorApiPlugin() {
                 if (req.method !== 'POST') return next();
                 try {
                     await handleUploadSceneImage(req, res);
+                } catch (e) {
+                    sendJson(res, 500, { error: String(e?.message ?? e) });
+                }
+            });
+            server.middlewares.use('/api/editor/upload-monster-sprite', async (req, res, next) => {
+                if (req.method !== 'POST') return next();
+                try {
+                    await handleUploadMonsterSprite(req, res);
                 } catch (e) {
                     sendJson(res, 500, { error: String(e?.message ?? e) });
                 }

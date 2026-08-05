@@ -22,13 +22,19 @@ export const CAT = {
 } as const;
 
 // ─── Rendering Depths / Z-Indices ─────────────────────────────────────
+// Per-entity Y-sort: the player and every monster derive their sprite /
+// shadow / bullet / weapon depths from their own footY (world Y). Two
+// entities overlap correctly on screen based on whose feet are lower.
+// `DEPTH.CHARACTER` / `BULLET` / `WEAPON` below are FALLBACKS for
+// callers that don't supply a footY (tests, off-character plumbing).
 export const DEPTH = {
     BACKGROUND_IMAGE: 0,
     LIGHT: 1, // Renders over background image, under all materials, walls, and entities
     MATERIAL_BACKGROUND: 10,
     BULLET_TRAIL: 15,
-    PROJECTILE_BASE: 20, // Min base depth for bullets so they always render OVER background materials
-    // Y-sorting range for characters, monsters, bullets, and y-sort materials (PROJECTILE_BASE + y-coord + offset)
+    CHARACTER: 20, // Fallback sprite depth when no footY is supplied
+    BULLET: 30, // Fallback bullet depth when no footY is supplied
+    WEAPON: 40, // Fallback weapon depth when no footY is supplied
     FOREGROUND_MATERIAL: 10000,
     MELEE_SLASH: 12000, // Slash arc always above foreground materials
     SELECTION_BOX: 15000,
@@ -190,6 +196,18 @@ export const HUD_STATUS_LABEL_OFFSET_Y = -2;
  *  brush-by contact from stacking to death in a single frame. */
 export const COMBAT_PLAYER_DAMAGE_COOLDOWN_MS = 100;
 
+/** Global scale factor applied to per-character crit chance.
+ *  critChance = (luck / 10) * COMBAT_CRIT_MULTIPLIER
+ *  At 0.5: luck=10 → 50 %, luck=5 → 25 %, luck=1 → 5 %.
+ *  Tune this to adjust overall crit frequency without
+ *  touching individual character YAML files. */
+export const COMBAT_CRIT_MULTIPLIER = 0.5;
+
+/** Damage multiplier applied when a hit is a critical strike.
+ *  finalDamage = baseDamage * COMBAT_CRIT_DAMAGE_MULTIPLIER.
+ *  Default 2 = double damage on crit. */
+export const COMBAT_CRIT_DAMAGE_MULTIPLIER = 2;
+
 /** How long a monster's death animation lingers in a fade-out tween
  *  before the body is destroyed and dropped items are released.
  *  Long enough for the player to register the kill, short enough to
@@ -208,6 +226,7 @@ export const RENDER_BULLET_TRAIL_LENGTH = 6;
 // `music:<id>` so the event name is a 1:1 map from the YAML id.
 
 export const SFX_EVENT = (id: string): string => `sfx:${id}`;
+export const SFX_STOP = (id: string): string => `sfx:stop:${id}`;
 export const MUSIC_EVENT = (id: string): string => `music:${id}`;
 export const MUSIC_STOP = 'music:stop';
 export const MUSIC_PAUSE = 'music:pause';
@@ -260,6 +279,14 @@ export const DROP_CONFIG = {
         /** Minimum distance to trigger actual pickup (px) */
         PICKUP_DISTANCE: 16,
     },
+
+    /** Ground-display scale multiplier for weapon-pickup drops. The
+     *  weapon's `visual.scale` (e.g. 0.16 for arcana-staff) is sized
+     *  for the in-hand sprite anchored to a character body. On the
+     *  ground the drop is its own prop, so we bump it by this factor
+     *  for legibility. Hand-tuned — change here if a weapon ends up
+     *  too tiny / too big on the tavern floor. */
+    WEAPON_PICKUP_SCALE_MULTIPLIER: 1,
 } as const;
 
 // ─── Graphics: Pixel Art Engine Lighting & Camera Filter Config ────────

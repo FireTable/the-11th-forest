@@ -2,11 +2,12 @@
  * src/game/weapons/visual.ts
  * --------------------------------------------------------------------------
  * WeaponVisualController: Handles Brotato-style floating weapon attachments,
- * aiming rotations, dynamic depth layer sorting, recoil procedural tweening,
+ * aiming rotations, fixed depth layer sorting, recoil procedural tweening,
  * melee arc swings, and laser beam rendering.
  */
 
 import type * as Phaser from 'phaser';
+import { DEPTH } from '@/lib/constants';
 import type { WeaponSpec } from '@/lib/weapons';
 
 export class WeaponVisualController {
@@ -47,10 +48,18 @@ export class WeaponVisualController {
      * Update weapon position, angle, orientation, and depth relative to player character.
      * @param playerX Character center X
      * @param playerY Character center Y
-     * @param feetY Character feet depth (Y-sorted)
      * @param aimAngle Angle in radians toward mouse/target
+     * @param depth Optional depth override. Defaults to `DEPTH.WEAPON`
+     *  (flat layer in front of bullets). Monsters pass their own footY so
+     *  the weapon stays pinned to its owner's depth slot — the weapon
+     *  never Y-sorts independently of the monster that holds it.
      */
-    public update(playerX: number, playerY: number, feetY: number, aimAngle: number): void {
+    public update(
+        playerX: number,
+        playerY: number,
+        aimAngle: number,
+        depth: number = DEPTH.WEAPON,
+    ): void {
         if (!this.sprite || !this.currentSpec) return;
 
         const orbitRadius = this.currentSpec.visual?.orbitRadius ?? 16;
@@ -75,15 +84,14 @@ export class WeaponVisualController {
             this.sprite.setFlipY(false);
         }
 
-        // 4. Dynamic Depth Sorting relative to Character Feet Y
-        // Aiming North/Up = Behind player (feetY - 1)
-        // Aiming South/Sides = In front of player (feetY + 10)
-        const sinAngle = Math.sin(aimAngle);
-        if (sinAngle < -0.3) {
-            this.sprite.setDepth(feetY - 1);
-        } else {
-            this.sprite.setDepth(feetY + 10);
-        }
+        // 4. Fixed depth — the weapon sits in front of bullets (so a
+        // passing shot never draws over the gun) and above the character
+        // sprite. No aim-direction depth swap: a top-down shooter with
+        // flat depth wants the held weapon to read as permanently in hand.
+        // Monsters override with their footY so the weapon rides along
+        // with its owner's depth slot rather than drawing at a fixed
+        // layer above everything.
+        this.sprite.setDepth(depth);
     }
 
     /** Trigger procedural recoil impulse when firing a ranged weapon. */

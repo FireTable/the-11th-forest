@@ -16,6 +16,7 @@ import { CAT, DROP_CONFIG, SFX_EVENT, WALL_PLAYER_MASK } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
 import type { DropSpec } from '@/lib/drops';
 import type { DropSpawn } from '@/lib/levels/types';
+import type { WeaponSpec } from '@/lib/weapons';
 
 import { useGameStore } from '@/store/game-store';
 
@@ -78,14 +79,40 @@ export class DropInstance {
     readonly body: MatterJS.BodyType;
     readonly rect: Phaser.GameObjects.Rectangle;
     readonly sprite?: Phaser.GameObjects.Sprite;
+    /** When this drop is a weapon pickup, override the spec's
+     *  `effect.weaponId` with this so the on-pickup callback resolves
+     *  to the actual weapon the player is standing on (multiple
+     *  dropSpawns can share one generic drop spec). Also used by the
+     *  visual layer — when present, the weapon's own `visual.texture`
+     *  replaces the spec's spritesheet so the drop on the ground looks
+     *  like the weapon you pick up. */
+    readonly weaponSpec?: WeaponSpec;
     private arcGraphics?: Phaser.GameObjects.Graphics;
 
     taken = false;
     isLanded = true;
     isAttracting = false;
+    /**
+     * True when the cap-replace hub dismissed this drop without
+     * consuming it. The magnet stays disengaged until the player
+     * walks far enough away to "release" the drop — otherwise the
+     * magnet would re-engage every frame the player is in range
+     * (dist <= RADIUS stays true even after pickup was rejected)
+     * and the pickup SFX would loop forever. Cleared when
+     * dist > RADIUS * 1.5 in the magnet update.
+     */
+    rejected = false;
 
-    constructor(scene: Phaser.Scene, spec: DropSpec, x: number, y: number, isFromMonster = false) {
+    constructor(
+        scene: Phaser.Scene,
+        spec: DropSpec,
+        x: number,
+        y: number,
+        isFromMonster = false,
+        weaponSpec?: WeaponSpec,
+    ) {
         this.spec = spec;
+        this.weaponSpec = weaponSpec;
 
         // If from monster, calculate wall-clamped landing position for parabolic drop
         let targetX = x;
@@ -148,7 +175,29 @@ export class DropInstance {
         this.rect.setStrokeStyle(1.5, 0x22c55e, 1);
         this.rect.setVisible(false);
 
-        if (spec.sprite && scene.textures.exists(textureKey(spec))) {
+        if (weaponSpec && weaponSpec.visual?.texture && scene.textures.exists(weaponSpec.visual.texture)) {
+            // Weapon pickups show the weapon's own in-hand texture so the
+            // drop on the ground is visually identical to the gun you're
+            // about to pick up. No spritesheet / anim — weapons are
+            // single-frame static images.
+            //
+            // Scale: use the weapon's own `visual.scale` from the YAML so
+            // every weapon renders at its hand-tuned size on the ground
+            // (arcana-staff at 0.16 stays tiny, plasma-sword at 0.16
+            // stays tiny, etc). The × GROUND_MULTIPLIER bump makes the
+            // drop legible at world zoom — the in-hand scale is sized
+            // for a tiny sprite anchored to a character body, the
+            // ground drop needs to be a readable prop on its own.
+            const spriteObj = scene.add.image(
+                isFromMonster ? x : targetX,
+                isFromMonster ? y : targetY,
+                weaponSpec.visual.texture,
+            );
+            spriteObj.setDepth(Math.round(targetY));
+            const pickupScale = weaponSpec.visual.scale ?? 0.16;
+            spriteObj.setScale(pickupScale * DROP_CONFIG.WEAPON_PICKUP_SCALE_MULTIPLIER);
+            this.sprite = spriteObj as unknown as Phaser.GameObjects.Sprite;
+        } else if (spec.sprite && scene.textures.exists(textureKey(spec))) {
             const idleAnimKey = animKey(spec, 'idle');
             const spriteObj = scene.add.sprite(
                 isFromMonster ? x : targetX,
@@ -247,17 +296,30 @@ export class DropInstance {
 // ─── Controller ──────────────────────────────────────────────────────────
 
 export interface DropControllerCallbacks {
-    /** Called on weapon pickup — character owns the runtime; we tell it
-     *  which weapon id to switch to. */
-    onWeaponPickup: (weaponId: string) => void;
+    /**
+     * Called on weapon pickup — character owns the runtime; we tell it
+     * which weapon id to switch to.
+     *
+     * Return value controls whether the drop is consumed:
+     *   - `true`  — drop is consumed (default pickup succeeded)
+     *   - `false` — drop stays on the ground (cap-replace flow is
+     *               open in the hub; the drop waits for confirmation
+     *               before being destroyed)
+     */
+    onWeaponPickup: (weaponId: string) => boolean;
 }
 
 export class DropController {
     private readonly scene: Phaser.Scene;
-    private readonly character: CharacterRuntime;
+    private character: CharacterRuntime;
     private readonly staticDrops: DropInstance[] = [];
     private readonly runtimeDrops: DropInstance[] = [];
     private readonly cb: DropControllerCallbacks;
+    /** Optional lookup used to resolve `DropSpawn.weaponId` overrides.
+     *  When a static spawn sets `weaponId`, the drop's visual is
+     *  switched to that weapon's in-hand texture and the pickup
+     *  callback resolves to that weapon. */
+    private readonly getWeapon?: (id: string) => WeaponSpec | undefined;
 
     constructor(
         scene: Phaser.Scene,
@@ -265,33 +327,98 @@ export class DropController {
         spawns: DropSpawn[] | undefined,
         getDrop: (id: string) => DropSpec,
         cb: DropControllerCallbacks,
+        getWeapon?: (id: string) => WeaponSpec | undefined,
     ) {
         this.scene = scene;
         this.character = character;
         this.cb = cb;
+        this.getWeapon = getWeapon;
 
+        // Drop restoration is unified across static (dropSpawns) and
+        // runtime (monster-death) drops:
+        //   - First load (no snapshot): spawn the static dropSpawns
+        //     from the level config. Runtime drops can only appear
+        //     later via monster deaths.
+        //   - Subsequent refresh (snapshot has entries): restore
+        //     every drop from the snapshot, including the static
+        //     ones. The level config is NOT re-spawned — drops the
+        //     player picked up last run stay picked up. Player
+        //     progress through the tavern weapon wall is preserved.
+        //
+        // The snapshot carries `weaponId` for weapon pickups so the
+        // drop's in-hand texture (which `weaponSpec.visual.texture`
+        // supplies) survives a refresh.
         const dropSnapshots = useGameStore.getState().groundDropsSnapshot;
-        if (dropSnapshots !== undefined && Array.isArray(dropSnapshots)) {
-            // Snapshot exists for this run: restore ground drops if any remain
+        if (dropSnapshots && dropSnapshots.length > 0) {
             for (const s of dropSnapshots) {
                 try {
-                    this.runtimeDrops.push(new DropInstance(scene, getDrop(s.specId), s.x, s.y, false));
+                    const weaponOverride = s.weaponId
+                        ? this.getWeapon?.(s.weaponId)
+                        : undefined;
+                    this.runtimeDrops.push(
+                        new DropInstance(
+                            scene,
+                            getDrop(s.specId),
+                            s.x,
+                            s.y,
+                            false,
+                            weaponOverride,
+                        ),
+                    );
                 } catch {
                     // Ignore missing specs
                 }
             }
         } else if (spawns) {
-            // Fresh start: spawn initial static drops from level config
+            // Fresh start: no snapshot yet. Spawn static drops from
+            // level config so the player has something to walk into.
             for (const s of spawns) {
-                this.staticDrops.push(new DropInstance(scene, getDrop(s.type), s.x, s.y, false));
+                const weaponOverride = s.weaponId ? this.getWeapon?.(s.weaponId) : undefined;
+                this.staticDrops.push(
+                    new DropInstance(
+                        scene,
+                        getDrop(s.type),
+                        s.x,
+                        s.y,
+                        false,
+                        weaponOverride,
+                    ),
+                );
             }
         }
 
         this.bindCollisions();
     }
 
-    /** Export fine-grained snapshot of uncollected ground drops. */
-    public getSnapshot(): { specId: string; x: number; y: number }[] {
+    /**
+     * Swap the character reference. Used by the tavern UI to rewire
+     * magnet / pickup collision to the freshly-spawned character after
+     * the player confirms a selection. The original character is
+     * `character` is otherwise captured once at construction.
+     */
+    public setCharacter(character: CharacterRuntime): void {
+        this.character = character;
+    }
+
+    /**
+     * Export fine-grained snapshot of every uncollected ground drop
+     * — both static (from `dropSpawns`) and runtime (monster death).
+     *
+     * The snapshot is the source of truth across refreshes: a player
+     * who picked up a static weapon drop stays without it after
+     * refresh. Static drops are seeded from `dropSpawns` only on the
+     * very first load when the snapshot is empty.
+     *
+     * `weaponId` is captured for weapon-pickup drops so the drop's
+     * in-hand texture can be restored on refresh — the snapshot is
+     * the only channel that survives across reloads.
+     */
+    public getSnapshot(): {
+        specId: string;
+        x: number;
+        y: number;
+        weaponId?: string;
+    }[] {
         const all = [...this.staticDrops, ...this.runtimeDrops];
         return all
             .filter((d) => !d.taken && d.isLanded && d.spec.id)
@@ -299,12 +426,33 @@ export class DropController {
                 specId: d.spec.id!,
                 x: d.body.position.x,
                 y: d.body.position.y,
+                ...(d.weaponSpec?.id ? { weaponId: d.weaponSpec.id } : {}),
             }));
     }
 
     /** Spawn a drop at the given position from monster death rolls. */
     spawn(spec: DropSpec, x: number, y: number): DropInstance {
         const d = new DropInstance(this.scene, spec, x, y, true);
+        this.runtimeDrops.push(d);
+        return d;
+    }
+
+    /**
+     * Spawn a weapon-pickup drop with a parabolic arc — used when
+     * the player walks onto a new weapon at cap and the controller
+     * auto-swaps the active slot. The replaced weapon launches out
+     * as a runtime drop with the same drop-the-character-just-picked
+     * visual style, so the player can walk back and pick it up
+     * later if they change their mind.
+     *
+     * Marks the new drop `rejected = true` so the magnet stays off
+     * until the player walks past RADIUS * 1.5 — without this, the
+     * parabola lands well within the magnet radius and the player
+     * immediately sucks the just-thrown weapon back up.
+     */
+    spawnWeapon(spec: DropSpec, weaponSpec: WeaponSpec, x: number, y: number): DropInstance {
+        const d = new DropInstance(this.scene, spec, x, y, true, weaponSpec);
+        d.rejected = true;
         this.runtimeDrops.push(d);
         return d;
     }
@@ -325,8 +473,19 @@ export class DropController {
 
             const dist = Phaser.Math.Distance.Between(charX, charY, dropX, dropY);
 
-            // Trigger magnet attraction when within radius
-            if (dist <= magnet.RADIUS) {
+            // Release a previously-rejected drop once the player
+            // walks far enough away (1.5× magnet radius). Without
+            // this the magnet would re-engage every frame because
+            // dist <= RADIUS stays true while the player stands
+            // near the drop.
+            if (drop.rejected && dist > magnet.RADIUS * 1.5) {
+                drop.rejected = false;
+            }
+
+            // Trigger magnet attraction when within radius. Skipped
+            // for rejected drops so the player isn't yanked back to
+            // the drop while the hub is open (or after dismissing it).
+            if (!drop.rejected && dist <= magnet.RADIUS) {
                 drop.isAttracting = true;
             }
 
@@ -349,9 +508,21 @@ export class DropController {
 
                 // Check final pickup threshold
                 if (dist <= magnet.PICKUP_DISTANCE) {
-                    drop.taken = true;
-                    this.applyEffect(drop.spec);
-                    this.removeDrop(drop);
+                    const consumed = this.applyEffect(drop);
+                    if (consumed) {
+                        drop.taken = true;
+                        this.removeDrop(drop);
+                    } else {
+                        // Cap-replace flow: hub opens, drop stays put
+                        // until the player walks far enough away
+                        // (rejected flag) or confirms a swap
+                        // (acknowledgePendingPickup). Setting
+                        // isAttracting=false here is critical — without
+                        // it the next frame would re-activate the
+                        // magnet because dist is still <= RADIUS.
+                        drop.isAttracting = false;
+                        drop.rejected = true;
+                    }
                 }
             }
         }
@@ -379,9 +550,17 @@ export class DropController {
                 const drop = this.findDrop(dropBody as MatterJS.BodyType);
                 if (!drop) continue;
                 if (drop.taken || !drop.isLanded) continue;
-                drop.taken = true;
-                this.applyEffect(drop.spec);
-                this.removeDrop(drop);
+                const consumed = this.applyEffect(drop);
+                if (consumed) {
+                    drop.taken = true;
+                    this.removeDrop(drop);
+                } else {
+                    // Cap-replace flow keeps the drop on the ground
+                    // until the hub confirms. Stop attracting so it
+                    // doesn't ride the player's center while the
+                    // hub is open.
+                    drop.isAttracting = false;
+                }
             }
         });
     }
@@ -400,20 +579,56 @@ export class DropController {
         d.destroy(this.scene);
     }
 
-    private applyEffect(spec: DropSpec): void {
+    private applyEffect(dropInstance: DropInstance): boolean {
         // Emit SFX BEFORE applying effect so the audio engine can play
         // before the pickup animation / freeze-frame finishes. Falls
         // back to a generic pickup tone when the spec doesn't declare
         // its own.
+        const spec = dropInstance.spec;
         const sfxId = spec.sfx ?? 'pickup-generic';
         EventBus.emit(SFX_EVENT(sfxId), {
             key: `drop:${spec.id}`,
             throttleMs: spec.throttleMs,
         });
-        planDropEffect(spec, {
+        // For weapon drops carrying a weaponSpec override, the spec's
+        // embedded `effect.weaponId` is the generic placeholder —
+        // resolve to the actual weapon's id so the pickup handler
+        // adds the right weapon to the hotbar. Other drop types
+        // (instant / refill-ammo) go through planDropEffect normally.
+        const effectiveSpec: DropSpec = dropInstance.weaponSpec
+            ? ({
+                  ...spec,
+                  effect: { type: 'weapon', weaponId: dropInstance.weaponSpec.id },
+              } as DropSpec)
+            : spec;
+        // Default consumed=true covers non-weapon drops (instant /
+        // refill-ammo) which have no opt-out path. For weapons the
+        // callback returns false when the cap-replace hub has not
+        // confirmed yet — the caller (magnet loop / collisionstart)
+        // uses this to keep the drop on the ground.
+        let consumed = true;
+        planDropEffect(effectiveSpec, {
             heal: (hp, sp) => this.character.heal(hp, sp),
             refillAmmo: (f) => this.character.refillAmmo(f),
-            onWeaponPickup: (id) => this.cb.onWeaponPickup(id),
+            onWeaponPickup: (id) => {
+                consumed = this.cb.onWeaponPickup(id);
+            },
         });
+        return consumed;
+    }
+
+    /**
+     * Destroy the still-on-ground weapon drop the cap-replace hub is
+     * negotiating. Called by the scene after `weapon-replace-confirm`
+     * commits the swap, so the drop never lingers once the player has
+     * actually committed to the new weapon.
+     */
+    acknowledgePendingPickup(weaponId: string): void {
+        const all = [...this.staticDrops, ...this.runtimeDrops];
+        const target = all.find(
+            (d) => !d.taken && d.spec.kind === 'static' && d.weaponSpec?.id === weaponId,
+        );
+        if (!target) return;
+        this.removeDrop(target);
     }
 }

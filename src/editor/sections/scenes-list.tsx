@@ -5,7 +5,7 @@
  * restart), create a new scene.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowRight, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -59,10 +59,16 @@ export function ScenesListSection({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [newOpen, setNewOpen] = useState(false);
-    const [newId, setNewId] = useState('');
-    const [newTitle, setNewTitle] = useState('');
     const [creating, setCreating] = useState(false);
-    const [jumpingTo, setJumpingTo] = useState<string | null>(null);
+    // Uncontrolled inputs — refs read on submit. Bypasses every possible
+    // state-vs-DOM fight (Phaser focus theft, browser autofill latching,
+    // controlled-input race conditions).
+    const newIdRef = useRef<HTMLInputElement>(null);
+    const newTitleRef = useRef<HTMLInputElement>(null);
+    // Fresh name per mount so the browser autofill matcher can't latch onto
+    // the input. Without this Chrome will "own" the field and React's
+    // onChange never fires — keystrokes look silently dropped.
+    const formNs = useId();
 
     useEffect(() => {
         refresh();
@@ -84,19 +90,16 @@ export function ScenesListSection({
     }
 
     async function jumpTo(id: string) {
-        setJumpingTo(id);
         try {
             await resolveAndRestart(id);
             onSceneChange(id);
         } catch (e) {
             setError(`Failed to jump: ${(e as Error).message ?? e}`);
-        } finally {
-            setJumpingTo(null);
         }
     }
 
     async function handleCreate() {
-        const id = newId.trim();
+        const id = (newIdRef.current?.value ?? '').trim();
         if (!id) return;
         setCreating(true);
         setError(null);
@@ -104,13 +107,16 @@ export function ScenesListSection({
             const res = await fetch('/api/editor/create-scene', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, title: newTitle.trim() || id }),
+                body: JSON.stringify({
+                    id,
+                    title: (newTitleRef.current?.value ?? '').trim() || id,
+                }),
             });
             const body = await res.json();
             if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
             setNewOpen(false);
-            setNewId('');
-            setNewTitle('');
+            if (newIdRef.current) newIdRef.current.value = '';
+            if (newTitleRef.current) newTitleRef.current.value = '';
             await refresh();
             // jump to the new scene
             await jumpTo(id);
@@ -147,16 +153,14 @@ export function ScenesListSection({
             <div className="flex flex-col gap-1">
                 {scenes.map((s) => {
                     const isCurrent = s.id === currentSceneId;
-                    const jumping = jumpingTo === s.id;
                     const isExpanded = expandedSceneId === s.id;
                     return (
                         <div
                             key={s.id}
-                            className={`border rounded ${
-                                isCurrent
-                                    ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200'
-                                    : 'bg-neutral-900 border-neutral-800 text-neutral-300'
-                            }`}
+                            className={`border rounded ${isCurrent
+                                ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200'
+                                : 'bg-neutral-900 border-neutral-800 text-neutral-300'
+                                }`}
                         >
                             <div className="flex items-center gap-2 px-2 py-1.5">
                                 <button
@@ -175,14 +179,9 @@ export function ScenesListSection({
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => jumpTo(s.id)}
-                                    disabled={isCurrent || jumping}
-                                    className="flex-1 min-w-0 text-left disabled:cursor-default"
-                                    title={
-                                        isCurrent
-                                            ? 'Currently loaded (click to load again)'
-                                            : 'Jump to this scene'
-                                    }
+                                    onClick={() => onToggleExpand(isExpanded ? null : s.id)}
+                                    className="flex-1 min-w-0 text-left"
+                                    title={isExpanded ? 'Collapse this scene' : 'Expand this scene'}
                                 >
                                     <div className="font-medium truncate text-[12px]">
                                         {s.title}
@@ -245,15 +244,26 @@ export function ScenesListSection({
                             </Label>
                             <Input
                                 autoFocus
-                                value={newId}
-                                onChange={(e) =>
-                                    setNewId(
-                                        e.target.value
-                                            .toLowerCase()
-                                            .replace(/[^a-z0-9-]/g, '')
-                                            .replace(/^-+|-+$/g, ''),
-                                    )
-                                }
+                                autoComplete="off"
+                                spellCheck={false}
+                                data-form-type="other"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                                name={`${formNs}-id`}
+                                defaultValue=""
+                                ref={newIdRef}
+                                onInput={(e) => {
+                                    // kebab-case sanitisation runs in onInput
+                                    // so the cursor doesn't fight controlled
+                                    // re-renders while the user is typing.
+                                    const v = e.currentTarget.value
+                                        .toLowerCase()
+                                        .replace(/[^a-z0-9-]/g, '')
+                                        .replace(/^-+|-+$/g, '');
+                                    if (v !== e.currentTarget.value) {
+                                        e.currentTarget.value = v;
+                                    }
+                                }}
                                 placeholder="ruined-garden"
                                 className="h-8 text-xs bg-neutral-950 border-neutral-700 mt-0.5"
                             />
@@ -263,8 +273,14 @@ export function ScenesListSection({
                                 Title (shown in HUD)
                             </Label>
                             <Input
-                                value={newTitle}
-                                onChange={(e) => setNewTitle(e.target.value)}
+                                autoComplete="off"
+                                spellCheck={false}
+                                data-form-type="other"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                                name={`${formNs}-title`}
+                                defaultValue=""
+                                ref={newTitleRef}
                                 placeholder="Ruined Garden"
                                 className="h-8 text-xs bg-neutral-950 border-neutral-700 mt-0.5"
                             />
@@ -281,7 +297,7 @@ export function ScenesListSection({
                         </Button>
                         <Button
                             size="sm"
-                            disabled={!newId.trim() || creating}
+                            disabled={creating}
                             onClick={handleCreate}
                             className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs"
                         >

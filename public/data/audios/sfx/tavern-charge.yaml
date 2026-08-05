@@ -1,0 +1,18 @@
+kind: sfx
+id: tavern-charge
+name: Tavern Charge
+source: assets/audio/sfx/tavern-charge.wav
+volume: 0.7
+# 1.5s charging-up build that pairs with the tavern "hold F to
+# confirm" interaction. Starts as a soft low hum, swells through
+# the middle with a rising filtered noise, and resolves on a
+# satisfying chime right at the end — matches the moment the
+# HOLD_MS timer trips and the selection commits.
+#
+# Single shot, no loop. Fired exactly once when the F key first
+# crosses into the held state (not on every frame the key is down).
+#
+# Note: `duration` is an input for the ElevenLabs regen script only
+# (scripts/elevenlabs-sfx.ts → defaultDuration), not a runtime spec
+# field. The schema is .strict() and would reject it.
+prompt: Series of ascending bell beeps getting progressively faster and more urgent, like a power meter charging up, accelerating chimes building toward a final confirmation, RPG menu timer filling sound, about 1.5 seconds

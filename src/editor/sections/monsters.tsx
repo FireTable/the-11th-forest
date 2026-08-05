@@ -37,10 +37,10 @@ interface Props {
 
 const TRIGGER_KINDS: MonsterTrigger['kind'][] = ['time', 'clear'];
 
-export function MonstersSection({ sceneId, level, setLevel }: Props) {
-    const [availableTypes, setAvailableTypes] = useState<string[]>([]);
-    const [error, setError] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
+export function MonstersSection({ level, setLevel }: Props) {
+    const [availableTypes, setAvailableTypes] = useState<
+        Array<{ id: string; name: string; texture: string } | string>
+    >([]);
 
     useEffect(() => {
         // Read the monsters index so the type dropdown knows the universe.
@@ -59,7 +59,8 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
     function addSpawn() {
         const last = monsters[monsters.length - 1];
         const nextWaveId = last?.waveId ?? 'wave-1';
-        const fallbackType = availableTypes[0] ?? 'drone';
+        const first = availableTypes[0];
+        const fallbackType = typeof first === 'string' ? first : first?.id ?? 'drone';
         const newSpawn: MonsterSpawn = {
             type: fallbackType,
             x: Math.round(level.imageSize.width / 2),
@@ -101,24 +102,6 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
         update(next);
     }
 
-    async function handleSave() {
-        setSaving(true);
-        setError(null);
-        try {
-            const res = await fetch('/api/editor/save-monsters', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: sceneId, monsters }),
-            });
-            const body = await res.json();
-            if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-        } catch (e) {
-            setError(String((e as Error).message ?? e));
-        } finally {
-            setSaving(false);
-        }
-    }
-
     // Summary at the top: "3 spawns in 2 waves".
     const summary = useMemo(() => {
         const waves = new Set<string>();
@@ -128,8 +111,6 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
 
     return (
         <div className="flex flex-col gap-3 text-xs">
-            {error && <div className="text-red-400 text-[11px]">{error}</div>}
-
             <div className="flex items-center justify-between">
                 <div className="font-semibold text-neutral-300">{summary}</div>
                 <Button
@@ -165,15 +146,7 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
                 ))}
             </div>
 
-            <div className="border-t border-neutral-800 pt-2 flex justify-end">
-                <Button
-                    disabled={saving}
-                    onClick={handleSave}
-                    className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs h-7 px-3"
-                >
-                    {saving ? 'Saving…' : 'Save monsters'}
-                </Button>
-            </div>
+
         </div>
     );
 }
@@ -181,7 +154,7 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
 interface RowProps {
     index: number;
     spawn: MonsterSpawn;
-    availableTypes: string[];
+    availableTypes: Array<{ id: string; name: string; texture: string } | string>;
     onMove: (idx: number, delta: number) => void;
     onRemove: (idx: number) => void;
     onPatch: (idx: number, p: Partial<MonsterSpawn>) => void;
@@ -217,11 +190,17 @@ function MonsterRow({
                         {availableTypes.length === 0 && (
                             <SelectItem value={spawn.type}>{spawn.type}</SelectItem>
                         )}
-                        {availableTypes.map((t) => (
-                            <SelectItem key={t} value={t}>
-                                {t}
-                            </SelectItem>
-                        ))}
+                        {availableTypes.map((t) => {
+                            // Backwards-compat: API used to return string ids,
+                            // now returns { id, name, texture }.
+                            const id = typeof t === 'string' ? t : t.id;
+                            const label = typeof t === 'string' ? t : t.name || t.id;
+                            return (
+                                <SelectItem key={id} value={id}>
+                                    {label}
+                                </SelectItem>
+                            );
+                        })}
                     </SelectContent>
                 </Select>
                 <Button
@@ -325,7 +304,10 @@ function MonsterRow({
                         >
                             <SelectTrigger
                                 size="sm"
-                                className="h-6 text-[11px] bg-neutral-950 border-neutral-700"
+                                // py-0 overrides the SelectTrigger's
+                                // default py-2 so the trigger matches
+                                // the h-6 inputs in the same grid row.
+                                className="h-6 py-0 text-[11px] bg-neutral-950 border-neutral-700"
                             >
                                 <SelectValue />
                             </SelectTrigger>

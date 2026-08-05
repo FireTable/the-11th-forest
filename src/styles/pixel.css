@@ -9,9 +9,11 @@
  *   src/index.css        — Tailwind + shadcn CSS variables (theme tokens)
  *   src/styles/pixel.css — this file (aesthetic overrides)
  *   src/editor/panel.css — editor-specific layout (legacy, will migrate)
+ *
+ * Font loading lives in `index.html` (`<link rel="stylesheet">` in
+ * <head>) so it's already painted by the time the #boot splash
+ * shows. The CSS variable below just references the family name.
  */
-
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
 @theme inline {
     --font-pixel: 'Press Start 2P', ui-monospace, monospace;

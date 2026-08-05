@@ -1,0 +1,48 @@
+name: Thorn Drone Ultra
+hp: 320
+moveSpeed: 3
+body:
+    halfW: 28
+    halfH: 28
+weaponId: bramble-knuckles
+sfx:
+    hit: monster-hit
+    death: monster-death
+    aggro: monster-aggro
+drops:
+    - dropId: hp-shard
+      chance: 0.6
+    - dropId: sp-fragment
+      chance: 0.4
+    - dropId: overcharge-core
+      chance: 0.3
+
+# Reuses the base drone sprite at 1.4x scale — no separate AI art needed.
+# Visual size scales the Phaser sprite; physics body still uses halfW/halfH above.
+sprite:
+    texture: assets/image/monsters/drone.png
+    grid: { rows: 4, cols: 4 }
+    scale: 1.2
+    offset: { left: 0, bottom: 4 }
+    script:
+        downsample: 4
+        colors: 32
+        pad: 2
+
+anims:
+    idle:
+        frames: [0, 3]
+        frameRate: 6
+        repeat: -1
+    move:
+        frames: [4, 7]
+        frameRate: 10
+        repeat: -1
+    hit:
+        frames: [8, 11]
+        frameRate: 12
+        repeat: 0
+    death:
+        frames: [12, 14]
+        frameRate: 10
+        repeat: 0

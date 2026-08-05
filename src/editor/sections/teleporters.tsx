@@ -160,34 +160,36 @@ export function TeleportersSection({ level, setLevel }: Props) {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                            <div>
-                                <Label className="text-[10px] text-neutral-400">X Position</Label>
-                                <Input
-                                    type="number"
-                                    value={t.x}
-                                    onKeyDown={(e) => e.stopPropagation()}
-                                    onChange={(e) =>
-                                        handleUpdate(idx, {
-                                            x: e.target.value === '' ? 0 : Number(e.target.value),
-                                        })
-                                    }
-                                    className="h-6 text-xs bg-neutral-900 border-neutral-700 font-mono text-neutral-200"
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-[10px] text-neutral-400">Y Position</Label>
-                                <Input
-                                    type="number"
-                                    value={t.y}
-                                    onKeyDown={(e) => e.stopPropagation()}
-                                    onChange={(e) =>
-                                        handleUpdate(idx, {
-                                            y: e.target.value === '' ? 0 : Number(e.target.value),
-                                        })
-                                    }
-                                    className="h-6 text-xs bg-neutral-900 border-neutral-700 font-mono text-neutral-200"
-                                />
+                        <div className="flex flex-col gap-2">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <Label className="text-[10px] text-neutral-400">X Position</Label>
+                                    <Input
+                                        type="number"
+                                        value={t.x}
+                                        onKeyDown={(e) => e.stopPropagation()}
+                                        onChange={(e) =>
+                                            handleUpdate(idx, {
+                                                x: e.target.value === '' ? 0 : Number(e.target.value),
+                                            })
+                                        }
+                                        className="h-6 text-xs bg-neutral-900 border-neutral-700 font-mono text-neutral-200"
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-[10px] text-neutral-400">Y Position</Label>
+                                    <Input
+                                        type="number"
+                                        value={t.y}
+                                        onKeyDown={(e) => e.stopPropagation()}
+                                        onChange={(e) =>
+                                            handleUpdate(idx, {
+                                                y: e.target.value === '' ? 0 : Number(e.target.value),
+                                            })
+                                        }
+                                        className="h-6 text-xs bg-neutral-900 border-neutral-700 font-mono text-neutral-200"
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <Label className="text-[10px] text-neutral-400">
@@ -221,7 +223,7 @@ export function TeleportersSection({ level, setLevel }: Props) {
                                 <SelectTrigger className="h-6 text-xs bg-neutral-900 border-neutral-700">
                                     <SelectValue placeholder="Select target scene" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-neutral-900 border-neutral-800 text-xs">
+                                <SelectContent className="bg-neutral-900 border-neutral-800 text-xs min-w-[220px]">
                                     <SelectItem value={AUTO_NEXT_SCENE}>
                                         <span className="text-cyan-400 italic">
                                             Auto (Next Scene in Index)

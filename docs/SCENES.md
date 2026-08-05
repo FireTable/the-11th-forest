@@ -79,7 +79,8 @@ src/game/main.ts:resolveScene()
       6. DropController   — self-spawns from level.dropSpawns + death rolls
       7. Bullet→monster damage hook (matter collisionstart)
       8. AudioController — subscribes to sfx:*/music:* events
-      9. emit MUSIC_EVENT(level.music)   ← cross-fade into the level's music
+      9. emit MUSIC_EVENT(level.music) or MUSIC_STOP (when level.music unset)
+         — see AUDIOS.md § "The BGM singleton"
      10. Camera center + MaterialManager + optional PointLight + Pixelate/Quantize FX
      11. per-frame: monsterSystem.update / dropSystem.update / material.update /
                     teleporterSystem.update / tickSaveState (1 Hz — clock + snapshots)
@@ -143,6 +144,14 @@ characterSpawn: # optional — where + which way the player starts
     facing: left | right
     x: number
     y: number
+tavern:
+    boolean # optional — when true, LoadScene enters tavern mode
+    #   (NPCs render for selection; no monsters; weapon cap from
+    #   character.weaponMax). The Forest Tavern scene sets this.
+npcSpawns: # tavern-mode only — per-character NPC standing positions
+    - characterId: string # id from public/data/characters/index.yaml
+      x: number
+      y: number
 
 airWalls: # polygon obstacles in image pixel space
     - id: string # unique within the level
@@ -151,6 +160,8 @@ airWalls: # polygon obstacles in image pixel space
           # short: blocks character only (bullets pass over)
       points: # polygon, implicitly closed; ≥3 vertices
           - [number, number] # rectangle = 4 vertices
+      # Legacy form (still parsed and migrated to points):
+      # x, y, width, height — converted to 4-vertex polygon by the schema
 
 monsters: # optional — list of monster spawns
     - type: string # id from public/data/monsters/index.yaml
@@ -168,6 +179,9 @@ dropSpawns: # optional — static drops placed in the level
     - type: string # id from public/data/drops/index.yaml
       x: number
       y: number
+      weaponId: # optional — when type='weapon-drop', the real weapon
+          # to grant. Lets the generic weapon-drop spec serve every
+          # weapon in the game from one yaml. See DROPS.md.
 
 materials: # optional — decorative props (trees, rocks, …)
     - id: string # unique within the level
@@ -301,8 +315,11 @@ Both reset on shutdown via `setLevelElapsedMs(0)` when the next scene boots.
 | --------------------- | ----------------------------------------- | ------------------------------ |
 | `level-loaded`        | `{ id, level }`                           | end of `create()`              |
 | `current-scene-ready` | `this` (the scene)                        | end of `create()`              |
-| `music:<id>`          | —                                         | if `level.music` set           |
+| `character-position`  | `{ x, y }`                                | per-frame while alive — tavern weapon-replace hub listens |
+| `music:<id>` or `music:stop` | —                                   | if `level.music` set, or `MUSIC_STOP` if unset |
 | `editor-open`         | listened by the scene (not emitted by it) | toggles HUD + debug rectangles |
+
+The `music` event is **not** auto-emitted on every scene; it is only emitted by `LoadScene.create()` based on `level.music`. See [`AUDIOS.md`](./AUDIOS.md#the-bgm-singleton-cross-scene-cross-fade) for the singleton semantics that prevent two scenes from stacking BGM.
 
 ## Validation
 
@@ -319,9 +336,6 @@ pnpm tsx scripts/validate-levels.ts
 
 ## What this design intentionally leaves out
 
-- **No `id` field** in any YAML — the filename is the id.
-- **No `number` field** — render order comes from `index.yaml`.
-- **No per-scene TS file** — `LoadScene` is generic.
-- **No level transition logic** yet — only the boot path is wired.
-- **Editor (air-wall drawing, props placement, monster spawn placement)** lives behind the editor panel (`EDITOR_PANEL=1`, F2 toggle). The scene subscribes to `editor-open` to hide HUD overlays and show debug rectangles. See `src/lib/editor/`.
-- **No `prompts/scenes/<id>.yaml`** anymore — that directory was removed; AI regen prompts now live inline in `level.prompt:` when used at all.
+- **Teleporter & Level Transition**: 传送门 (`teleporter.ts`) 提供了多场景间的平滑切换支持。走进 Teleporter 碰撞圈（支持设置 `targetScene`）会自动通过 `resolveAndRestart()` 切换至目标关卡，重置 HUD / 怪物并平滑承接存档状态。
+- **Editor (air-wall drawing, teleporters, props placement, monster spawn placement)** lives behind the editor panel (`?editor=1`). The scene subscribes to `editor-open` to hide HUD overlays and show debug rectangles. See `src/editor/` and `docs/EDITOR.md`.
+- **No `prompts/scenes/<id>.yaml`** anymore — AI regen prompts live inline in `level.prompt:` when used.

@@ -14,13 +14,36 @@ import {
 } from '@/game/monsters/logic';
 
 describe('monsters/logic — decideAIState', () => {
-    it('returns attack when in range', () => {
-        expect(decideAIState(30, 36)).toBe('attack');
-        expect(decideAIState(0, 36)).toBe('attack');
+    it('switches from chase to attack only after crossing range minus hysteresis', () => {
+        // Just inside range → still chase (not enough margin to flip)
+        expect(decideAIState(34, 36, 'chase')).toBe('chase');
+        // Clearly inside (≤ range - hysteresis default 8)
+        expect(decideAIState(28, 36, 'chase')).toBe('attack');
+        expect(decideAIState(0, 36, 'chase')).toBe('attack');
     });
 
-    it('returns chase when out of range', () => {
-        expect(decideAIState(40, 36)).toBe('chase');
+    it('switches from attack to chase only after crossing range plus hysteresis', () => {
+        // Just outside range → still attack (hysteresis hold)
+        expect(decideAIState(38, 36, 'attack')).toBe('attack');
+        // Clearly outside (> range + hysteresis default 8)
+        expect(decideAIState(45, 36, 'attack')).toBe('chase');
+    });
+
+    it('does not strobe when distance jitters around the threshold', () => {
+        // Player at dist oscillating 35 / 36 / 37 / 36 — none of these
+        // flip the state once it has settled into one of them.
+        expect(decideAIState(35, 36, 'attack')).toBe('attack');
+        expect(decideAIState(36, 36, 'attack')).toBe('attack');
+        expect(decideAIState(37, 36, 'attack')).toBe('attack');
+        expect(decideAIState(34, 36, 'chase')).toBe('chase');
+        expect(decideAIState(33, 36, 'chase')).toBe('chase');
+    });
+
+    it('respects a custom hysteresis band', () => {
+        // With band = 16, a 4-px buffer past range still holds chase
+        expect(decideAIState(40, 36, 'chase', 16)).toBe('chase');
+        // And only distance ≤ 20 (= 36 - 16) triggers attack
+        expect(decideAIState(20, 36, 'chase', 16)).toBe('attack');
     });
 });
 

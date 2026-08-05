@@ -17,7 +17,7 @@ Click the **Editor** button (bottom-left of the canvas) to toggle the side panel
 │ Scenes │ Chars │ Drops │ Mobs │ Weaps │ Audio            │
 ├─ Scene sub-tabs (only when Scenes is selected) ───────────┤
 │ Scenes │ Background │ Settings │ Monsters │ Air walls │  │
-│ Materials                                                │
+│ Teleporters │ Materials                                  │
 ├─ Body ────────────────────────────────────────────────────┤
 │ (selected section UI)                                    │
 └───────────────────────────────────────────────────────────┘
@@ -53,13 +53,19 @@ Sortable list of `MonsterSpawn` rows. Per row: type (dropdown from `data/monster
 
 Polygon wall editor. Toggle "Draw on canvas" then click vertices on the Konva overlay; clicking the first vertex closes the polygon. Per-wall kind dropdown (tall/short) and delete.
 
+#### Teleporters sub-tab
+
+Configurable list of `TeleporterSpec` entries for scene transitions. Per row: x/y coordinates, radius (trigger circle size), targetScene dropdown (selectable levels from `index.yaml`), targetSpawn placement, and delete/add operations.
+
 #### Materials sub-tab
 
 Scene-placed materials list (with inspector) + a library of every folder under `assets/image/materials/`. Click a tile to place it at scene center; click an existing item to inspect/edit mode/scale/rotation/flip.
 
 ### Chars
 
-List of every entry in [`public/data/characters/index.yaml`](../public/data/characters/index.yaml). Click a row to expand an inline form covering **Identity** (name + gender) → **Stats** → **Body** → **Dodge** → **Hotbar** (weapon id list with ✕) → **Sprite** (upload + grid + scale + imageSize) → **Anims** (visual frame picker with chip-based range picking) → **SFX** (8 fields) → **AI prompt**.
+List of every entry in [`public/data/characters/index.yaml`](../public/data/characters/index.yaml). Click a row to expand an inline form covering **Identity** (name + gender + description) → **Stats** → **Body** → **Dodge** → **WeaponMax** → **Hotbar** (weapon id list with ✕) → **Sprite** (upload + grid + scale + imageSize) → **Anims** (visual frame picker with chip-based range picking) → **SFX** (per-character audio identity) → **AI prompt**.
+
+The character spec's `id:` field is required and must match the filename basename — the editor surfaces a validation error if the two diverge.
 
 The sprite upload endpoint shells out to [`scripts/split-sheet.ts`](../scripts/split-sheet.ts) with the chroma-key pipeline; the returned natural size back-fills `sprite.texture`, `imageSize`, and the grid defaults.
 
@@ -69,10 +75,10 @@ All four use the same generic [`ModuleShell`](../src/editor/sections/modules.tsx
 
 | Tab             | Form fields (covered)                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Drops           | Identity, Effect (instant / refill-ammo / weapon — discriminated), Audio (sfx), Visual (size, tint), AI prompt                                                                                                                                                                                                                                                                                                                                                                                   |
-| Mobs (Monsters) | Identity, Stats, SFX (hit/death/aggro), Drop table (dropId + chance), AI prompt                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Weaps (Weapons) | Identity, Kind toggle (ranged/melee — auto-prunes projectile vs hitWidth/hitHeight), Combat (damage/cooldownMs/range/clipSize/reloadTimeMs/bulletsPerShot), Projectile visual (radius/width/height/color), Bullet (texture/type/scale/color/beamWidth/beamDuration/anchor/rotationOffset/spawnOffset), Weapon visual (texture/scale/orbitRadius/anchor/muzzleOffset/recoilDistance/recoilDuration/swingAngle/rotationOffset), SFX (shoot/dryFire/bulletWall/reloadStart/reloadFinish), AI prompt |
-| Audio           | SFX / Music sub-tabs. Identity, Source, Playback (volume + rate+loop for SFX, volume + fadeIn/Out for Music), AI prompt                                                                                                                                                                                                                                                                                                                                                                          |
+| Drops           | Identity, Effect (instant / refill-ammo / weapon — discriminated), Audio (sfx + throttle), Visual (size, tint), Sprite (texture / grid / scale / offset / script), Anims, AI prompt                                                                                                                                                                                                                                                                                                          |
+| Mobs (Monsters) | Identity, Body, Stats, SFX (hit/death/aggro + throttleMs), Drop table (dropId + chance), Sprite, Anims, AI prompt                                                                                                                                                                                                                                                                                                                                                                              |
+| Weaps (Weapons) | Identity, Kind toggle (ranged/melee — auto-prunes projectile vs hitWidth/hitHeight), Combat (damage/cooldownMs/range/clipSize/reloadTimeMs/bulletsPerShot), Projectile visual (radius/width/height/color), Bullet (texture/type/speed/scale/color/beamWidth/beamDuration/anchor/rotationOffset/spawnOffset), Weapon visual (texture/scale/orbitRadius/anchor/muzzleOffset/recoilDistance/recoilDuration/swingAngle/rotationOffset), SFX (shoot/dryFire/bulletWall/reloadStart/reloadFinish + throttleMs), AI prompt |
+| Audio           | SFX / Music sub-tabs. Identity, Source, Playback (volume + rate + loop for SFX, volume + fadeIn/Out for Music), AI prompt                                                                                                                                                                                                                                                                                                                                                                       |
 
 ---
 
@@ -111,6 +117,17 @@ Caveat: `New` templates only seed the fields the form knows about. New entities 
 - **Scene background**: write PNG to `assets/image/scenes/<id>.png`, return natural size + previous size. The editor decides whether to update `imageSize`.
 - **Character sprite**: write to `tmp/editor-uploads/<id>-<ts>.png`, shell out to `pnpm tsx scripts/split-sheet.ts` with `--in-place --id=<id>`, read natural size of the processed output, return path + size. Editor fills `sprite.*` + `imageSize`.
 - **Material tile**: write to `assets/image/materials/<folder>/temp-upload-raw.png`, shell out to `split-sheet.ts --append --no-recompose`, clean up temp files.
+
+The tavern uses one `tavern` materials folder for the level's decorative props; other levels can introduce their own folder under `assets/image/materials/`.
+
+## Audio tab specifics
+
+The Audio tab is a single tab with **two sub-tabs**: SFX and Music. Each sub-tab lists the ids from the corresponding `public/data/audios/<kind>/` directory, sorted by index order. Click an entry to expand the form:
+
+- **SFX**: `volume` (0..1), `rate` (default 1), `loop` (default false). Source file is shown but not editable in the panel — drop a new file at the source path and re-trigger.
+- **Music**: `volume` (default 0.5), `fadeIn` ms, `fadeOut` ms.
+
+The shared `prompt:` AI-regen field sits at the bottom; the `scripts/elevenlabs-sfx.ts` regen pipeline reads it (see [`AUDIOS.md`](./AUDIOS.md#regenerating-ai-sfx)).
 
 ---
 

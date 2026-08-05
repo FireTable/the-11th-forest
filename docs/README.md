@@ -11,12 +11,13 @@ This directory holds long-form docs for The 11th Forest. One topic per file, nam
 | [`SCENES.md`](./SCENES.md)           | Scene file layout, loading flow, `handle-fetch`, how to add a new scene.          |
 | [`WEAPONS.md`](./WEAPONS.md)         | Weapon yaml schema + `WeaponController` + `WeaponVisualController`.               |
 | [`MONSTERS.md`](./MONSTERS.md)       | Monster yaml schema + `Monster` / `MonsterController` + AI helpers + spawn queue. |
-| [`CHARACTERS.md`](./CHARACTERS.md)   | Character yaml schema + `CharacterController` + per-gender hurt routing.          |
+| [`CHARACTERS.md`](./CHARACTERS.md)   | Character yaml schema + `CharacterController` + per-gender hurt routing + tavern selection. |
 | [`DROPS.md`](./DROPS.md)             | Drop yaml schema + `DropController` + pickup flow.                                |
-| [`AUDIOS.md`](./AUDIOS.md)           | Audio yaml schema + `AudioController` + ElevenLabs regen pipeline.                |
+| [`AUDIOS.md`](./AUDIOS.md)           | Audio yaml schema + `AudioController` + BGM singleton + ElevenLabs regen pipeline. |
 | [`EVENTS.md`](./EVENTS.md)           | `EventBus` pub/sub bus, naming conventions, lifecycle rules.                      |
 | [`PERSIST.md`](./PERSIST.md)         | Save & restore — what the store persists, write cadence, reset paths.             |
 | [`EDITOR.md`](./EDITOR.md)           | In-browser level editor — panel layout, Konva overlay, save endpoint.             |
+| [`SKILL.md`](./SKILL.md)             | How to maintain `public/data/` — schema discipline, balance calculations, AI-asset regeneration. |
 
 ## Convention
 

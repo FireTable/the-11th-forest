@@ -117,6 +117,8 @@ const DEFAULT_DURATION: Record<string, number> = {
     'bullet-wall': 0.7,
     'reload-': 0.9,
     'teleporter-': 1.0,
+    'victory-': 2.5,
+    'tavern-': 1.5,
 };
 function defaultDuration(id: string): number {
     for (const [prefix, dur] of Object.entries(DEFAULT_DURATION)) {

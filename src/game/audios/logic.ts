@@ -7,7 +7,10 @@
  *   - AudioController: subscribes to EventBus events `sfx:<id>`,
  *     `music:<id>`, `music:stop/pause/resume`. Each SFX spec id becomes a
  *     dedicated listener so other modules emit, never import.
- *   - Music is single-track: starting a new track cross-fades the old one.
+ *   - Music is single-track, cross-scene: the music id + sound instance
+ *     live in module-level globals so a scene swap doesn't restart the
+ *     same BGM (a fresh AudioController adopts the running sound instead
+ *     of spawning a duplicate).
  *
  * No direct imports of the audio module from gameplay code — every sound
  * is triggered by `EventBus.emit` (CLU rule 12: each module owns its own
@@ -23,6 +26,7 @@ import {
     MUSIC_RESUME,
     MUSIC_STOP,
     SFX_EVENT,
+    SFX_STOP,
 } from '@/lib/constants';
 import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
@@ -37,6 +41,23 @@ const audioKey = (spec: SoundSpec): string => {
 };
 
 const sourceUrl = (src: string): string => (src.startsWith('/') ? src : `/${src}`);
+
+// ─── Music singleton ─────────────────────────────────────────────────────
+
+/**
+ * Module-level "what's playing right now" tracker. Survives scene
+ * transitions: when a scene's AudioController is destroyed, the music
+ * keeps playing; the next scene's controller adopts the same sound
+ * instead of adding a new instance. Without this, two scenes that
+ * share a BGM would stack their sounds on top of each other.
+ */
+let globalMusicId: string | null = null;
+let globalMusicSound: Phaser.Sound.BaseSound | null = null;
+
+/** Read-only peek used by tests / debug surfaces. */
+export function getCurrentMusicId(): string | null {
+    return globalMusicId;
+}
 
 // ─── Asset loading ──────────────────────────────────────────────────────
 
@@ -59,8 +80,9 @@ export class AudioController {
     private readonly scene: Phaser.Scene;
     private readonly sfxSpecs: Map<string, SfxSpec>;
     private readonly musicSpecs: Map<string, MusicSpec>;
-    private currentMusic?: Phaser.Sound.BaseSound;
-    private currentMusicSpec?: MusicSpec;
+    /** Local throttle + EventBus unsubscribers — destroyed on teardown.
+     *  Music state itself lives in module-level globals so it survives
+     *  scene transitions (see `globalMusicId` / `globalMusicSound`). */
     private readonly throttle = new SfxThrottle();
     private readonly unsubscribers: Array<() => void> = [];
     /** Music id deferred until Phaser unlocks the AudioContext (first
@@ -166,13 +188,44 @@ export class AudioController {
         }
     }
 
-    /** Cross-fade to a registered music track. No-op if unknown. */
+    /**
+     * Stop every active instance of a registered SFX id. Used when a
+     * trigger that started a long sfx is cancelled mid-play (e.g. the
+     * player releases F in the tavern before the hold completes — the
+     * 1.5s charge beep should cut, not bleed out). Iterates
+     * `scene.sound.sounds` for matching keys and stops + destroys each
+     * instance; non-matches are left alone.
+     */
+    stopSfx(id: string): void {
+        const spec = this.sfxSpecs.get(id);
+        if (!spec) return;
+        const aKey = audioKey(spec);
+        // `removeByKey` is defined on WebAudioSoundManager /
+        // HTML5AudioSoundManager; the NoAudioSoundManager fallback is
+        // an empty stub that no-ops. Cast so the union narrows and TS
+        // doesn't see the missing property on NoAudioSoundManager.
+        const manager = this.scene.sound as Phaser.Sound.BaseSoundManager;
+        manager.removeByKey?.(aKey);
+    }
+
+    /** Cross-fade to a registered music track. No-op if unknown.
+     *
+     *  Singleton-aware: if the requested id matches the music that's
+     *  already playing globally (across scene transitions), this just
+     *  adopts the running sound instead of spawning a duplicate. */
     playMusic(id: string): void {
         const spec = this.musicSpecs.get(id);
         if (!spec) return;
         const key = audioKey(spec);
         if (!this.scene.cache.audio.exists(key)) return;
-        if (this.currentMusicSpec?.id === id && this.currentMusic?.isPlaying) return;
+
+        // Same BGM already playing globally (e.g. the previous scene
+        // set it and the new scene is requesting the same id) — adopt
+        // ownership, don't restart. Otherwise two sounds stack on
+        // top of each other during the cross-scene transition.
+        if (globalMusicId === id && globalMusicSound?.isPlaying) {
+            return;
+        }
 
         // Browser autoplay policy keeps AudioContext suspended until the
         // first user gesture. If we play now, the WebAudio source is
@@ -184,6 +237,10 @@ export class AudioController {
             this.pendingMusic = id;
             return;
         }
+
+        // Different music (or none playing): cross-fade global old → new.
+        const oldSound = globalMusicSound;
+        const oldSpec = globalMusicId ? this.musicSpecs.get(globalMusicId) : null;
 
         const next = this.scene.sound.add(key, {
             volume: 0,
@@ -201,43 +258,43 @@ export class AudioController {
         } else {
             next.setVolume(spec.volume);
         }
-        const fadedOut = this.currentMusic;
-        const oldSpecs = this.currentMusicSpec;
-        if (fadedOut && oldSpecs) {
+        if (oldSound && oldSpec) {
             this.scene.tweens.add({
-                targets: fadedOut,
+                targets: oldSound,
                 volume: 0,
-                duration: oldSpecs.fadeOut || AUDIO_DEFAULT_FADE_MS,
+                duration: oldSpec.fadeOut || AUDIO_DEFAULT_FADE_MS,
                 ease: 'Linear',
-                onComplete: () => fadedOut.destroy(),
+                onComplete: () => oldSound.destroy(),
             });
         }
-        this.currentMusic = next;
-        this.currentMusicSpec = spec;
+        globalMusicId = id;
+        globalMusicSound = next;
     }
 
-    /** Stop the current music track with its fadeOut (or default). */
+    /** Stop the current music track with its fadeOut (or default).
+     *  Operates on the global current music — whichever scene owns it. */
     stopMusic(): void {
-        if (!this.currentMusic) return;
-        const old = this.currentMusic;
-        const fadeOut = this.currentMusicSpec?.fadeOut ?? AUDIO_DEFAULT_FADE_MS;
-        this.currentMusic = undefined;
-        this.currentMusicSpec = undefined;
+        const sound = globalMusicSound;
+        if (!sound) return;
+        const spec = globalMusicId ? this.musicSpecs.get(globalMusicId) : null;
+        const fadeOut = spec?.fadeOut ?? AUDIO_DEFAULT_FADE_MS;
+        globalMusicId = null;
+        globalMusicSound = null;
         this.scene.tweens.add({
-            targets: old,
+            targets: sound,
             volume: 0,
             duration: fadeOut,
             ease: 'Linear',
-            onComplete: () => old.destroy(),
+            onComplete: () => sound.destroy(),
         });
     }
 
     pauseMusic(): void {
-        this.currentMusic?.pause();
+        globalMusicSound?.pause();
     }
 
     resumeMusic(): void {
-        this.currentMusic?.resume();
+        globalMusicSound?.resume();
     }
 
     setSfxVolume(v: number): void {
@@ -251,9 +308,9 @@ export class AudioController {
     destroy(): void {
         for (const u of this.unsubscribers) u();
         this.unsubscribers.length = 0;
-        this.currentMusic?.destroy();
-        this.currentMusic = undefined;
-        this.currentMusicSpec = undefined;
+        // Do NOT destroy globalMusicSound here — it's the singleton
+        // BGM that survives scene transitions. The next scene's
+        // AudioController will adopt it via playMusic's same-id branch.
     }
 
     // ─── internals ──────────────────────────────────────────────────────
@@ -265,6 +322,11 @@ export class AudioController {
                 this.playSfx(id, payload ?? {});
             EventBus.on(event, handler);
             this.unsubscribers.push(() => EventBus.removeListener(event, handler));
+
+            const stopEvent = SFX_STOP(id);
+            const stopHandler = () => this.stopSfx(id);
+            EventBus.on(stopEvent, stopHandler);
+            this.unsubscribers.push(() => EventBus.removeListener(stopEvent, stopHandler));
         }
         for (const id of this.musicSpecs.keys()) {
             const event = MUSIC_EVENT(id);

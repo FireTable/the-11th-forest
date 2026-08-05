@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 
-import { nativeToViewport } from '@/components/hud/PixelCrosshair';
+import { nativeToViewport } from '@/components/hud/pixel-crosshair';
 
 describe('PixelCrosshair — nativeToViewport (native 1536x864 → viewport px)', () => {
     it('returns the canvas offset for coord 0 (top-left anchor)', () => {

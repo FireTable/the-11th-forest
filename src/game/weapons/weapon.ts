@@ -21,10 +21,28 @@ import type { WeaponSpec } from '@/lib/weapons';
 
 /**
  * Queue weapon and paired bullet texture assets into the Phaser Loader.
+ *
+ * `loadVisualTexture` controls whether `spec.visual.texture` is queued:
+ *   - `true` (default) for player-pickup weapons — the in-hand sprite
+ *     is rendered and used as the drop's ground sprite.
+ *   - `false` for monster weapons — they only need `spec.bullet.texture`
+ *     because monsters fire projectiles, not held weapons.
+ *
+ * `spec.bullet.texture` is always queued when present — even monster
+ * weapons render their bullets in flight.
  */
-export function loadWeaponAssets(scene: Phaser.Scene, weaponSpecs: Iterable<WeaponSpec>): void {
+export function loadWeaponAssets(
+    scene: Phaser.Scene,
+    weaponSpecs: Iterable<WeaponSpec>,
+    options: { loadVisualTexture?: boolean } = {},
+): void {
+    const loadVisual = options.loadVisualTexture !== false;
     for (const spec of weaponSpecs) {
-        if (spec.visual?.texture && !scene.textures.exists(spec.visual.texture)) {
+        if (
+            loadVisual &&
+            spec.visual?.texture &&
+            !scene.textures.exists(spec.visual.texture)
+        ) {
             const url = spec.visual.texture.startsWith('/')
                 ? spec.visual.texture
                 : `/${spec.visual.texture}`;
@@ -43,12 +61,21 @@ export function loadWeaponAssets(scene: Phaser.Scene, weaponSpecs: Iterable<Weap
 
 export interface BulletRecord {
     body: MatterJS.BodyType;
-    rect: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+    rect:
+        | Phaser.GameObjects.Shape
+        | Phaser.GameObjects.Sprite
+        | Phaser.GameObjects.Image
+        | Phaser.GameObjects.Graphics;
     damage: number;
     color: number;
     originX: number;
     originY: number;
     maxDistance: number;
+    /** `scene.time.now` (ms) when the bullet was spawned. Combined with
+     *  `lifeMs` this gives a hard cap on how long a missed shot can
+     *  linger. */
+    spawnAt: number;
+    lifeMs: number;
     rotationOffset?: number;
     isMelee?: boolean;
     trail: { x: number; y: number }[];
@@ -67,6 +94,15 @@ export interface ProjectileSpawnOptions {
     maxDistance?: number;
     rotationOffset?: number;
     anchor?: [number, number];
+    /** Hard cap on bullet lifetime in ms. Passed through from the
+     *  weapon spec's `projectile.lifeMs` (defaults to 1500ms when
+     *  omitted). */
+    lifeMs?: number;
+    /** Pin the visual's depth at spawn time. Monsters pass their own
+     *  footY so the bullet rides along with the originating monster's
+     *  depth slot — bullets never Y-sort independently of their owner.
+     *  Defaults to `DEPTH.BULLET` (flat layer above the character). */
+    depth?: number;
 }
 
 /**
@@ -109,6 +145,11 @@ export function spawnProjectile(
         visualObj = rect;
     }
 
+    // Pin depth at spawn time so the bullet stays in its owner's depth
+    // slot — no per-frame re-set. Player bullets default to DEPTH.BULLET
+    // (flat); monster bullets pass their originating monster's footY.
+    visualObj.setDepth(opts.depth ?? DEPTH.BULLET);
+
     const rotRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
     visualObj.setRotation(Math.atan2(direction.y, direction.x) + rotRad);
 
@@ -120,6 +161,8 @@ export function spawnProjectile(
         originX: origin.x,
         originY: origin.y,
         maxDistance: opts.maxDistance ?? 800,
+        spawnAt: scene.time.now,
+        lifeMs: opts.lifeMs ?? 1500,
         rotationOffset: rotRad,
         trail: [],
     };
@@ -135,13 +178,22 @@ export interface MeleeSpawnOptions {
     texture?: string;
     scale?: number;
     rotationOffset?: number;
-    feetY?: number;
+    /** Swing arc sweep in degrees. Used by the procedural arc visual
+     *  when no `texture` is provided; defaults to 120 (the schema
+     *  default for `visual.swingAngle`). */
+    swingAngle?: number;
     /** Matter category. Defaults to CAT.BULLET (player melee). */
     category?: number;
     /** Matter mask (who the hitbox collides with). Defaults to PROJECTILE_PLAYER_MASK. */
     mask?: number;
     /** Body label for collisionstart lookup. Defaults to 'player-bullet'. */
     label?: string;
+    /** Pin the visual's depth at swing time. Monsters pass their own
+     *  footY so the swing rides along with the originating monster's
+     *  depth slot — melee arcs never Y-sort independently of their
+     *  owner. Defaults to `DEPTH.BULLET` (flat layer above the
+     *  character; matches the player melee depth). */
+    depth?: number;
 }
 
 /**
@@ -180,7 +232,11 @@ export function spawnMeleeHitbox(
     });
     scene.matter.world.add(body);
 
-    let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+    let visualObj:
+        | Phaser.GameObjects.Shape
+        | Phaser.GameObjects.Sprite
+        | Phaser.GameObjects.Image
+        | Phaser.GameObjects.Graphics;
 
     const rotOffsetRad = ((opts.rotationOffset ?? 0) * Math.PI) / 180;
     const visualRotation = isLeft ? -rotOffsetRad : rotOffsetRad;
@@ -189,10 +245,13 @@ export function spawnMeleeHitbox(
         // Spawn full circle / melee graphic centered directly at character left/right
         const sprite = scene.add.image(hx, hy, opts.texture);
         sprite.setOrigin(0.5, 0.5);
-        // Dynamic depth: Calculate character feetY + 5 so it rests BETWEEN character sprite (feetY) and handheld weapon (feetY + 10)
-        const feetY = opts.feetY ?? opts.origin.y + 32;
-        const effectDepth = Math.round(feetY) + 5;
-        sprite.setDepth(effectDepth);
+        // Fixed depth in the BULLET slot so melee hitboxes render in the
+        // same plane as ranged bullets — character feet sit behind, weapon
+        // sprite sits in front (DEPTH.WEAPON), so a melee swing never
+        // draws over the held weapon but always draws over the body.
+        // Monsters override with their own footY so the swing rides
+        // with the originating monster's depth slot.
+        sprite.setDepth(opts.depth ?? DEPTH.BULLET);
         sprite.setFlipX(isLeft);
         sprite.setScale(scale, scale);
         sprite.setRotation(visualRotation);
@@ -212,20 +271,78 @@ export function spawnMeleeHitbox(
         });
         visualObj = sprite;
     } else {
-        const rect = scene.add.rectangle(hx, hy, opts.hitWidth, opts.hitHeight, 0xc084fc, 0.7);
-        const feetY = opts.feetY ?? opts.origin.y + 32;
-        const effectDepth = Math.round(feetY) + 5;
-        rect.setDepth(effectDepth);
+        // Procedural arc visual — translucent ripple made of three
+        // concentric rings + a dashed outer trace whose alpha follows a
+        // sine wave along the swing. No solid fill, so the silhouette of
+        // the attacker stays visible through the arc and the effect
+        // reads as a moving wave instead of a static purple wedge.
+        const swingAngleDeg = opts.swingAngle ?? 120;
+        const halfRad = ((swingAngleDeg / 2) * Math.PI) / 180;
+        const innerR = Math.max(0, opts.range - opts.hitWidth);
+        const outerR = opts.range;
+        const arcColor = 0xffffff;
+
+        const g = scene.add.graphics();
+        g.setPosition(opts.origin.x, opts.origin.y);
+        g.setRotation(opts.angle);
+
+        // Inner ring — barely-there hint of the attack's near edge.
+        if (innerR > 4) {
+            g.lineStyle(1, arcColor, 0.05);
+            g.beginPath();
+            g.arc(0, 0, innerR, -halfRad, halfRad, false);
+            g.strokePath();
+        }
+
+        // Mid ring — single faint line so the arc reads as a layer of
+        // ripples instead of one line at the outer rim.
+        const midR = (innerR + outerR) / 2;
+        g.lineStyle(1, arcColor, 0.12);
+        g.beginPath();
+        g.arc(0, 0, midR, -halfRad, halfRad, false);
+        g.strokePath();
+
+        // Outer rim — 32 short dashes whose alpha follows a 3-cycle
+        // sine wave across the sweep. Peak alpha cut roughly in half
+        // (0.45 → 0.22) so the brightest pulse is still a soft white
+        // glint rather than a hard line; base alpha near zero so the
+        // troughs disappear entirely. Three peaks travel along the
+        // edge as the slash plays out.
+        const segments = 32;
+        const segSweep = (halfRad * 2) / segments;
+        for (let i = 0; i < segments; i++) {
+            const t = i / segments;
+            const wave = 0.5 + 0.5 * Math.sin(t * Math.PI * 6);
+            const alpha = 0.015 + 0.21 * wave;
+            g.lineStyle(1.5, arcColor, alpha);
+            g.beginPath();
+            g.arc(
+                0,
+                0,
+                outerR,
+                -halfRad + i * segSweep,
+                -halfRad + (i + 0.4) * segSweep,
+                false,
+            );
+            g.strokePath();
+        }
+
+        const effectDepth = opts.depth ?? DEPTH.BULLET;
+        g.setDepth(effectDepth);
+
         scene.tweens.add({
-            targets: rect,
+            targets: g,
             alpha: 0,
+            scaleX: 1.2,
+            scaleY: 1.2,
             duration: 200,
+            ease: 'Cubic.out',
             onComplete: () => {
-                rect.destroy();
+                g.destroy();
                 scene.matter.world.remove(body);
             },
         });
-        visualObj = rect;
+        visualObj = g;
     }
 
     return {
@@ -236,6 +353,12 @@ export function spawnMeleeHitbox(
         originX: opts.origin.x,
         originY: opts.origin.y,
         maxDistance: opts.range,
+        // Melee hitboxes self-destruct via the tween above (200ms).
+        // Stamp spawnAt + a matching lifeMs so the per-frame cleanup
+        // path doesn't choke on missing fields. The tween is the
+        // authoritative destroyer.
+        spawnAt: scene.time.now,
+        lifeMs: 250,
         isMelee: true,
         trail: [],
     };

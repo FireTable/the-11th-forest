@@ -1,0 +1,143 @@
+id: otaku
+name: Otaku
+description: |
+    A bookish shut-in turned reluctant forest-warrior. Lower stamina
+    but a longer dodge cooldown means each roll has to count —
+    favours positional play and tight engagements. Reads the
+    battlefield before charging in.
+imageSize: 2048x2048
+prompt: |
+    The 11th Forest — Otaku sprite sheet
+
+    HARD NEGATIVE PROMPTS (must NOT appear in the image):
+      - No visible grid, no dividers, no borders, no ground, no scene,
+        no text, no logo, no watermark.
+      - No grid lines, no cell borders, no cell separators, no dividers
+        of any kind between the 4×4 frames.
+      - No guide marks, no reference crosses, no axis labels, no frame
+        numbers, no "Frame N" text, no index annotations.
+      - No checkerboard pattern, no tile outline overlays, no debug
+        visualizations.
+      - No watermarks, no logos, no signatures, no UI elements.
+      - The 4×4 layout is COMPLETELY IMPLIED by the character's position
+        — the magenta background is one continuous flat field everywhere
+        except where the character is drawn.
+
+    CRITICAL LAYOUT (must be EXACTLY this — 16 cells, no more, no less,
+    4 rows × 4 columns, every cell the same size):
+
+      ┌────┬────┬────┬────┐
+      │  0 │  1 │  2 │  3 │   row 1: idle (4 frames)
+      ├────┼────┼────┼────┤
+      │  4 │  5 │  6 │  7 │   row 2: walk (4 frames)
+      ├────┼────┼────┼────┤
+      │  8 │  9 │ 10 │ 11 │   row 3: dodge (4 frames)
+      ├────┼────┼────┼────┤
+      │ 12 │ 13 │ 14 │ 15 │   row 4: wounded (4 frames; cell #15 used)
+      └────┴────┴────┴────┘
+
+    NOTE: this sheet uses all 16 cells — the bottom-right cell (cell #15)
+    contains a standing-injured pose, NOT an empty cell. This deviates
+    from the standard 15+empty convention because the AI populated it.
+
+    Image size 2048×2048 (1:1), laid out as a 4×4 grid so each cell is
+    512×512 px. The character is ~360×480 px in each cell, centered
+    horizontally. No overlapping between cells. The character faces RIGHT
+    in every frame (his right side = screen right); left-facing or
+    back-facing poses are wrong.
+
+    Character: a young man with messy short black hair and square
+    rectangular glasses. Wearing a plain white tank top, olive-green cargo
+    shorts, and white sneakers. A casual, slightly chubby build. Chibi
+    head-to-body ratio (~1:2). Outline: 1-pixel dark brown outline, clean
+    pixel-art shading with 2-3 tonal steps per material (no smooth
+    gradients).
+
+    Same character in every frame — face, hair, glasses, outfit,
+    proportions are identical. Only the pose changes.
+
+    16 frames in row order (left-to-right, top-to-bottom), distributed as:
+
+    Frames 0–3 (idle, 4 frames, row 1):
+      Character standing still, arms at sides or one hand up adjusting
+      glasses (frame 3), gentle body sway, slow breathing.
+
+    Frames 4–7 (walk, 4 frames, row 2):
+      A walk cycle. Legs alternate step-by-step; arms swing in
+      counter-rhythm. Body stays roughly upright. Frame 5 may include a
+      glasses-adjustment hand gesture mid-stride.
+
+    Frames 8–11 (dodge, 4 frames, row 3):
+      Reaction shots suitable for a dodge animation — head-turn surprise
+      (frame 8), neutral glance (frame 9), flinch-back recoil (frame 10),
+      recovery stance (frame 11).
+
+    Frames 12–15 (wounded, 4 frames, row 4):
+      Collapse sequence. Frame 12 crouching wince, frame 13 fallen on
+      side with glasses askew, frame 14 crawling or pushing up off the
+      ground, frame 15 standing injured with one arm hanging limp.
+
+    Style requirements:
+    - High-end handcrafted 16-bit RPG aesthetic.
+    - Inspired by Chrono Trigger, Eastward, Children of Morta, Hyper Light
+      Drifter, and premium modern indie pixel games.
+    - Hard clean pixel edges, no anti-aliasing on the silhouette.
+    - Limited muted color palette: ~32 colors total per character.
+    - No purple, magenta, or pink in the character body itself.
+hp: 100
+sp: 60
+luck: 3         # Reluctant bookish shut-in — low crit chance
+moveSpeed: 4
+spRegenMs: 5000
+gender: male
+body:
+    halfW: 28
+    halfH: 24
+dodge:
+    spCost: 15
+    speed: 14
+    durationMs: 220
+    cooldownMs: 600
+hotbar: []
+weaponMax: 4
+sfx:
+    dodge: dodge
+    hurtMale: player-hurt-male
+    throttleMs: 1200
+    footstep: footstep
+    footstepThrottleMs: 200
+    lowHpHeartbeat: low-hp-heartbeat
+    lowHpThreshold: 0.3
+    lowHpPulseMs: 900
+sprite:
+    texture: assets/image/characters/otaku.png
+    grid:
+        rows: 4
+        cols: 4
+    scale: 1.2
+    offset:
+        left: -6
+        bottom: -2
+    script:
+        downsample: 4
+        colors: 32
+        pad: 2
+anims:
+    idle:
+        frames:
+            - 0
+            - 2
+        frameRate: 6
+        repeat: -1
+    walk:
+        frames:
+            - 4
+            - 7
+        frameRate: 10
+        repeat: -1
+    dodge:
+        frames:
+            - 8
+            - 11
+        frameRate: 12
+        repeat: 0

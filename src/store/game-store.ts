@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+
 export interface WeaponSlotData {
     id: string;
     name: string;
@@ -39,6 +40,10 @@ export interface DropEntitySnapshot {
     specId: string;
     x: number;
     y: number;
+    /** When this drop is a weapon pickup, the resolved weapon id is
+     *  recorded so the drop's in-hand texture can be restored on
+     *  refresh. Undefined for non-weapon drops (heal / ammo / etc.). */
+    weaponId?: string;
 }
 
 export interface GameUIState {
@@ -80,6 +85,20 @@ export interface GameUIState {
     // Phaser scene pauses until the user clicks Restart.
     isDead: boolean;
 
+    // Victory state — true when the final level's waves and monsters are all cleared.
+    isVictory: boolean;
+
+    // Tavern / character selection state
+    /** Persisted id of the character the player selected in the tavern.
+     *  null = never selected (tavern not yet completed). */
+    selectedCharacterId: string | null;
+    /** true once the player has finished the tavern (selected a character
+     *  + entered the first real level). Resets on clearSaveData. */
+    tavernCleared: boolean;
+    /** How many weapons the player has picked up in the current tavern
+     *  session. Not persisted — resets each time the tavern scene loads. */
+    tavernWeaponCount: number;
+
     // Setters
     setLevelTitle: (title: string) => void;
     setCurrentLevelId: (levelId: string) => void;
@@ -110,8 +129,19 @@ export interface GameUIState {
     }) => void;
     setHubsVisible: (visible: boolean) => void;
     setDead: (dead: boolean) => void;
+    setVictory: (victory: boolean) => void;
     resetLevelProgress: (levelId: string) => void;
+    /**
+     * Clear per-scene entity snapshots only (player/monster/drop
+     * positions). Preserves the player's hotbar, HP, SP, and
+     * character choice. Used by scene transitions (teleport, Jump-
+     * to-scene) so picked-up weapons survive the cut.
+     */
+    clearSceneSnapshots: () => void;
     clearSaveData: () => void;
+    setSelectedCharacterId: (id: string | null) => void;
+    setTavernCleared: (cleared: boolean) => void;
+    setTavernWeaponCount: (n: number) => void;
 }
 
 export const initialGameState = {
@@ -140,6 +170,11 @@ export const initialGameState = {
 
     hubsVisible: true,
     isDead: false,
+    isVictory: false,
+
+    selectedCharacterId: null as string | null,
+    tavernCleared: false,
+    tavernWeaponCount: 0,
 };
 
 export const useGameStore = create<GameUIState>()(
@@ -207,6 +242,8 @@ export const useGameStore = create<GameUIState>()(
 
             setDead: (dead) => set({ isDead: dead }),
 
+            setVictory: (victory) => set({ isVictory: victory }),
+
             resetLevelProgress: (levelId) =>
                 set((state) => {
                     const newMap = { ...state.levelProgressMap };
@@ -223,14 +260,32 @@ export const useGameStore = create<GameUIState>()(
                     };
                 }),
 
+            /**
+             * Clear only the per-scene entity snapshots so the new
+             * scene's loadCharacter() reads a clean slate. Used by
+             * scene transitions (teleport, Jump-to-scene) where the
+             * player's stats / hotbar must survive — only the world
+             * position should reset.
+             */
+            clearSceneSnapshots: () =>
+                set(() => ({
+                    playerSnapshot: undefined,
+                    activeMonstersSnapshot: undefined,
+                    groundDropsSnapshot: undefined,
+                })),
+
             clearSaveData: () => {
                 try {
                     useGameStore.persist?.clearStorage();
                 } catch {
                     // Fallback
                 }
-                set(initialGameState);
+                set(() => ({ ...initialGameState, tavernCleared: false, selectedCharacterId: null, }));
             },
+
+            setSelectedCharacterId: (id) => set({ selectedCharacterId: id }),
+            setTavernCleared: (cleared) => set({ tavernCleared: cleared }),
+            setTavernWeaponCount: (n) => set({ tavernWeaponCount: n }),
         }),
         {
             name: '11th_forest_save_v1',
@@ -248,6 +303,9 @@ export const useGameStore = create<GameUIState>()(
                 playerSnapshot: state.playerSnapshot,
                 activeMonstersSnapshot: state.activeMonstersSnapshot,
                 groundDropsSnapshot: state.groundDropsSnapshot,
+                // Tavern
+                selectedCharacterId: state.selectedCharacterId,
+                tavernCleared: state.tavernCleared,
             }),
         }
     )
