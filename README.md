@@ -79,6 +79,42 @@ The project integrates native AI generation pipelines for graphics, sound, and s
 
 ---
 
+## 📦 Content Layout — one folder per module
+
+Every gameplay module has two siblings under `public/`: a `data/` folder of YAML descriptors (the schema of the thing) and an `assets/` folder of generated media (the skin of the thing). Adding a new monster, weapon, drop, level, character, or audio clip means dropping one YAML + the files it references — no TypeScript touched.
+
+```text
+public/
+├── data/                     # YAML descriptors (one folder per module)
+│   ├── characters/           # one *.yaml per playable character
+│   ├── monsters/             # one *.yaml per enemy (stats, body, sprite, anims, prompt)
+│   ├── weapons/              # one *.yaml per weapon (damage, cooldown, projectile)
+│   ├── drops/                # one *.yaml per drop type (visual + effect)
+│   ├── levels/               # index.yaml + one *.yaml per scene (tavern, forest, boss-arena…)
+│   └── audios/
+│       ├── music/            # one *.yaml per BGM track (webm source, fade, volume)
+│       └── sfx/              # one *.yaml per SFX (source, volume, prompt notes)
+│
+└── assets/                   # Generated media, mirrored by module
+    ├── image/
+    │   ├── characters/       # chroma-key sprite sheets
+    │   ├── monsters/         # per-monster sprite sheets
+    │   ├── weapons/          # projectile / muzzle sprites
+    │   ├── drops/            # drop icons
+    │   ├── materials/        # tilemap tiles
+    │   ├── ui/               # HUD icons, panels
+    │   └── scenes/           # background art per scene
+    ├── audio/
+    │   ├── music/            # .webm background tracks
+    │   └── sfx/              # .wav / .mp3 one-shots
+    ├── font/                 # pixel fonts
+    └── lottie/               # lottie JSON animations
+```
+
+The data and asset folders share names deliberately: `data/monsters/keeper.yaml` references `assets/image/monsters/keeper.png`. A module's loading, registration, animation driving, and cleanup live in its own `src/game/<module>/` directory — see [`docs/MODULES.md`](./docs/MODULES.md) for the YAML → Schema → Parser → Loader → Logic pattern.
+
+---
+
 ## 🛠️ Tech Stack
 
 | Layer | Technology | Description |

@@ -79,6 +79,42 @@
 
 ---
 
+## 📦 内容组织 — 一模块一目录 (Content Layout)
+
+每个游戏模块在 `public/` 下都有一对平行目录：`data/` 存放 YAML 描述文件 (定义规则),`assets/` 存放 AI 生成的素材 (定义皮肤)。新增一只怪物、一把武器、一个掉落物、一张关卡、一个角色或一段音频,只需丢入一份 YAML + 它所引用的资源文件,**完全不需要修改 TypeScript 代码**。
+
+```text
+public/
+├── data/                     # YAML 描述文件 (按模块分子目录)
+│   ├── characters/           # 每个可玩角色一份 *.yaml
+│   ├── monsters/             # 每只怪物一份 *.yaml (属性、体积框、sprite、动画、prompt)
+│   ├── weapons/              # 每把武器一份 *.yaml (伤害、冷却、弹道)
+│   ├── drops/                # 每个掉落物一份 *.yaml (贴图 + 效果)
+│   ├── levels/               # index.yaml + 每张关卡一份 *.yaml (酒馆、森林、Boss 房…)
+│   └── audios/
+│       ├── music/            # 每首 BGM 一份 *.yaml (webm 源、淡入淡出、音量)
+│       └── sfx/              # 每个 SFX 一份 *.yaml (源、音量、prompt 备注)
+│
+└── assets/                   # AI 生成的素材,目录命名与 data 一一对应
+    ├── image/
+    │   ├── characters/       # 色键抠图的角色 sprite 序列帧
+    │   ├── monsters/         # 怪物 sprite 序列帧
+    │   ├── weapons/          # 弹道 / 枪口贴图
+    │   ├── drops/            # 掉落物图标
+    │   ├── materials/        # 地图瓦片贴图
+    │   ├── ui/               # HUD 图标、面板
+    │   └── scenes/           # 关卡背景原画
+    ├── audio/
+    │   ├── music/            # .webm 背景音乐
+    │   └── sfx/              # .wav / .mp3 一次性音效
+    ├── font/                 # 像素字体
+    └── lottie/               # Lottie JSON 动画
+```
+
+`data/` 与 `assets/` 目录刻意采用同名约定:例如 `data/monsters/keeper.yaml` 引用 `assets/image/monsters/keeper.png`。每个模块的资源加载、注册、动画驱动、清理逻辑都集中在自己的 `src/game/<module>/` 目录中 — 详见 [`docs/MODULES.md`](./docs/MODULES.md) 的 *YAML → Schema → Parser → Loader → Logic* 模式。
+
+---
+
 ## 🛠️ 技术栈 (Tech Stack)
 
 | 架构层 | 技术方案 | 说明 |
