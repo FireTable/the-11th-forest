@@ -1,120 +1,135 @@
 /**
  * src/components/hud/victory-overlay.tsx
  * --------------------------------------------------------------------------
- * Full-screen "Victory" overlay with pure CSS confetti/sparkle animation
- * and a Restart/Return to Tavern button. Rendered by GameHUDLayer when
- * `useGameStore().isVictory` is true.
+ * Full-screen Lottie confetti that plays on top of the scene when
+ * `useGameStore().isVictory` flips true. Intentionally NON-modal:
+ *
+ *   - `pointer-events-none` so the player can still walk + interact
+ *     with the level (specifically the teleporter that returns them
+ *     to the tavern)
+ *   - no dialog box, button, or "Return to Tavern" UI — the user
+ *     exits via the in-scene teleporter instead
+ *
+ * The animation data is generated at module load (see `makeConfetti`)
+ * — kept inline so designers can tweak the constants without an extra
+ * asset round-trip. 24 particles fall from above the viewport with
+ * rotation + fade, looping indefinitely while the victory state is
+ * held.
  */
 
-import { Trophy, RotateCcw, Sparkles } from 'lucide-react';
+import Lottie from 'lottie-react';
 
-import { Button } from '@/components/ui/button';
-import { restartAtTavern } from '@/lib/phaser-game';
 import { useGameStore } from '@/store/game-store';
 
-import { CornerPixels, RETRO_BOX } from './retro-box';
+const COLORS: Array<[number, number, number]> = [
+    [0.98, 0.75, 0.14], // amber
+    [0.96, 0.62, 0.04], // amber-deep
+    [0.2, 0.83, 0.6], // emerald
+    [0.38, 0.65, 0.98], // sky
+    [0.96, 0.45, 0.71], // pink
+    [0.65, 0.55, 0.98], // violet
+];
+
+const FR = 30;
+const TOTAL = 150;
+const PARTICLES = 24;
+const VIEW_W = 1920;
+const VIEW_H = 1080;
+
+/**
+ * Build the Lottie animation JSON for a single particle layer.
+ * Position drops from y = -40 to y = VIEW_H + 40 with horizontal drift,
+ * rotation spins 0 -> 540°, opacity fades 100 -> 0 at the tail.
+ */
+function makeParticleLayer(index: number): Record<string, unknown> {
+    const color = COLORS[index % COLORS.length];
+    const startX = (index * 73 + 41) % VIEW_W;
+    const endX = startX + ((index % 2 === 0 ? 1 : -1) * (60 + (index % 4) * 30));
+    const startFrame = (index * 4) % 20;
+    const endFrame = startFrame + 110;
+
+    return {
+        ddd: 0,
+        ind: index + 1,
+        ty: 4,
+        nm: `p${index}`,
+        sr: 1,
+        ks: {
+            o: {
+                a: 1,
+                k: [
+                    { t: startFrame, s: [100] },
+                    { t: endFrame - 15, s: [100] },
+                    { t: endFrame, s: [0] },
+                ],
+            },
+            r: {
+                a: 1,
+                k: [
+                    { t: startFrame, s: [0] },
+                    { t: endFrame, s: [540 * ((index % 2 === 0 ? 1 : -1))] },
+                ],
+            },
+            p: {
+                a: 1,
+                k: [
+                    { t: startFrame, s: [startX, -40] },
+                    { t: endFrame, s: [endX, VIEW_H + 40] },
+                ],
+            },
+            a: { a: 0, k: [0, 0] },
+            s: { a: 0, k: [100, 100] },
+        },
+        ao: 0,
+        shapes: [
+            {
+                ty: 'rc',
+                d: 1,
+                s: { a: 0, k: [index % 2 === 0 ? 10 : 8, index % 3 === 0 ? 14 : 10] },
+                p: { a: 0, k: [0, 0] },
+                r: { a: 0, k: 1 },
+                nm: 'r',
+                c: { a: 0, k: [color[0], color[1], color[2], 1] },
+            },
+        ],
+        ip: 0,
+        op: TOTAL,
+        st: 0,
+        bm: 0,
+    };
+}
+
+/** Hand-rolled Lottie JSON for the victory confetti. */
+const confettiAnimationData = {
+    v: '5.7.0',
+    fr: FR,
+    ip: 0,
+    op: TOTAL,
+    w: VIEW_W,
+    h: VIEW_H,
+    nm: 'victory-confetti',
+    ddd: 0,
+    assets: [],
+    layers: Array.from({ length: PARTICLES }, (_, i) => makeParticleLayer(i)),
+};
 
 export function VictoryOverlay() {
     const isVictory = useGameStore((s) => s.isVictory);
-    const characterName = useGameStore((s) => s.characterName);
-    const levelElapsedMs = useGameStore((s) => s.levelElapsedMs);
-
     if (!isVictory) return null;
-
-    // Format total time mm:ss
-    const totalSec = Math.floor((levelElapsedMs || 0) / 1000);
-    const mins = Math.floor(totalSec / 60);
-    const secs = totalSec % 60;
-    const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
     return (
         <div
             data-testid="victory-overlay"
-            className="pointer-events-auto absolute inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm overflow-hidden select-none"
+            // pointer-events-none: never block input — the player still
+            // needs to walk + tap the teleporter to leave the level.
+            className="pointer-events-none absolute inset-0 z-50 overflow-hidden"
         >
-            {/* CSS Confetti Particles */}
-            <style>{`
-                @keyframes confetti-fall {
-                    0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
-                    100% { transform: translateY(100vh) rotate(720deg); opacity: 0.2; }
-                }
-                .confetti-particle {
-                    position: absolute;
-                    top: -20px;
-                    width: 10px;
-                    height: 10px;
-                    animation: confetti-fall 3.5s linear infinite;
-                }
-            `}</style>
-
-            {/* Falling Confetti Bits */}
-            {Array.from({ length: 24 }).map((_, i) => {
-                const colors = ['#fbbf24', '#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#a78bfa'];
-                const color = colors[i % colors.length];
-                const left = `${(i * 4.3 + 2) % 100}%`;
-                const delay = `${(i * 0.25) % 3}s`;
-                const duration = `${2.8 + (i % 4) * 0.4}s`;
-                const size = i % 2 === 0 ? 'w-2 h-2.5 rounded-sm' : 'w-1.5 h-1.5 rounded-full';
-                return (
-                    <div
-                        key={i}
-                        className={`confetti-particle ${size}`}
-                        style={{
-                            left,
-                            backgroundColor: color,
-                            animationDelay: delay,
-                            animationDuration: duration,
-                        }}
-                    />
-                );
-            })}
-
-            <div
-                className={`${RETRO_BOX} relative flex flex-col items-center gap-4 px-10 py-8 font-['Silkscreen',monospace] min-w-[290px]`}
-            >
-                <CornerPixels />
-
-                {/* Trophy icon with glowing effect */}
-                <div className="relative">
-                    <Trophy
-                        className="size-12 text-yellow-400"
-                        style={{ filter: 'drop-shadow(0 0 12px rgba(251,191,36,0.85))' }}
-                    />
-                    <Sparkles className="absolute -top-1 -right-2 size-5 text-amber-200 animate-pulse" />
-                </div>
-
-                {/* Title + decorative divider */}
-                <div className="flex flex-col items-center gap-1.5 w-full">
-                    <div className="text-2xl font-bold tracking-[0.2em] text-amber-300 drop-shadow-[2px_2px_0px_#000] uppercase">
-                        VICTORY!
-                    </div>
-                    <div className="flex items-center gap-2 w-full">
-                        <span className="flex-1 h-px bg-amber-800/60" />
-                        <span className="text-yellow-400 text-[10px] leading-none">✦</span>
-                        <span className="flex-1 h-px bg-amber-800/60" />
-                    </div>
-                </div>
-
-                {/* Clear Stats */}
-                <div className="flex flex-col items-center gap-1 text-[11px] text-stone-300">
-                    <div>HERO: <span className="text-amber-200 font-bold">{characterName || 'WANDERER'}</span></div>
-                    <div>CLEAR TIME: <span className="text-amber-200 font-mono font-bold">{timeStr}</span></div>
-                </div>
-
-                {/* Subtitle */}
-                <div className="text-[10px] uppercase tracking-wider text-amber-200/80 text-center leading-relaxed mt-1">
-                    All waves cleared!<br />The 11th Forest is saved.
-                </div>
-
-                {/* Return button */}
-                <Button
-                    onClick={() => void restartAtTavern()}
-                    className="mt-2 h-9 w-full bg-amber-500 px-6 font-['Silkscreen',monospace] font-bold text-black hover:bg-amber-400 tracking-wider uppercase text-xs rounded-none flex items-center justify-center gap-2"
-                >
-                    <RotateCcw className="size-4" />
-                    Return to Tavern
-                </Button>
-            </div>
+            <Lottie
+                animationData={confettiAnimationData}
+                loop
+                autoplay
+                style={{ width: '100%', height: '100%' }}
+            />
         </div>
     );
 }

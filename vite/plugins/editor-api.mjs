@@ -950,9 +950,9 @@ async function handleSaveMonsters(req, res) {
  * List every monster type from public/data/monsters/index.yaml. The
  * Monsters sub-tab uses this to populate its type dropdown AND the
  * visual canvas overlay (which needs each monster's display name,
- * sprite texture path, sheet grid, and idle anim range to play an
- * animated sprite-sheet preview). Each entry:
- *   { id, name, texture, cols, idleCount, idleFrameRate }
+ * sprite texture path, sheet grid, and idle anim range to render a
+ * single idle frame in the marker thumbnail). Each entry:
+ *   { id, name, texture, cols, rows, idleCount, idleFrameRate }
  */
 async function handleListMonsterTypes(res) {
     try {
@@ -972,6 +972,10 @@ async function handleListMonsterTypes(res) {
                     typeof spec?.sprite?.grid?.cols === 'number'
                         ? spec.sprite.grid.cols
                         : 4;
+                const rows =
+                    typeof spec?.sprite?.grid?.rows === 'number'
+                        ? spec.sprite.grid.rows
+                        : 4;
                 const idle = spec?.anims?.idle;
                 const idleCount =
                     Array.isArray(idle?.frames) && idle.frames.length === 2
@@ -987,6 +991,7 @@ async function handleListMonsterTypes(res) {
                             ? spec.sprite.texture
                             : `assets/image/monsters/${id}.png`,
                     cols,
+                    rows,
                     idleCount,
                     idleFrameRate,
                 });
@@ -996,6 +1001,7 @@ async function handleListMonsterTypes(res) {
                     name: id,
                     texture: `assets/image/monsters/${id}.png`,
                     cols: 4,
+                    rows: 4,
                     idleCount: 4,
                     idleFrameRate: 6,
                 });
