@@ -41,9 +41,8 @@ export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWal
             <div className="flex gap-2">
                 <Button
                     variant={drawing ? 'default' : 'outline'}
-                    className={`flex-1 gap-2 ${
-                        drawing ? 'bg-cyan-500 hover:bg-cyan-400 text-black' : 'bg-transparent'
-                    }`}
+                    className={`flex-1 gap-2 ${drawing ? 'bg-cyan-500 hover:bg-cyan-400 text-black' : 'bg-transparent'
+                        }`}
                     onClick={() => setDrawing((d) => !d)}
                 >
                     {drawing ? (
@@ -59,23 +58,6 @@ export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWal
                     )}
                 </Button>
                 <Button
-                    variant={showPathDebug ? 'default' : 'outline'}
-                    className={`gap-2 ${
-                        showPathDebug
-                            ? 'bg-amber-500 hover:bg-amber-400 text-black'
-                            : 'bg-transparent'
-                    }`}
-                    onClick={() => {
-                        const next = !showPathDebug;
-                        setShowPathDebug(next);
-                        EventBus.emit('path-debug-visible', next);
-                    }}
-                    title="Toggle pathfinding grid + per-monster path debug overlay"
-                >
-                    <Route className="size-4" />
-                    {showPathDebug ? 'Hide path debug' : 'Show path debug'}
-                </Button>
-                <Button
                     variant="outline"
                     className="bg-transparent"
                     onClick={onAddWall}
@@ -84,6 +66,24 @@ export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWal
                     <Plus className="size-4" />
                 </Button>
             </div>
+
+            <Button
+                variant={showPathDebug ? 'default' : 'outline'}
+                className={`mt-2 gap-2 ${showPathDebug
+                    ? 'bg-amber-500 hover:bg-amber-400 text-black'
+                    : 'bg-transparent'
+                    }`}
+                onClick={() => {
+                    const next = !showPathDebug;
+                    setShowPathDebug(next);
+                    EventBus.emit('path-debug-visible', next);
+                }}
+                title="Toggle pathfinding grid + per-monster path debug overlay"
+            >
+                <Route className="size-4" />
+                {showPathDebug ? 'Hide path debug' : 'Show path debug'}
+            </Button>
+
             {drawing && (
                 <div className="text-cyan-400 text-[11px] text-center mt-2 italic">
                     Click on the canvas to add vertices. Click the first vertex to close.

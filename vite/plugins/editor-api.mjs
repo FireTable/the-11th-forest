@@ -742,7 +742,7 @@ async function handleDeleteMaterialItem(req, res) {
     return sendJson(res, 200, { ok: true });
 }
 
-// ─── Scene management (list / create / replace bg / save monsters) ──────
+// ─── Scene management (list / create / replace bg ) ──────
 
 /**
  * Read every level yaml and return {id, title}. Cheap because the files
@@ -949,8 +949,10 @@ async function handleSaveMonsters(req, res) {
 /**
  * List every monster type from public/data/monsters/index.yaml. The
  * Monsters sub-tab uses this to populate its type dropdown AND the
- * visual canvas overlay (which needs each monster's display name and
- * sprite texture path). Each entry: { id, name, texture }.
+ * visual canvas overlay (which needs each monster's display name,
+ * sprite texture path, sheet grid, and idle anim range to play an
+ * animated sprite-sheet preview). Each entry:
+ *   { id, name, texture, cols, idleCount, idleFrameRate }
  */
 async function handleListMonsterTypes(res) {
     try {
@@ -966,6 +968,17 @@ async function handleListMonsterTypes(res) {
                     'utf8',
                 );
                 const spec = parseYaml(specText) || {};
+                const cols =
+                    typeof spec?.sprite?.grid?.cols === 'number'
+                        ? spec.sprite.grid.cols
+                        : 4;
+                const idle = spec?.anims?.idle;
+                const idleCount =
+                    Array.isArray(idle?.frames) && idle.frames.length === 2
+                        ? idle.frames[1] - idle.frames[0] + 1
+                        : 4;
+                const idleFrameRate =
+                    typeof idle?.frameRate === 'number' ? idle.frameRate : 6;
                 types.push({
                     id,
                     name: typeof spec.name === 'string' ? spec.name : id,
@@ -973,12 +986,18 @@ async function handleListMonsterTypes(res) {
                         typeof spec?.sprite?.texture === 'string'
                             ? spec.sprite.texture
                             : `assets/image/monsters/${id}.png`,
+                    cols,
+                    idleCount,
+                    idleFrameRate,
                 });
             } catch {
                 types.push({
                     id,
                     name: id,
                     texture: `assets/image/monsters/${id}.png`,
+                    cols: 4,
+                    idleCount: 4,
+                    idleFrameRate: 6,
                 });
             }
         }

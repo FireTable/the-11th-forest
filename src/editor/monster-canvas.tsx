@@ -28,6 +28,9 @@ interface MonsterTypeInfo {
     id: string;
     name: string;
     texture: string;
+    cols: number;
+    idleCount: number;
+    idleFrameRate: number;
 }
 
 interface Props {
@@ -73,6 +76,9 @@ export function MonsterCanvas({ level, active = true, onSpawnMove }: Props) {
                                 id: t,
                                 name: t,
                                 texture: `assets/image/monsters/${t}.png`,
+                                cols: 4,
+                                idleCount: 4,
+                                idleFrameRate: 6,
                             };
                         }
                         const o = t as Partial<MonsterTypeInfo>;
@@ -81,6 +87,9 @@ export function MonsterCanvas({ level, active = true, onSpawnMove }: Props) {
                             name: o.name ?? o.id ?? '',
                             texture:
                                 o.texture ?? `assets/image/monsters/${o.id ?? 'unknown'}.png`,
+                            cols: o.cols ?? 4,
+                            idleCount: o.idleCount ?? 4,
+                            idleFrameRate: o.idleFrameRate ?? 6,
                         };
                     }),
                 );
@@ -161,36 +170,54 @@ export function MonsterCanvas({ level, active = true, onSpawnMove }: Props) {
             className={`absolute inset-0 ${active ? 'pointer-events-none' : 'hidden'}`}
         >
             {box.width > 0 && box.height > 0 && (
-                <div
-                    className="absolute"
-                    style={{
-                        left: box.x,
-                        top: box.y,
-                        width: box.width,
-                        height: box.height,
-                    }}
-                >
-                    {(level.monsters ?? []).map((m, i) => {
-                        const info = typeById.get(m.type);
-                        const waveI = waveIndex.get(m.waveId ?? '') ?? 0;
-                        const palette = WAVE_PALETTE[waveI % WAVE_PALETTE.length];
-                        const left = m.x * scale - MARKER_W / 2;
-                        const top = m.y * scale - MARKER_W / 2;
-                        return (
-                            <DraggableMarker
-                                key={i}
-                                index={i}
-                                spawn={m}
-                                left={left}
-                                top={top}
-                                scale={scale}
-                                palette={palette}
-                                info={info}
-                                onMove={onSpawnMove}
-                            />
-                        );
-                    })}
-                </div>
+                <>
+                    <style>
+                        {(level.monsters ?? []).map((m, i) => {
+                            const info = typeById.get(m.type);
+                            if (!info) return null;
+                            const cols = info.cols;
+                            const idleCount = info.idleCount;
+                            // Slide from frame 0 to the last idle frame.
+                            // background-size is cols×100% so each frame
+                            // is 100/cols % wide; idleCount frames fit in
+                            // (idleCount-1)/cols of the sheet width.
+                            const endPct = -(((idleCount - 1) / cols) * 100).toFixed(3);
+                            return (
+                                <span key={i}>{`@keyframes monster-idle-${i}{from{background-position:0% 50%}to{background-position:${endPct}% 50%}}`}</span>
+                            );
+                        })}
+                    </style>
+                    <div
+                        className="absolute"
+                        style={{
+                            left: box.x,
+                            top: box.y,
+                            width: box.width,
+                            height: box.height,
+                        }}
+                    >
+                        {(level.monsters ?? []).map((m, i) => {
+                            const info = typeById.get(m.type);
+                            const waveI = waveIndex.get(m.waveId ?? '') ?? 0;
+                            const palette = WAVE_PALETTE[waveI % WAVE_PALETTE.length];
+                            const left = m.x * scale - MARKER_W / 2;
+                            const top = m.y * scale - MARKER_W / 2;
+                            return (
+                                <DraggableMarker
+                                    key={i}
+                                    index={i}
+                                    spawn={m}
+                                    left={left}
+                                    top={top}
+                                    scale={scale}
+                                    palette={palette}
+                                    info={info}
+                                    onMove={onSpawnMove}
+                                />
+                            );
+                        })}
+                    </div>
+                </>
             )}
         </div>
     );
@@ -258,6 +285,24 @@ function DraggableMarker({
     const displayLeft = dragOffset ? left + dragOffset.dx : left;
     const displayTop = dragOffset ? top + dragOffset.dy : top;
 
+    // Idle anim: cycle background-position across the sprite-sheet's
+    // first `idleCount` frames at `idleFrameRate` fps. `steps(idleCount)`
+    // makes it jump frame-by-frame instead of sliding smoothly.
+    const cols = info?.cols ?? 4;
+    const idleCount = info?.idleCount ?? 4;
+    const idleFps = info?.idleFrameRate ?? 6;
+    const animStyle: React.CSSProperties | undefined = info
+        ? {
+              width: MARKER_W,
+              height: MARKER_W,
+              backgroundImage: `url(${info.texture})`,
+              backgroundSize: `${cols * 100}% auto`,
+              backgroundPosition: '0% 50%',
+              backgroundRepeat: 'no-repeat',
+              animation: `monster-idle-${index} ${idleCount / idleFps}s steps(${idleCount}) infinite`,
+          }
+        : {};
+
     return (
         <div
             className="absolute flex flex-col items-center"
@@ -275,16 +320,13 @@ function DraggableMarker({
                     top: MARKER_W / 2 - 4,
                 }}
             />
-            {/* Sprite thumbnail — drag handle */}
+            {/* Sprite thumbnail — drag handle.
+                pointer-events-auto so it receives the drag even though
+                the rest of the overlay is non-interactive. */}
             <div
-                className={`relative flex items-center justify-center border-2 ${palette} rounded ${onMove ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                className={`relative flex items-center justify-center border-2 ${palette} rounded ${onMove ? 'cursor-grab active:cursor-grabbing' : ''} pointer-events-auto`}
                 style={{
-                    width: MARKER_W,
-                    height: MARKER_W,
-                    backgroundImage: info ? `url(${info.texture})` : undefined,
-                    backgroundSize: '400% auto',
-                    backgroundPosition: info ? '0% 50%' : undefined,
-                    backgroundRepeat: 'no-repeat',
+                    ...animStyle,
                     touchAction: 'none',
                 }}
                 onPointerDown={onPointerDown}

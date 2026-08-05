@@ -37,12 +37,10 @@ interface Props {
 
 const TRIGGER_KINDS: MonsterTrigger['kind'][] = ['time', 'clear'];
 
-export function MonstersSection({ sceneId, level, setLevel }: Props) {
+export function MonstersSection({ level, setLevel }: Props) {
     const [availableTypes, setAvailableTypes] = useState<
         Array<{ id: string; name: string; texture: string } | string>
     >([]);
-    const [error, setError] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         // Read the monsters index so the type dropdown knows the universe.
@@ -104,24 +102,6 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
         update(next);
     }
 
-    async function handleSave() {
-        setSaving(true);
-        setError(null);
-        try {
-            const res = await fetch('/api/editor/save-monsters', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: sceneId, monsters }),
-            });
-            const body = await res.json();
-            if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-        } catch (e) {
-            setError(String((e as Error).message ?? e));
-        } finally {
-            setSaving(false);
-        }
-    }
-
     // Summary at the top: "3 spawns in 2 waves".
     const summary = useMemo(() => {
         const waves = new Set<string>();
@@ -131,8 +111,6 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
 
     return (
         <div className="flex flex-col gap-3 text-xs">
-            {error && <div className="text-red-400 text-[11px]">{error}</div>}
-
             <div className="flex items-center justify-between">
                 <div className="font-semibold text-neutral-300">{summary}</div>
                 <Button
@@ -168,15 +146,7 @@ export function MonstersSection({ sceneId, level, setLevel }: Props) {
                 ))}
             </div>
 
-            <div className="border-t border-neutral-800 pt-2 flex justify-end">
-                <Button
-                    disabled={saving}
-                    onClick={handleSave}
-                    className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs h-7 px-3"
-                >
-                    {saving ? 'Saving…' : 'Save monsters'}
-                </Button>
-            </div>
+
         </div>
     );
 }
