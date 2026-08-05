@@ -5,9 +5,12 @@
  * GameHUDLayer when `useGameStore().isDead` is true; the Phaser scene
  * is already paused at that point (see Character.handleDeath).
  *
- * Restart goes through `restartCurrentLevel` — the same helper the
- * settings panel uses. The Phaser scene is destroyed and a fresh
- * LoadScene is constructed with full HP from the spec.
+ * Restart goes through `restartAtTavern` — the same helper the
+ * settings panel uses. The Phaser scene is destroyed, the store is
+ * wiped to `initialGameState` via `clearSaveData` (so a refresh
+ * doesn't restore the dead run), and a fresh tavern `LoadScene` is
+ * constructed. HP / weapons / character choice all re-seed from the
+ * tavern phase-1 selection.
  */
 
 import { Skull } from 'lucide-react';

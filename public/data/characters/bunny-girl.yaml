@@ -104,7 +104,7 @@ dodge:
     durationMs: 200
     cooldownMs: 500
 hotbar: []
-weaponMax: 3
+weaponMax: 2
 sfx:
     dodge: dodge
     hurtFemale: player-hurt-female

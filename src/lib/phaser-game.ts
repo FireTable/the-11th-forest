@@ -83,9 +83,11 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
 }
 
 /**
- * Restart the level the player is currently in, from a clean slate —
- * the shared path behind both the death overlay's and the settings
- * panel's Restart button.
+ * Restart the level the player is currently in, from a clean slate.
+ * Not currently wired to any UI button — both the death overlay and
+ * the settings panel route through `restartAtTavern` instead. Kept
+ * for a future "retry this level" option that preserves the chosen
+ * character + weapons while resetting combat state.
  */
 export function restartCurrentLevel(): void {
     const resolved = getCachedResolvedScene();
@@ -98,24 +100,15 @@ export function restartCurrentLevel(): void {
 /**
  * Restart from the tavern — a full reset. Used by the death
  * overlay and the settings panel as the "back to the beginning"
- * path. Clears every player-progress field so the player re-runs
- * character selection AND weapon pickup from scratch:
- *
- *   - isDead: back to false (overlay needs to disappear)
- *   - selectedCharacterId: null (phase-1 NPCs show again)
- *   - tavernCleared: false (next page load lands in tavern)
- *   - slots: [] (picked weapons are dropped, not carried over)
- *   - hp/sp/snapshots: cleared via clearSceneSnapshots + slot
- *     reset; the actual values get re-seeded when the next scene
- *     rehydrates from the spec defaults.
+ * path. `clearSaveData` wipes the persisted localStorage and
+ * resets the store to `initialGameState` in one shot (isDead →
+ * false, selectedCharacterId → null, tavernCleared → false, slots
+ * → [], all three entity snapshots → undefined, hp/sp/currentLevelId
+ * → zero/empty), so the next page load lands in the tavern phase-1
+ * NPC selection with no stale snapshot restoring mid-fight.
  */
 export async function restartAtTavern(): Promise<void> {
-    const store = useGameStore.getState();
-    store.setDead(false);
-    store.setSelectedCharacterId(null);
-    store.setTavernCleared(false);
-    useGameStore.setState({ slots: [] });
-    store.clearSceneSnapshots();
+    useGameStore.getState().clearSaveData();
     const resolved = await resolveScene('tavern');
     await restartSceneWith(resolved);
 }
