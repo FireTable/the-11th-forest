@@ -361,6 +361,12 @@ export interface MonsterProjectile {
      *  pinned value is the fallback once the monster dies or starts
      *  dying mid-flight (no owner to track). */
     fireFootY: number;
+    /** Mirror of BulletRecord.spawnAt / lifeMs — populated by the
+     *  ranged-path spawn call so the per-frame cleanup can expire
+     *  missed shots instead of waiting for Matter friction to drop
+     *  speed below the 1.0 px/frame threshold. */
+    spawnAt: number;
+    lifeMs: number;
 }
 
 export class MonsterController {
@@ -937,7 +943,11 @@ export class MonsterController {
             const dx = bp.x - proj.originX;
             const dy = bp.y - proj.originY;
             const distSq = dx * dx + dy * dy;
-            if (currentSpeed < 1.0 || distSq >= proj.maxDistance * proj.maxDistance) {
+            // Hard cap on lifetime (per-weapon via projectile.lifeMs,
+            // default 1500ms) — kills missed shots that would otherwise
+            // linger ~4-10s while Matter friction decays speed.
+            const expired = time - proj.spawnAt >= proj.lifeMs;
+            if (expired || currentSpeed < 1.0 || distSq >= proj.maxDistance * proj.maxDistance) {
                 this.destroyProjectile(proj);
             }
         }
@@ -1070,6 +1080,11 @@ export class MonsterController {
                 scale: weapon.bullet?.scale,
                 anchor: weapon.bullet?.anchor,
                 rotationOffset: weapon.bullet?.rotationOffset,
+                // Hard cap on lifetime — per-weapon override or default
+                // (1500ms) applied in spawnProjectile. Prevents missed
+                // shots from lingering ~4-10s on screen while Matter
+                // friction decays speed below the cleanup threshold.
+                lifeMs: weapon.projectile?.lifeMs,
                 // Stack the bullet in front of the monster's sprite.
                 // The +10 offset matches DEPTH.BULLET - DEPTH.CHARACTER
                 // on the flat layer, so the per-frame sync can keep

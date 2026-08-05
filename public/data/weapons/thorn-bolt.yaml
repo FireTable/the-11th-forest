@@ -1,7 +1,7 @@
 name: Thorn Bolt
-damage: 3
-cooldownMs: 700
-range: 380
+damage: 6
+cooldownMs: 550
+range: 520
 bulletsPerShot: 1
 bullet:
     texture: assets/image/weapons/thorn-bolt.png
@@ -9,12 +9,13 @@ bullet:
     scale: 0.5
     anchor: [0.5, 0.5]
 projectile:
-    speed: 18
+    speed: 22
     visual:
         radius: 3
         width: 10
         height: 4
         color: 0x586B48
+    lifeMs: 1500
 sfx:
     shoot: gunner-shoot
     bulletWall: bullet-wall

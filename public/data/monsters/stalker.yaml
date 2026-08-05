@@ -1,6 +1,6 @@
 name: Bramble Stalker
 hp: 140
-moveSpeed: 6
+moveSpeed: 4
 body:
   halfW: 18
   halfH: 18

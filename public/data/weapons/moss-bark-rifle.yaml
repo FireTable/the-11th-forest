@@ -1,7 +1,7 @@
 name: Moss Bark Rifle
-damage: 5
-cooldownMs: 900
-range: 450
+damage: 12
+cooldownMs: 1400
+range: 700
 bulletsPerShot: 1
 bullet:
     texture: assets/image/weapons/bark-missile.png
@@ -16,12 +16,13 @@ visual:
     recoilDistance: 4
     recoilDuration: 100
 projectile:
-    speed: 16
+    speed: 24
     visual:
         radius: 3
         width: 10
         height: 3
         color: 0x9ac06b
+    lifeMs: 2000
 sfx:
     shoot: gunner-shoot
     bulletWall: bullet-wall

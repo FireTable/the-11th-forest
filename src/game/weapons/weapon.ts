@@ -71,6 +71,11 @@ export interface BulletRecord {
     originX: number;
     originY: number;
     maxDistance: number;
+    /** `scene.time.now` (ms) when the bullet was spawned. Combined with
+     *  `lifeMs` this gives a hard cap on how long a missed shot can
+     *  linger. */
+    spawnAt: number;
+    lifeMs: number;
     rotationOffset?: number;
     isMelee?: boolean;
     trail: { x: number; y: number }[];
@@ -89,6 +94,10 @@ export interface ProjectileSpawnOptions {
     maxDistance?: number;
     rotationOffset?: number;
     anchor?: [number, number];
+    /** Hard cap on bullet lifetime in ms. Passed through from the
+     *  weapon spec's `projectile.lifeMs` (defaults to 1500ms when
+     *  omitted). */
+    lifeMs?: number;
     /** Pin the visual's depth at spawn time. Monsters pass their own
      *  footY so the bullet rides along with the originating monster's
      *  depth slot — bullets never Y-sort independently of their owner.
@@ -152,6 +161,8 @@ export function spawnProjectile(
         originX: origin.x,
         originY: origin.y,
         maxDistance: opts.maxDistance ?? 800,
+        spawnAt: scene.time.now,
+        lifeMs: opts.lifeMs ?? 1500,
         rotationOffset: rotRad,
         trail: [],
     };
@@ -342,6 +353,12 @@ export function spawnMeleeHitbox(
         originX: opts.origin.x,
         originY: opts.origin.y,
         maxDistance: opts.range,
+        // Melee hitboxes self-destruct via the tween above (200ms).
+        // Stamp spawnAt + a matching lifeMs so the per-frame cleanup
+        // path doesn't choke on missing fields. The tween is the
+        // authoritative destroyer.
+        spawnAt: scene.time.now,
+        lifeMs: 250,
         isMelee: true,
         trail: [],
     };

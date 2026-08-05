@@ -467,9 +467,13 @@ export class WeaponController {
             const vel = b.body.velocity;
             const currentSpeed = Math.hypot(vel.x, vel.y);
             const distSq = (bp.x - b.originX) ** 2 + (bp.y - b.originY) ** 2;
+            // Hard lifetime cap (per-weapon projectile.lifeMs, default
+            // 1500ms) so missed shots don't linger on screen while Matter
+            // friction decays their speed below the cleanup threshold.
+            const expired = time - b.spawnAt >= b.lifeMs;
 
-            // Cleanup ranged bullets that stopped moving (speed < 1.0) or traveled past max range
-            if (!b.isMelee && (currentSpeed < 1.0 || distSq >= b.maxDistance ** 2)) {
+            // Cleanup ranged bullets that expired, stopped moving (speed < 1.0) or traveled past max range
+            if (!b.isMelee && (expired || currentSpeed < 1.0 || distSq >= b.maxDistance ** 2)) {
                 this.destroyBullet(i);
                 continue;
             }

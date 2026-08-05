@@ -30,6 +30,13 @@ const ProjectileSchema = z
     .object({
         speed: z.number().gt(0),
         visual: ProjectileVisualSchema,
+        /** Hard cap on bullet lifetime in ms. A missed shot that doesn't
+         *  hit anything (no wall, no target) gets destroyed after this
+         *  many ms regardless of remaining speed or distance — without
+         *  it Matter's frictionAir lets bullets linger ~4-10s on screen
+         *  before the `currentSpeed < 1.0` cleanup catches them. Default
+         *  applied in spawnProjectile (1500ms) when omitted. */
+        lifeMs: z.number().gt(0).optional(),
     })
     .strict();
 
