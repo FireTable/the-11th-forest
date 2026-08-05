@@ -25,5 +25,5 @@ export type {
 
 export { parseImageSize, formatImageSize } from './types';
 export { parseLevelIndex, parseLevelYaml } from './parser';
-export { fetchLevel, fetchLevelIndex } from './loader';
+export { fetchLevel, fetchLevelIndex, clearLevelIndexCache } from './loader';
 export { collectDropIds } from './prefetch';

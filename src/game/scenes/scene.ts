@@ -671,11 +671,14 @@ export class LoadScene extends Phaser.Scene {
         this.pathDebugOverlay?.destroy();
     }
 
+    private isCheckingVictory = false;
+
     private checkVictory(): void {
         const store = useGameStore.getState();
-        if (store.isVictory || store.isDead) return;
+        if (store.isVictory || store.isDead || this.isCheckingVictory) return;
         if (this.level.tavern) return;
 
+        this.isCheckingVictory = true;
         // Verify if this is the final level in index.yaml
         fetchLevelIndex()
             .then((indexManifest) => {
@@ -689,14 +692,17 @@ export class LoadScene extends Phaser.Scene {
                         // to the tavern — the React overlay is just
                         // confetti, not a modal. AudioController
                         // subscribes to `sfx:victory-fanfare` and
-                        // fires once.
+                        // fires once. Throttled to 5s min gap.
                         store.setVictory(true);
-                        EventBus.emit(SFX_EVENT('victory-fanfare'));
+                        EventBus.emit(SFX_EVENT('victory-fanfare'), { throttleMs: 5000 });
                     }
                 }
             })
             .catch(() => {
                 /* ignore manifest fetch error */
+            })
+            .finally(() => {
+                this.isCheckingVictory = false;
             });
     }
 

@@ -5,7 +5,7 @@
  * same `/data/*` paths work in browser and Node without branching.
  */
 
-import { fetch } from '@/lib/handle-fetch';
+import { clearFetchCache, fetch } from '@/lib/handle-fetch';
 
 import { parseLevelIndex, parseLevelYaml } from './parser';
 import type { Level, LevelIndex } from './types';
@@ -17,7 +17,14 @@ export async function fetchLevel(id: string): Promise<Level> {
     return parseLevelYaml(text, id);
 }
 
-export async function fetchLevelIndex(): Promise<LevelIndex> {
+export async function fetchLevelIndex(forceRefresh = false): Promise<LevelIndex> {
+    if (forceRefresh) {
+        clearFetchCache(`${BASE}/index.yaml`);
+    }
     const text = await (await fetch(`${BASE}/index.yaml`)).text();
     return parseLevelIndex(text);
+}
+
+export function clearLevelIndexCache(): void {
+    clearFetchCache(`${BASE}/index.yaml`);
 }

@@ -1,6 +1,6 @@
 name: Arcana Staff
-damage: 28
-cooldownMs: 350
+damage: 24
+cooldownMs: 500
 range: 1000
 clipSize: 8
 reloadTimeMs: 1800

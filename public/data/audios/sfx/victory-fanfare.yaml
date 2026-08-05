@@ -2,7 +2,7 @@ kind: sfx
 id: victory-fanfare
 name: Victory Fanfare
 source: assets/audio/sfx/victory-fanfare.wav
-volume: 0.95
+volume: 0.5
 # Anime-RPG victory fanfare: bright brassy stinger + choral swell that
 # resolves on a triumphant major chord, lasting about 2.5 seconds.
 # Plays once when the player clears the final boss (the React overlay's
