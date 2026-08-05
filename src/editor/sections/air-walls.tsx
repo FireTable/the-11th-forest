@@ -35,6 +35,11 @@ export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWal
     // that the canvas stays cleaner without it. The toggle lets the
     // designer opt in when they actually want to see the grid.
     const [showPathDebug, setShowPathDebug] = useState(false);
+    const togglePathDebug = (): void => {
+        const next = !showPathDebug;
+        setShowPathDebug(next);
+        EventBus.emit('path-debug-visible', next);
+    };
 
     return (
         <div>
@@ -67,22 +72,50 @@ export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWal
                 </Button>
             </div>
 
-            <Button
-                variant={showPathDebug ? 'default' : 'outline'}
-                className={`mt-2 gap-2 ${showPathDebug
-                    ? 'bg-amber-500 hover:bg-amber-400 text-black'
-                    : 'bg-transparent'
-                    }`}
-                onClick={() => {
-                    const next = !showPathDebug;
-                    setShowPathDebug(next);
-                    EventBus.emit('path-debug-visible', next);
-                }}
+            <label
+                className="mt-2 flex items-center justify-between gap-2 cursor-pointer select-none rounded border border-neutral-800 bg-neutral-900 px-2.5 py-2 hover:bg-neutral-800"
                 title="Toggle pathfinding grid + per-monster path debug overlay"
             >
-                <Route className="size-4" />
-                {showPathDebug ? 'Hide path debug' : 'Show path debug'}
-            </Button>
+                <span className="flex items-center gap-2 text-xs">
+                    <Route className="size-4" />
+                    <span>Show path debug</span>
+                </span>
+                <span
+                    role="switch"
+                    aria-checked={showPathDebug}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                        if (e.key === ' ' || e.key === 'Enter') {
+                            e.preventDefault();
+                            togglePathDebug();
+                        }
+                    }}
+                    onClick={(e) => {
+                        // Prevent double-fire when the inner knob or
+                        // label is clicked — <label> already toggles
+                        // the inner checkbox on click.
+                        e.stopPropagation();
+                        togglePathDebug();
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                        showPathDebug ? 'bg-amber-500' : 'bg-neutral-700'
+                    }`}
+                >
+                    <span
+                        className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${
+                            showPathDebug ? 'translate-x-4' : 'translate-x-0.5'
+                        }`}
+                    />
+                </span>
+                {/* Hidden checkbox so the <label> still drives a native
+                     toggle (clicking the label fires change on this). */}
+                <input
+                    type="checkbox"
+                    checked={showPathDebug}
+                    onChange={togglePathDebug}
+                    className="sr-only"
+                />
+            </label>
 
             {drawing && (
                 <div className="text-cyan-400 text-[11px] text-center mt-2 italic">

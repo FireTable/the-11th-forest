@@ -292,23 +292,20 @@ characterSpawn:
   'y': 200
   facing: right
 monsters:
-  # wave-1 — inside the corridor between wall-1 (left) and wall-2 (right).
-  # Wall-1 right edge at y≈460 is x≈985; wall-2 left edge is x≈1837.
   - type: drone
-    x: 1150
-    'y': 460
+    x: 1177
+    'y': 330
     waveId: wave-1
     trigger:
       kind: time
       delayMs: 1500
   - type: drone
-    x: 1650
-    'y': 520
+    x: 1562
+    'y': 402
     waveId: wave-1
     trigger:
       kind: time
       delayMs: 1500
-  # wave-2 — corridor widens here (wall-1 ≈740, wall-2 ≈2060).
   - type: stalker
     x: 1050
     'y': 740
@@ -319,39 +316,36 @@ monsters:
       waveId: wave-1
   - type: sniper
     x: 1750
-    'y': 780
+    'y': 834
     waveId: wave-2
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-1
-  # wave-3 — corridor is widest here (wall-1 ≈620, wall-2 ≈2290).
-  # Three spread positions: left, center, right — forced side-to-side.
   - type: keeper
-    x: 950
-    'y': 980
+    x: 1736
+    'y': 563
     waveId: wave-3
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-2
   - type: stalker
-    x: 1400
-    'y': 1020
+    x: 1302
+    'y': 1135
     waveId: wave-3
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-2
   - type: drone-ultra
-    x: 1900
-    'y': 1040
+    x: 852
+    'y': 949
     waveId: wave-3
     trigger:
       kind: clear
       delayMs: 500
       waveId: wave-2
-  # wave-4 — pre-boss gauntlet, corridor narrows (wall-1 ≈770, wall-2 ≈2050).
   - type: gunner
     x: 1050
     'y': 1240
@@ -361,8 +355,8 @@ monsters:
       delayMs: 500
       waveId: wave-3
   - type: sniper
-    x: 1500
-    'y': 1280
+    x: 1360
+    'y': 536
     waveId: wave-4
     trigger:
       kind: clear

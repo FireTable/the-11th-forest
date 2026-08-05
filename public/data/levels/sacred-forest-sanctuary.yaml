@@ -461,12 +461,12 @@ characterSpawn:
   facing: left
 monsters:
   - type: drone
-    x: 800
-    'y': 1250
+    x: 942
+    'y': 1048
     waveId: wave-1
   - type: drone
-    x: 1100
-    'y': 1200
+    x: 1198
+    'y': 1210
     waveId: wave-2
     trigger:
       kind: clear
@@ -475,13 +475,13 @@ monsters:
   - type: gunner
     x: 2000
     'y': 600
-    waveId: boss
+    waveId: Suprise
     trigger:
       kind: time
       delayMs: 5000
   - type: drone
-    x: 2000
-    'y': 660
+    x: 2054
+    'y': 881
     waveId: wave-3
     trigger:
       kind: clear
@@ -496,8 +496,8 @@ monsters:
       delayMs: 2000
       waveId: wave-2
   - type: sniper
-    x: 1300
-    'y': 450
+    x: 1310
+    'y': 386
     waveId: wave-3
     trigger:
       kind: clear
