@@ -26,6 +26,7 @@ import {
     MUSIC_RESUME,
     MUSIC_STOP,
     SFX_EVENT,
+    SFX_STOP,
 } from '@/lib/constants';
 import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
@@ -187,6 +188,26 @@ export class AudioController {
         }
     }
 
+    /**
+     * Stop every active instance of a registered SFX id. Used when a
+     * trigger that started a long sfx is cancelled mid-play (e.g. the
+     * player releases F in the tavern before the hold completes — the
+     * 1.5s charge beep should cut, not bleed out). Iterates
+     * `scene.sound.sounds` for matching keys and stops + destroys each
+     * instance; non-matches are left alone.
+     */
+    stopSfx(id: string): void {
+        const spec = this.sfxSpecs.get(id);
+        if (!spec) return;
+        const aKey = audioKey(spec);
+        // `removeByKey` is defined on WebAudioSoundManager /
+        // HTML5AudioSoundManager; the NoAudioSoundManager fallback is
+        // an empty stub that no-ops. Cast so the union narrows and TS
+        // doesn't see the missing property on NoAudioSoundManager.
+        const manager = this.scene.sound as Phaser.Sound.BaseSoundManager;
+        manager.removeByKey?.(aKey);
+    }
+
     /** Cross-fade to a registered music track. No-op if unknown.
      *
      *  Singleton-aware: if the requested id matches the music that's
@@ -301,6 +322,11 @@ export class AudioController {
                 this.playSfx(id, payload ?? {});
             EventBus.on(event, handler);
             this.unsubscribers.push(() => EventBus.removeListener(event, handler));
+
+            const stopEvent = SFX_STOP(id);
+            const stopHandler = () => this.stopSfx(id);
+            EventBus.on(stopEvent, stopHandler);
+            this.unsubscribers.push(() => EventBus.removeListener(stopEvent, stopHandler));
         }
         for (const id of this.musicSpecs.keys()) {
             const event = MUSIC_EVENT(id);

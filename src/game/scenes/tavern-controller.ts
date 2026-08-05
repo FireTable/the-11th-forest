@@ -18,7 +18,7 @@
 import * as Phaser from 'phaser';
 
 import { EventBus } from '@/lib/events/bus';
-import { SFX_EVENT } from '@/lib/constants';
+import { SFX_EVENT, SFX_STOP } from '@/lib/constants';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 import type { CharacterRuntime } from '@/game/characters/character';
@@ -538,9 +538,12 @@ export class TavernController {
                     return;
                 }
             } else if (this.fHolding) {
-                // Released before reaching HOLD_MS — cancel.
+                // Released before reaching HOLD_MS — cancel. Cut the
+                // charge SFX immediately so the beep doesn't bleed out
+                // the full 1.5s after the player gave up.
                 this.fHolding = false;
                 this.holdElapsed = 0;
+                EventBus.emit(SFX_STOP('tavern-charge'));
             }
 
             // One combined emit per frame: position (unchanged for this NPC) +

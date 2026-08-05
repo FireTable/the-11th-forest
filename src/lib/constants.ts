@@ -226,6 +226,7 @@ export const RENDER_BULLET_TRAIL_LENGTH = 6;
 // `music:<id>` so the event name is a 1:1 map from the YAML id.
 
 export const SFX_EVENT = (id: string): string => `sfx:${id}`;
+export const SFX_STOP = (id: string): string => `sfx:stop:${id}`;
 export const MUSIC_EVENT = (id: string): string => `music:${id}`;
 export const MUSIC_STOP = 'music:stop';
 export const MUSIC_PAUSE = 'music:pause';
