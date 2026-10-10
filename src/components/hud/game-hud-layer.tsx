@@ -25,14 +25,14 @@ import { useHudScale } from '@/lib/use-hud-scale';
  * for free — `appViewport()` already reports the rotated dimensions.
  */
 export const GameHUDLayer: React.FC = () => {
-    const { scale, width, height } = useHudScale();
+    const { scale, width, height, left, top } = useHudScale();
 
     const style: React.CSSProperties =
         width > 0
             ? {
                   position: 'absolute',
-                  left: 0,
-                  top: 0,
+                  left: `${left}px`,
+                  top: `${top}px`,
                   width: `${width / scale}px`,
                   height: `${height / scale}px`,
                   transform: `scale(${scale})`,

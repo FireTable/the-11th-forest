@@ -1061,7 +1061,6 @@ export class MonsterController {
             const hitPos = bulletBody?.position ?? hitBody.position;
             spawnHitSparks(this.scene, hitPos.x, hitPos.y, {
                 dir: { x: kb.vx, y: kb.vy },
-                color: isCrit ? 0xfbbf24 : undefined,
                 isCrit,
             });
 
