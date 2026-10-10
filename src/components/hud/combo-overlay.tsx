@@ -93,46 +93,46 @@ export const ComboOverlay: React.FC = () => {
 
     return (
         <div
-            className="absolute top-20 right-8 pointer-events-none select-none transition-transform duration-100 ease-out z-20"
+            className="absolute top-26 right-6 pointer-events-none select-none transition-transform duration-100 ease-out z-20 origin-top-right"
             style={{
-                transform: punch ? 'scale(1.35)' : 'scale(1)',
-                filter: `drop-shadow(0 4px 16px ${tierGlow})`,
+                transform: punch ? 'scale(1.12)' : 'scale(1)',
+                filter: `drop-shadow(0 2px 10px ${tierGlow})`,
             }}
         >
             <div className="flex flex-col items-end">
-                <div className="flex items-baseline gap-2 font-black italic tracking-wider font-mono">
+                <div className="flex items-baseline gap-1.5 font-black italic tracking-wider font-mono">
                     <span
-                        className="text-xs uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-sm bg-black/75 backdrop-blur-sm border shadow-sm"
+                        className="text-[10px] uppercase font-extrabold tracking-widest px-1.5 py-0.5 rounded-xs bg-black/80 backdrop-blur-sm border shadow-xs"
                         style={{
                             color: tierColor,
                             borderColor: `${tierColor}66`,
-                            boxShadow: `0 0 8px ${tierGlow}`,
+                            boxShadow: `0 0 6px ${tierGlow}`,
                         }}
                     >
                         {tierTitle}
                     </span>
                     <span
-                        className={`${combo >= 25 ? 'text-6xl' : 'text-5xl'} font-black drop-shadow-[0_3px_6px_rgba(0,0,0,0.95)]`}
+                        className={`${combo >= 25 ? 'text-4xl' : 'text-3xl'} font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]`}
                         style={{
                             color: tierColor,
-                            textShadow: `0 0 16px ${tierGlow}, 0 2px 0 #000, 3px 3px 0 #000, -2px -2px 0 #000`,
+                            textShadow: `0 0 12px ${tierGlow}, 0 2px 0 #000, 2px 2px 0 #000, -1px -1px 0 #000`,
                         }}
                     >
                         {combo}
                     </span>
-                    <span className="text-base text-white/90 font-black uppercase tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                    <span className="text-xs text-white/90 font-black uppercase tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                         HITS
                     </span>
                 </div>
 
                 {/* 3s shrinking combo timeout timer bar with direct high-performance rAF updates */}
-                <div className="w-36 h-2.5 bg-black/70 rounded-full overflow-hidden mt-1.5 border border-white/25 backdrop-blur-sm p-[1px] shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+                <div className="w-28 h-2 bg-black/70 rounded-full overflow-hidden mt-1 border border-white/20 backdrop-blur-sm p-[1px] shadow-[0_2px_6px_rgba(0,0,0,0.5)]">
                     <div
                         ref={barRef}
                         className="h-full w-full rounded-full"
                         style={{
                             backgroundColor: tierColor,
-                            boxShadow: `0 0 10px ${tierColor}, inset 0 1px 1px rgba(255,255,255,0.45)`,
+                            boxShadow: `0 0 8px ${tierColor}, inset 0 1px 1px rgba(255,255,255,0.4)`,
                         }}
                     />
                 </div>

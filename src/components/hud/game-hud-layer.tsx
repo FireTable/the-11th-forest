@@ -6,6 +6,7 @@ import { SettingsOverlay } from './settings-overlay';
 import { WeaponHUDOverlay } from './weapon-hud-overlay';
 import { SceneHubOverlay } from './scene-hub-overlay';
 import { ComboOverlay } from './combo-overlay';
+import { HurtVignetteOverlay } from './hurt-vignette-overlay';
 
 import { useHudScale } from '@/lib/use-hud-scale';
 
@@ -41,6 +42,7 @@ export const GameHUDLayer: React.FC = () => {
 
     return (
         <div style={style} className="pointer-events-none overflow-hidden z-10">
+            <HurtVignetteOverlay />
             <SceneHubOverlay />
             <ComboOverlay />
             <CharacterHUDOverlay />

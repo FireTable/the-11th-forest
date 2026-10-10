@@ -366,6 +366,7 @@ export class CharacterController {
                 this.hurtFlashUntil = this.scene.time.now + CHARACTER_HURT_FLASH_MS;
                 this.parts.sprite.setTint(0x992222);
                 (this.parts.sprite as any).setTintMode?.(2);
+                EventBus.emit('combat:player-hurt', { damage: -actualDelta });
                 const sfx = resolveHurtSfx(this.spec);
                 if (sfx) {
                     EventBus.emit(SFX_EVENT(sfx), {
