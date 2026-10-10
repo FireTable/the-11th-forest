@@ -112,14 +112,6 @@ export const ComboOverlay: React.FC = () => {
                         {tierTitle}
                     </span>
                     <span
-                        className="text-white text-xl sm:text-2xl font-black italic select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]"
-                        style={{
-                            textShadow: '0 2px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000',
-                        }}
-                    >
-                        ✕
-                    </span>
-                    <span
                         className={`${combo >= 25 ? 'text-4xl' : 'text-3xl'} font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]`}
                         style={{
                             color: tierColor,
