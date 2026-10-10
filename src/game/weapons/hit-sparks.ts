@@ -1,9 +1,9 @@
 /**
  * src/game/weapons/hit-sparks.ts
  * --------------------------------------------------------------------------
- * Visceral physical mosaic pixel blood & impact debris particle effect.
- * Temporarily magnified 10x (28px ~ 48px massive square blocks with 3px outlines)
- * per user request for visual verification of physics, blood palette, and trajectory.
+ * Visceral physical mosaic pixel blood mist & impact debris particle effect.
+ * Produces dispersed micro pixel blood mist (2px~3px) and droplet chips (4px~5px)
+ * scattering naturally across the impact area.
  */
 
 import type * as Phaser from 'phaser';
@@ -20,29 +20,29 @@ export interface HitSparksOptions {
 }
 
 // Vivid high-contrast pixel blood mosaic palette:
-// blazing arterial red, deep crimson, ruby gore, coagulated dark blood, and specular white gleam
+// arterial crimson, scarlet mist, ruby gore, coagulated dark blood, and specular glints
 const BLOOD_PALETTE = [
-    0xff0000, // vibrant pure blood red
-    0xdc2626, // red-600 — arterial crimson
-    0xef4444, // red-500 — fresh splatter
-    0xb91c1c, // red-700 — deep blood
-    0x990000, // dark coagulated maroon
-    0xff3366, // vivid ruby flesh
-    0xffffff, // specular impact glint
+    0xff0033, // vibrant arterial crimson
+    0xd90429, // vivid crimson blood
+    0xef233c, // fresh scarlet blood mist
+    0xb91c1c, // deep blood red
+    0x9b111e, // ruby gore
+    0x660708, // dark coagulated maroon
+    0xffffff, // specular glint
 ];
 
 const CRIT_BLOOD_PALETTE = [
-    0xff0000,
-    0xdc2626,
-    0xef4444,
+    0xff0033,
+    0xd90429,
+    0xef233c,
     0xfbbf24, // gold crit spark
     0xf59e0b, // amber fire
-    0xffffff, // brilliant white flash
-    0x990000,
+    0xffffff, // brilliant white glint
+    0x9b111e,
 ];
 
 /**
- * Spawn a burst of physical mosaic pixel blood chips and debris at (x, y).
+ * Spawn a dispersed burst of physical mosaic pixel blood mist and droplets at (x, y).
  */
 export function spawnHitSparks(
     scene: Phaser.Scene,
@@ -51,12 +51,12 @@ export function spawnHitSparks(
     opts: HitSparksOptions = {},
 ): void {
     const isCrit = opts.isCrit ?? false;
-    const count = opts.count ?? (isCrit ? 16 : 10);
+    const count = opts.count ?? (isCrit ? 36 : 24);
     const baseAngle =
         opts.dir && (opts.dir.x !== 0 || opts.dir.y !== 0)
             ? Math.atan2(opts.dir.y, opts.dir.x)
             : -Math.PI / 2; // Default burst upwards if no direction
-    const baseSpeed = opts.speed ?? 180;
+    const baseSpeed = opts.speed ?? 170;
 
     // Guaranteed top rendering depth above all map materials and entities
     const renderDepth = opts.depth ?? DEPTH.HUD + 5000;
@@ -64,36 +64,64 @@ export function spawnHitSparks(
     const palette = isCrit ? CRIT_BLOOD_PALETTE : BLOOD_PALETTE;
 
     for (let i = 0; i < count; i++) {
-        // Wide explosive splatter cone (~140 degrees arc)
-        const spread = (Math.random() - 0.5) * 2.5;
-        const angle = baseAngle + Math.PI + spread;
+        // Disperse spawn origin around monster body for a natural blood mist cloud
+        const jitterRadius = Math.random() * 14;
+        const jitterAngle = Math.random() * Math.PI * 2;
+        const spawnX = x + Math.cos(jitterAngle) * jitterRadius;
+        const spawnY = y + Math.sin(jitterAngle) * jitterRadius;
 
-        // Magnified 10x: 28px ~ 48px chunky square mosaic cubes
-        const size = isCrit
-            ? Math.random() < 0.4 ? 36 : Math.random() < 0.7 ? 42 : 48
-            : Math.random() < 0.4 ? 28 : Math.random() < 0.75 ? 34 : 40;
+        // Dispersed angles: 65% directional spray cone, 35% radial omnidirectional mist
+        const isSpray = Math.random() < 0.65;
+        const spread = (Math.random() - 0.5) * 2.2;
+        const angle = isSpray
+            ? baseAngle + Math.PI + spread
+            : Math.random() * Math.PI * 2;
+
+        // Mosaic pixel blood mist sizes: 2px (fine mist), 3px (mist speck), 4px~5px (droplets)
+        const size =
+            Math.random() < 0.45
+                ? 2
+                : Math.random() < 0.75
+                ? 3
+                : Math.random() < 0.92
+                ? 4
+                : 5;
 
         const chipColor =
             opts.color ?? palette[Math.floor(Math.random() * palette.length)];
 
-        // Bold mosaic block with 3px dark stroke for unmistakable visibility
-        const chip = scene.add.rectangle(x, y, size, size, chipColor);
+        // Crisp pixel block with subtle outline on droplets to keep retro pixel fidelity
+        const chip = scene.add.rectangle(spawnX, spawnY, size, size, chipColor);
         chip.setDepth(renderDepth);
-        chip.setStrokeStyle(3, 0x000000, 1.0);
+        chip.setStrokeStyle(1, 0x1f0000, size >= 4 ? 0.7 : 0.3);
 
-        // Trajectory distances
-        const horizDist = (35 + Math.random() * (baseSpeed * 0.45)) * Math.cos(angle);
-        const vertPop = -(30 + Math.random() * (isCrit ? 60 : 45)); // High explosive pop up
-        const gravityDrop = 60 + Math.random() * (isCrit ? 90 : 70); // Heavy downward drop to floor
+        // Speed variation: suspended floating mist specks vs bursting droplets
+        const speedMult =
+            Math.random() < 0.35
+                ? 0.3 + Math.random() * 0.3
+                : 0.65 + Math.random() * 0.75;
 
-        const midX = x + horizDist * 0.45;
-        const midY = y + vertPop;
-        const targetX = x + horizDist;
-        const targetY = y + vertPop + gravityDrop;
+        const horizDist =
+            (16 + Math.random() * (baseSpeed * 0.35)) *
+            speedMult *
+            Math.cos(angle);
+        const vertPop =
+            Math.sin(angle) *
+                (12 + Math.random() * (isCrit ? 35 : 25)) *
+                speedMult -
+            Math.random() * 8;
+        const gravityDrop =
+            (14 + Math.random() * (isCrit ? 30 : 20)) *
+            (size >= 4 ? 1.1 : 0.6);
 
-        const duration = 550 + Math.random() * 250; // 550ms ~ 800ms
-        const popTime = duration * 0.38;
-        const fallTime = duration * 0.62;
+        const midX = spawnX + horizDist * 0.45;
+        const midY = spawnY + vertPop;
+        const targetX = spawnX + horizDist;
+        const targetY = spawnY + vertPop + gravityDrop;
+
+        const duration = 400 + Math.random() * 250; // 400ms ~ 650ms
+        const popTime = duration * 0.35;
+        const fallTime = duration * 0.65;
 
         // Two-stage sequential tweens: Stage 1 Pop Upward -> Stage 2 Splatter Downward & Fade
         scene.tweens.add({

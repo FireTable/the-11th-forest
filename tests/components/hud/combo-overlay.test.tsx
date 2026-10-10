@@ -53,6 +53,7 @@ describe('ComboOverlay', () => {
         expect(container.textContent).toContain('5');
         expect(container.textContent).toContain('HITS');
         expect(container.textContent).toContain('HIT');
+        expect(container.textContent).toContain('✕');
     });
 
     it('displays higher tiers for high combos', () => {

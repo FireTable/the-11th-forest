@@ -46,7 +46,7 @@ describe('weapons/hit-sparks — spawnHitSparks', () => {
         }
     });
 
-    it('defaults to 10 chips on regular hits and 16 on crits', () => {
+    it('defaults to 24 chips on regular hits and 36 on crits', () => {
         const createMockScene = () => {
             let count = 0;
             return {
@@ -63,10 +63,10 @@ describe('weapons/hit-sparks — spawnHitSparks', () => {
 
         const normalScene = createMockScene();
         spawnHitSparks(normalScene as any, 50, 50, {});
-        expect(normalScene.getCount()).toBe(10);
+        expect(normalScene.getCount()).toBe(24);
 
         const critScene = createMockScene();
         spawnHitSparks(critScene as any, 50, 50, { isCrit: true });
-        expect(critScene.getCount()).toBe(16);
+        expect(critScene.getCount()).toBe(36);
     });
 });
