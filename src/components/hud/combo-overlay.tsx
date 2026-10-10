@@ -4,20 +4,29 @@ import { EventBus } from '@/lib/events/bus';
 export const ComboOverlay: React.FC = () => {
     const [combo, setCombo] = useState(0);
     const [punch, setPunch] = useState(false);
-    const [remainingRatio, setRemainingRatio] = useState(1);
     const lastHitTimeRef = useRef<number>(0);
     const animFrameRef = useRef<number | null>(null);
+    const barRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleCombo = (payload?: { count: number }) => {
             if (!payload || payload.count < 2) {
                 setCombo(0);
+                if (animFrameRef.current) {
+                    cancelAnimationFrame(animFrameRef.current);
+                    animFrameRef.current = null;
+                }
                 return;
             }
             lastHitTimeRef.current = performance.now();
             setCombo(payload.count);
             setPunch(true);
             setTimeout(() => setPunch(false), 130);
+
+            // Reset progress bar width to 100% immediately on new hit
+            if (barRef.current) {
+                barRef.current.style.width = '100%';
+            }
         };
 
         EventBus.on('combat:combo', handleCombo);
@@ -26,17 +35,24 @@ export const ComboOverlay: React.FC = () => {
         };
     }, []);
 
-    // Progress bar decay ticker (3000ms combo decay)
+    // 60/120 FPS high-precision progress bar decay ticker (3000ms combo decay)
     useEffect(() => {
         if (combo < 2) {
-            setRemainingRatio(0);
+            if (animFrameRef.current) {
+                cancelAnimationFrame(animFrameRef.current);
+                animFrameRef.current = null;
+            }
             return;
         }
 
         const tick = () => {
             const elapsed = performance.now() - lastHitTimeRef.current;
-            const ratio = Math.max(0, 1 - elapsed / 3000);
-            setRemainingRatio(ratio);
+            const ratio = Math.max(0, Math.min(1, 1 - elapsed / 3000));
+
+            // Directly drive DOM element width for ultra-smooth 60/120 FPS rendering
+            if (barRef.current) {
+                barRef.current.style.width = `${(ratio * 100).toFixed(1)}%`;
+            }
 
             if (ratio > 0) {
                 animFrameRef.current = requestAnimationFrame(tick);
@@ -47,7 +63,10 @@ export const ComboOverlay: React.FC = () => {
 
         animFrameRef.current = requestAnimationFrame(tick);
         return () => {
-            if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+            if (animFrameRef.current) {
+                cancelAnimationFrame(animFrameRef.current);
+                animFrameRef.current = null;
+            }
         };
     }, [combo]);
 
@@ -60,7 +79,7 @@ export const ComboOverlay: React.FC = () => {
 
     if (combo >= 50) {
         tierColor = '#f43f5e'; // Rose / crimson
-        tierGlow = 'rgba(244, 63, 94, 0.8)';
+        tierGlow = 'rgba(244, 63, 94, 0.85)';
         tierTitle = 'MAX FEVER';
     } else if (combo >= 25) {
         tierColor = '#f97316'; // Vivid orange
@@ -106,14 +125,14 @@ export const ComboOverlay: React.FC = () => {
                     </span>
                 </div>
 
-                {/* 3s shrinking combo timeout timer bar (larger & more luminous) */}
-                <div className="w-36 h-2 bg-black/60 rounded-full overflow-hidden mt-1.5 border border-white/20 backdrop-blur-xs p-[1px]">
+                {/* 3s shrinking combo timeout timer bar with direct high-performance rAF updates */}
+                <div className="w-36 h-2.5 bg-black/70 rounded-full overflow-hidden mt-1.5 border border-white/25 backdrop-blur-sm p-[1px] shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
                     <div
-                        className="h-full rounded-full transition-[width] duration-75"
+                        ref={barRef}
+                        className="h-full w-full rounded-full"
                         style={{
-                            width: `${remainingRatio * 100}%`,
                             backgroundColor: tierColor,
-                            boxShadow: `0 0 10px ${tierColor}`,
+                            boxShadow: `0 0 10px ${tierColor}, inset 0 1px 1px rgba(255,255,255,0.45)`,
                         }}
                     />
                 </div>
