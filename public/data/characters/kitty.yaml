@@ -89,7 +89,7 @@ prompt: |
       magenta. The background is the only place magenta appears.
 hp: 90
 sp: 70
-luck: 5         # Cats have nine lives — moderate crit chance
+luck: 5 # Cats have nine lives — moderate crit chance
 moveSpeed: 5
 spRegenMs: 4000
 gender: female

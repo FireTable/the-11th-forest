@@ -11,6 +11,7 @@ import {
     calcSeparationForce,
     getSurroundOffset,
     getPathLookAheadPoint,
+    calcKnockbackVelocity,
 } from '@/game/monsters/logic';
 
 describe('monsters/logic — decideAIState', () => {
@@ -180,12 +181,7 @@ describe('monsters/logic — PathfindingService', () => {
         const pathfinder = new PathfindingService(levelSize, airWalls, 10);
         // Target sits inside the buffer cell — the path should still
         // succeed via snapToWalkable and the buffer-aware A*.
-        const path = pathfinder.findPath(
-            { x: 10, y: 20 },
-            { x: 60, y: 20 },
-            10,
-            10,
-        );
+        const path = pathfinder.findPath({ x: 10, y: 20 }, { x: 60, y: 20 }, 10, 10);
         expect(path).not.toBeNull();
         // Path waypoints must never land on buffer or wall cells.
         for (const wp of path!) {
@@ -203,17 +199,8 @@ describe('monsters/logic — PathfindingService', () => {
         // Open level, start near the monster so the first A* waypoint
         // would land within halfH of the start point. The path should
         // either skip past it or report it ≥ halfH away from the start.
-        const pathfinder = new PathfindingService(
-            { width: 100, height: 100 },
-            [],
-            10,
-        );
-        const path = pathfinder.findPath(
-            { x: 50, y: 50 },
-            { x: 90, y: 50 },
-            10,
-            10,
-        );
+        const pathfinder = new PathfindingService({ width: 100, height: 100 }, [], 10);
+        const path = pathfinder.findPath({ x: 50, y: 50 }, { x: 90, y: 50 }, 10, 10);
         expect(path).not.toBeNull();
         // First waypoint after start should be at least halfH away
         // (the filter drops anything sitting inside the body box).
@@ -385,10 +372,7 @@ describe('PathfindingService — pickEscapeDirection', () => {
         // = cell (5, 5); player at (80, 48) — same column, above.
         // Escape direction should have a positive y component (down).
         const pf = new PathfindingService({ width: 128, height: 128 }, []);
-        const dir = pf.pickEscapeDirection(
-            { x: 80, y: 80 },
-            { x: 80, y: 48 },
-        );
+        const dir = pf.pickEscapeDirection({ x: 80, y: 80 }, { x: 80, y: 48 });
         expect(dir).not.toBeNull();
         expect(dir!.y).toBeGreaterThan(0.3);
     });
@@ -414,8 +398,34 @@ describe('PathfindingService — pickEscapeDirection', () => {
 // behaviour is exercised by every findPath test that consumes the
 // return value.
 
-describe('PathfindingService — steerAroundWall', () => {
+describe.skip('PathfindingService — steerAroundWall', () => {
     // ponytail: removed — per-frame wall steering broke melee
     // monsters that intentionally hug walls. Kept the describe block
     // as a placeholder so future helpers can land here.
+});
+
+describe('monsters/logic — calcKnockbackVelocity', () => {
+    it('uses normalized bullet velocity direction when present', () => {
+        const vel = { x: 10, y: 0 };
+        const fallback = { x: 0, y: 1 };
+        const kb = calcKnockbackVelocity(vel, fallback, 16);
+        expect(kb.vx).toBeGreaterThan(0);
+        expect(kb.vy).toBe(0);
+    });
+
+    it('falls back to player-to-monster direction when bullet velocity is zero or undefined', () => {
+        const fallback = { x: 0, y: 5 };
+        const kb = calcKnockbackVelocity(undefined, fallback, 16);
+        expect(kb.vx).toBe(0);
+        expect(kb.vy).toBeGreaterThan(0);
+    });
+
+    it('scales with damage within min and max boundaries', () => {
+        const dir = { x: 1, y: 0 };
+        const lightKb = calcKnockbackVelocity(dir, dir, 2);
+        const heavyKb = calcKnockbackVelocity(dir, dir, 55);
+        expect(lightKb.vx).toBeGreaterThanOrEqual(1.5);
+        expect(heavyKb.vx).toBeGreaterThan(lightKb.vx);
+        expect(heavyKb.vx).toBeLessThanOrEqual(7.5);
+    });
 });

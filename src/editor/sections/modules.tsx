@@ -31,12 +31,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, NumberField, Section } from './fields';
-import {
-    AnimsEditor,
-    SpriteUploader,
-    type SpriteSpec,
-    type AnimSpec,
-} from './sprite-editor';
+import { AnimsEditor, SpriteUploader, type SpriteSpec, type AnimSpec } from './sprite-editor';
 
 type ModuleSlug = 'drops' | 'monsters' | 'weapons' | 'audios-sfx' | 'audios-music';
 
@@ -664,7 +659,6 @@ function MonsterForm({ spec, patch }: { spec: any; patch: (p: any) => void }) {
         </div>
     );
 }
-
 
 function DropsEditor({
     drops,
@@ -1538,7 +1532,10 @@ function AudioPreviewButton({ source }: { source: string }) {
         // .play() returns a Promise that rejects on autoplay-policy
         // violation or 404 — swallow + flip the button back to Stop
         // state so the UI doesn't lie about an in-flight sound.
-        audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+        audio
+            .play()
+            .then(() => setPlaying(true))
+            .catch(() => setPlaying(false));
     };
 
     useEffect(() => {
@@ -1566,4 +1563,3 @@ function AudioPreviewButton({ source }: { source: string }) {
 }
 
 // ─── Shared bits (duplicated from character.tsx for module-level reuse) ──
-

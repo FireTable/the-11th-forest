@@ -24,14 +24,8 @@ const SLOT_GAP_PX = 6;
 const SLOT_BOTTOM_PX = 168;
 
 export const WeaponHUDOverlay: React.FC = () => {
-    const {
-        activeWeaponIndex,
-        activeWeaponName,
-        isReloading,
-        reloadProgress,
-        slots,
-        hubsVisible,
-    } = useGameStore();
+    const { activeWeaponIndex, activeWeaponName, isReloading, reloadProgress, slots, hubsVisible } =
+        useGameStore();
     const mobile = useIsMobile();
 
     // Show whenever the character has weapons. Tavern phase 1
@@ -68,10 +62,11 @@ export const WeaponHUDOverlay: React.FC = () => {
                             }}
                             aria-label={`Switch to ${slot.name}`}
                             data-testid={`weapon-slot-${index}`}
-                            className={`relative flex items-center justify-center border-2 transition-all active:scale-95 pointer-events-auto ${isActive
-                                ? 'bg-amber-950/90 border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
-                                : 'bg-stone-950/70 border-stone-700 hover:border-amber-700/60'
-                                }`}
+                            className={`relative flex items-center justify-center border-2 transition-all active:scale-95 pointer-events-auto ${
+                                isActive
+                                    ? 'bg-amber-950/90 border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
+                                    : 'bg-stone-950/70 border-stone-700 hover:border-amber-700/60'
+                            }`}
                             style={{ width: SLOT_PX, height: SLOT_PX }}
                         >
                             <CornerPixels />
@@ -90,20 +85,22 @@ export const WeaponHUDOverlay: React.FC = () => {
                             )}
                             {/* Index badge — top-left corner */}
                             <span
-                                className={`absolute top-0 left-0 px-1 text-[9px] font-bold leading-none ${isActive
-                                    ? 'bg-amber-400 text-black'
-                                    : 'bg-stone-800 text-stone-400'
-                                    }`}
+                                className={`absolute top-0 left-0 px-1 text-[9px] font-bold leading-none ${
+                                    isActive
+                                        ? 'bg-amber-400 text-black'
+                                        : 'bg-stone-800 text-stone-400'
+                                }`}
                             >
                                 {index + 1}
                             </span>
                             {/* Ammo badge — bottom-right corner (current / total) */}
                             {slot.clipSize > 1 && (
                                 <span
-                                    className={`absolute bottom-0 right-0 px-1 text-[9px] font-bold font-mono leading-none border ${isActive
-                                        ? 'bg-black/85 text-amber-300 border-amber-700'
-                                        : 'bg-black/70 text-stone-400 border-stone-700'
-                                        }`}
+                                    className={`absolute bottom-0 right-0 px-1 text-[9px] font-bold font-mono leading-none border ${
+                                        isActive
+                                            ? 'bg-black/85 text-amber-300 border-amber-700'
+                                            : 'bg-black/70 text-stone-400 border-stone-700'
+                                    }`}
                                 >
                                     {String(slot.ammo).padStart(2, '0')}/
                                     {String(slot.clipSize).padStart(2, '0')}
@@ -172,20 +169,22 @@ export const WeaponHUDOverlay: React.FC = () => {
                                 left: '50%',
                                 marginLeft: -45,
                             }}
-                            className={`absolute w-[90px] h-[150px] border-2 transition-all duration-200 ease-out pointer-events-auto cursor-pointer backdrop-blur-sm ${isActive
-                                ? 'bg-amber-950/85 border-amber-400 shadow-[0_4px_12px_rgba(0,0,0,0.45),inset_0_0_8px_rgba(245,158,11,0.4)]'
-                                : 'bg-black/70 border-stone-800 text-stone-400 shadow-[0_2px_8px_rgba(0,0,0,0.45)] hover:border-amber-400 hover:text-amber-200'
-                                }`}
+                            className={`absolute w-[90px] h-[150px] border-2 transition-all duration-200 ease-out pointer-events-auto cursor-pointer backdrop-blur-sm ${
+                                isActive
+                                    ? 'bg-amber-950/85 border-amber-400 shadow-[0_4px_12px_rgba(0,0,0,0.45),inset_0_0_8px_rgba(245,158,11,0.4)]'
+                                    : 'bg-black/70 border-stone-800 text-stone-400 shadow-[0_2px_8px_rgba(0,0,0,0.45)] hover:border-amber-400 hover:text-amber-200'
+                            }`}
                         >
                             <CornerPixels />
 
                             {/* Hotkey rank — uniform size across active
                              *  and inactive so cards look identical. */}
                             <span
-                                className={`absolute top-0.5 left-1 text-[12px] font-bold leading-none z-10 ${isActive
-                                    ? 'text-amber-300 drop-shadow-[1px_1px_0px_#000]'
-                                    : 'text-stone-400'
-                                    }`}
+                                className={`absolute top-0.5 left-1 text-[12px] font-bold leading-none z-10 ${
+                                    isActive
+                                        ? 'text-amber-300 drop-shadow-[1px_1px_0px_#000]'
+                                        : 'text-stone-400'
+                                }`}
                             >
                                 {index + 1}
                             </span>

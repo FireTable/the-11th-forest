@@ -107,7 +107,10 @@ export class WeaponController {
             const savedSlot = savedSlots?.find((s) => s.id === spec.id) ?? savedSlots?.[idx];
             return {
                 spec,
-                ammo: savedSlot && typeof savedSlot.ammo === 'number' ? Math.min(savedSlot.ammo, clipSize) : clipSize,
+                ammo:
+                    savedSlot && typeof savedSlot.ammo === 'number'
+                        ? Math.min(savedSlot.ammo, clipSize)
+                        : clipSize,
                 lastFireAt: 0,
                 reloading: false,
                 reloadStartedAt: 0,
@@ -130,8 +133,8 @@ export class WeaponController {
                     pair.bodyA?.label === 'player-bullet'
                         ? pair.bodyA
                         : pair.bodyB?.label === 'player-bullet'
-                            ? pair.bodyB
-                            : null;
+                          ? pair.bodyB
+                          : null;
                 if (!bulletBody) continue;
                 const other = pair.bodyA === bulletBody ? pair.bodyB : pair.bodyA;
                 if (!other) continue;
@@ -448,7 +451,7 @@ export class WeaponController {
         // 4. Sync weapon attachment visual at character upper body / hand position
         const origin = this.body.position;
         const handX = origin.x;
-        const handY = origin.y - halfH; // Align weapon to character hitbox center (chest/hands)      
+        const handY = origin.y - halfH; // Align weapon to character hitbox center (chest/hands)
         const dx = tx - handX;
         const dy = ty - handY;
         const aimAngle = Math.atan2(dy, dx);
@@ -590,6 +593,7 @@ export class WeaponController {
                     mask: PROJECTILE_PLAYER_MASK,
                     speed,
                     damage: slot.spec.damage,
+                    aoeRadius: slot.spec.aoeRadius ?? slot.spec.bullet?.aoeRadius,
                     size,
                     texture: slot.spec.bullet?.texture,
                     scale: slot.spec.bullet?.scale,

@@ -22,7 +22,7 @@ export function fitZoom(boxW: number, boxH: number, gameW: number, gameH: number
 /** Keep the canvas fitting its parent with 100% full visibility. Returns a cleanup function. */
 export function installCanvasFit(game: Phaser.Game): () => void {
     const parent = document.getElementById('game-container');
-    if (!parent) return () => { };
+    if (!parent) return () => {};
 
     let rafId: number | null = null;
     let lastWidth = 0;
@@ -46,12 +46,7 @@ export function installCanvasFit(game: Phaser.Game): () => void {
         lastHeight = box.height;
 
         // fitZoom everywhere — 100% full view, never crops top/bottom or sides.
-        const zoom = fitZoom(
-            box.width,
-            box.height,
-            gameSize.width,
-            gameSize.height,
-        );
+        const zoom = fitZoom(box.width, box.height, gameSize.width, gameSize.height);
 
         if (game.scale) {
             game.scale.setZoom(zoom);

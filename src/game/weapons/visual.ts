@@ -144,6 +144,18 @@ export class WeaponVisualController {
         }
     }
 
+    /** Apply or clear hit flash tint (50% additive white highlight). */
+    public setHitFlash(active: boolean): void {
+        if (!this.sprite) return;
+        if (active) {
+            this.sprite.setTint(0x808080);
+            (this.sprite as any).setTintMode?.(2);
+        } else if ((this.sprite as any).tintMode !== 0) {
+            this.sprite.clearTint();
+            (this.sprite as any).setTintMode?.(0);
+        }
+    }
+
     /** Get exact world position of the weapon muzzle tip based on rotation and muzzleOffset. */
     public getMuzzlePosition(fallbackX: number, fallbackY: number): { x: number; y: number } {
         if (!this.sprite || !this.currentSpec) return { x: fallbackX, y: fallbackY };

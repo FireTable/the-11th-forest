@@ -77,11 +77,7 @@ export function EditorPanel() {
         const swallow = (e: KeyboardEvent) => {
             const t = e.target as HTMLElement | null;
             if (!t) return;
-            if (
-                t.tagName === 'INPUT' ||
-                t.tagName === 'TEXTAREA' ||
-                t.isContentEditable
-            ) {
+            if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) {
                 e.stopPropagation();
             }
         };
@@ -276,10 +272,11 @@ export function EditorPanel() {
                             key={t.id}
                             variant="ghost"
                             onClick={() => setTopTab(t.id)}
-                            className={`flex-1 rounded-none border-b-2 ${topTab === t.id
-                                ? 'border-cyan-400 text-cyan-400'
-                                : 'border-transparent text-neutral-500 hover:text-neutral-300'
-                                }`}
+                            className={`flex-1 rounded-none border-b-2 ${
+                                topTab === t.id
+                                    ? 'border-cyan-400 text-cyan-400'
+                                    : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                            }`}
                         >
                             {t.label}
                         </Button>
@@ -292,10 +289,11 @@ export function EditorPanel() {
                                 key={t.id}
                                 variant="ghost"
                                 onClick={() => setSceneSubTab(t.id)}
-                                className={`flex-shrink-0 rounded-none border-b-2 px-3 ${sceneSubTab === t.id
-                                    ? 'border-cyan-400 text-cyan-400'
-                                    : 'border-transparent text-neutral-500 hover:text-neutral-300'
-                                    }`}
+                                className={`flex-shrink-0 rounded-none border-b-2 px-3 ${
+                                    sceneSubTab === t.id
+                                        ? 'border-cyan-400 text-cyan-400'
+                                        : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                                }`}
                             >
                                 {t.label}
                             </Button>

@@ -181,7 +181,14 @@ export function pickNearestMonster<T extends { x: number; y: number }>(
 
 /** Structural shape the controller needs from the WeaponSystem. */
 export interface WeaponsLike {
-    update(time: number, tx: number, ty: number, fire: boolean, halfH: number, footY?: number): void;
+    update(
+        time: number,
+        tx: number,
+        ty: number,
+        fire: boolean,
+        halfH: number,
+        footY?: number,
+    ): void;
     switchTo(index: number): void;
     cycleSlot(direction: 1 | -1): void;
     manualReload(): void;
@@ -252,6 +259,8 @@ export class CharacterController {
     private sp: number;
     private dodgeActiveUntil = 0;
     private lastDodgeEndAt = 0;
+    private lastGhostAt = 0;
+    private readonly activeDodgeGhosts: Phaser.GameObjects.Sprite[] = [];
     private dodgeVx = 0;
     private dodgeVy = 0;
     private firing = false;
@@ -289,7 +298,8 @@ export class CharacterController {
         const savedHp = useGameStore.getState().hp;
         const savedSp = useGameStore.getState().sp;
         this.hp = typeof savedHp === 'number' && savedHp > 0 ? Math.min(savedHp, spec.hp) : spec.hp;
-        this.sp = typeof savedSp === 'number' && savedSp >= 0 ? Math.min(savedSp, spec.sp) : spec.sp;
+        this.sp =
+            typeof savedSp === 'number' && savedSp >= 0 ? Math.min(savedSp, spec.sp) : spec.sp;
 
         // Honor a pre-existing dev "Infinite HP" toggle (e.g. user
         // toggled it, then refreshed the page). The cheat panel only
@@ -411,6 +421,8 @@ export class CharacterController {
     destroy(): void {
         for (const fn of this.cleanupFns) fn();
         this.cleanupFns.length = 0;
+        for (const g of this.activeDodgeGhosts) g.destroy();
+        this.activeDodgeGhosts.length = 0;
         this.parts.sprite.destroy();
         this.scene.matter.world.remove(this.parts.body);
     }
@@ -481,13 +493,26 @@ export class CharacterController {
         // weapon). Mirrors MonsterController.computeFootY so the player and
         // monsters share one Y-sort layer — a monster at footY=900 no longer
         // draws in front of a player at footY=200 just because 900 > 20.
-        const footY = Math.round(
-            pos.y + (sprite.displayHeight / 2 - this.spec.body.halfH),
-        );
+        const footY = Math.round(pos.y + (sprite.displayHeight / 2 - this.spec.body.halfH));
         sprite.setDepth(footY);
+
+        // Dodge roll afterimage trail (semi-transparent fading cyan/sky blue ghosts)
+        if (now < this.dodgeActiveUntil && now - this.lastGhostAt >= 40) {
+            this.lastGhostAt = now;
+            this.spawnDodgeGhost(sprite, footY);
+        }
+
+        // Keep all active dodge afterimage ghosts strictly beneath the character sprite
+        // (even if player dodges upwards against Y-sort direction)
+        for (let i = 0; i < this.activeDodgeGhosts.length; i++) {
+            const g = this.activeDodgeGhosts[i];
+            if (g.active) {
+                g.setDepth(footY - 1 - (this.activeDodgeGhosts.length - 1 - i) * 0.05);
+            }
+        }
         if (this.parts.shadow) {
             this.parts.shadow.setPosition(pos.x, pos.y + this.spec.body.halfH);
-            this.parts.shadow.setDepth(footY - 1);
+            this.parts.shadow.setDepth(footY - 2);
         }
         if (this.parts.debugBodyRect) {
             this.parts.debugBodyRect.setPosition(pos.x, pos.y);
@@ -633,6 +658,35 @@ export class CharacterController {
         } else if (cur !== idleKey && this.scene.anims.exists(idleKey)) {
             sprite.anims.play(idleKey, true);
         }
+    }
+
+    /** Spawn semi-transparent afterimage ghost during dodge roll. */
+    private spawnDodgeGhost(sprite: Phaser.GameObjects.Sprite, footY: number): void {
+        const ghost = this.scene.add.sprite(
+            sprite.x,
+            sprite.y,
+            sprite.texture.key,
+            sprite.frame.name,
+        );
+        ghost.setOrigin(sprite.originX, sprite.originY);
+        ghost.setFlipX(sprite.flipX);
+        ghost.setScale(sprite.scaleX, sprite.scaleY);
+        ghost.setDepth(footY - 1);
+        ghost.setAlpha(0.55);
+        ghost.setTint(0x38bdf8);
+        this.activeDodgeGhosts.push(ghost);
+
+        this.scene.tweens.add({
+            targets: ghost,
+            alpha: 0,
+            duration: 220,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                const idx = this.activeDodgeGhosts.indexOf(ghost);
+                if (idx !== -1) this.activeDodgeGhosts.splice(idx, 1);
+                ghost.destroy();
+            },
+        });
     }
 
     /**

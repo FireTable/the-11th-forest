@@ -80,7 +80,7 @@ export const TouchControls: React.FC = () => {
         // taps there so a stray press on the action buttons doesn't
         // also summon a ghost joystick underneath them.
         const layerX = e.clientX / scale;
-        if (layerX > (width / scale) / 2) return;
+        if (layerX > width / scale / 2) return;
 
         // Position the joystick centred on the touch point, then clamp
         // so the full base fits inside the layer (touches near a screen
@@ -192,7 +192,7 @@ export const TouchControls: React.FC = () => {
                 style={{
                     left: 0,
                     top: 0,
-                    width: (width / scale) / 2,
+                    width: width / scale / 2,
                     height: height / scale,
                     touchAction: 'none',
                 }}

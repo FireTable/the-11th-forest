@@ -158,7 +158,6 @@ export class TavernController {
         // whatever Phaser's default is (empty in v4, so CSS rules win).
         this.bindCursor();
 
-
         if (startPhase === 'selection') {
             // NPC selection UI: spawn idle sprites, bind A/D/F, emit
             // focus events so the React TavernHud renders the
@@ -180,7 +179,6 @@ export class TavernController {
     }
 
     // ─── Keyboard ────────────────────────────────────────────────────────
-
 
     /**
      * Cap check for the tavern phase-2 weapon pickup. Called by
@@ -248,19 +246,22 @@ export class TavernController {
             const y = spawn?.y ?? Math.round(imgH * 0.6);
 
             const shadow = this.scene.add.ellipse(
-                x, y,
+                x,
+                y,
                 spec.body.halfW * 2.4,
                 spec.body.halfH * 0.7,
-                0x000000, 0.25,
+                0x000000,
+                0.25,
             );
 
             // Same offset formula as CharacterController.updateSprite —
             // keeps the sprite's visible feet planted at `(x, y)` so the
             // shadow lines up.
             const offX = spec.sprite?.offset?.left ?? spec.sprite?.offset?.x ?? 0;
-            const offY = spec.sprite?.offset?.bottom !== undefined
-                ? -spec.sprite.offset.bottom
-                : (spec.sprite?.offset?.y ?? 0);
+            const offY =
+                spec.sprite?.offset?.bottom !== undefined
+                    ? -spec.sprite.offset.bottom
+                    : (spec.sprite?.offset?.y ?? 0);
 
             const key = textureKey(spec);
             const sprite = this.scene.add.sprite(x + offX, y + offY, key);
@@ -355,7 +356,13 @@ export class TavernController {
             moveSpeed: s.moveSpeed,
             spRegenMs: s.spRegenMs,
             description: s.description,
-            stats: { hp: s.hp, sp: s.sp, moveSpeed: s.moveSpeed, weaponMax: s.weaponMax ?? TAVERN_WEAPON_MAX, luck: s.luck ?? 1 },
+            stats: {
+                hp: s.hp,
+                sp: s.sp,
+                moveSpeed: s.moveSpeed,
+                weaponMax: s.weaponMax ?? TAVERN_WEAPON_MAX,
+                luck: s.luck ?? 1,
+            },
             statRange: this.statRange,
             phase: this.phase,
             weaponCount: this.weaponCount,
@@ -519,8 +526,7 @@ export class TavernController {
             // (`tavern-f-fill`) toggled by `holding` — we don't push
             // per-frame progress here; CSS runs the smooth 1.5s fill
             // on the GPU compositor and resets on F release.
-            const holding =
-                this.keyConfirm.isDown || this.mouseHoldingIdx !== undefined;
+            const holding = this.keyConfirm.isDown || this.mouseHoldingIdx !== undefined;
             if (holding) {
                 if (!this.fHolding) {
                     this.fHolding = true;
@@ -571,8 +577,16 @@ export class TavernController {
             visible: false,
         });
         for (const npc of this.npcs) {
-            try { npc.sprite.destroy(); } catch { /* ok */ }
-            try { npc.shadow.destroy(); } catch { /* ok */ }
+            try {
+                npc.sprite.destroy();
+            } catch {
+                /* ok */
+            }
+            try {
+                npc.shadow.destroy();
+            } catch {
+                /* ok */
+            }
         }
         this.npcs = [];
         EventBus.emit('tavern-focus', null);

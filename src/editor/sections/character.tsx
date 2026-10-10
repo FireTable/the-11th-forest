@@ -30,12 +30,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Field, NumberField, Section } from './fields';
-import {
-    AnimsEditor,
-    SpriteUploader,
-    type SpriteSpec,
-    type AnimSpec,
-} from './sprite-editor';
+import { AnimsEditor, SpriteUploader, type SpriteSpec, type AnimSpec } from './sprite-editor';
 import {
     Select,
     SelectContent,
@@ -505,7 +500,6 @@ function CharacterForm({ spec, onPatch, onPatchDeep }: FormProps) {
         </div>
     );
 }
-
 
 function SfxEditor({
     sfx,

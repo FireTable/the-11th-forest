@@ -12,4 +12,3 @@ volume: 0.85
 # (scripts/elevenlabs-sfx.ts → defaultDuration), not a runtime spec
 # field. The schema is .strict() and would reject it.
 prompt: MMORPG waypoint activation sound, like activating a hearthstone or portal anchor in World of Warcraft, deep resonant magical hum that builds and stabilizes into a low ethereal glow, layered fantasy synth pads with shimmering high-frequency tinkles on top, satisfying magical confirmation chime, about one second, no voice, no music, no impact hit
-

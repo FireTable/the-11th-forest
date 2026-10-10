@@ -26,6 +26,11 @@ import {
     COMBAT_PLAYER_DAMAGE_COOLDOWN_MS,
     COMBAT_CRIT_MULTIPLIER,
     COMBAT_CRIT_DAMAGE_MULTIPLIER,
+    COMBAT_HIT_FLASH_MS,
+    COMBAT_HIT_STUN_MS,
+    COMBAT_SCREEN_SHAKE_CRIT,
+    COMBAT_SCREEN_SHAKE_EXPLOSION,
+    DEPTH,
     MONSTER_DEATH_FADE_MS,
     SFX_EVENT,
 } from '@/lib/constants';
@@ -33,6 +38,7 @@ import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
 import type { WeaponSpec } from '@/lib/weapons';
 import { spawnProjectile, spawnMeleeHitbox } from '@/game/weapons/weapon';
+import { spawnHitSparks } from '@/game/weapons/hit-sparks';
 import { WeaponVisualController } from '@/game/weapons/visual';
 import {
     advanceSpawnQueue,
@@ -54,6 +60,7 @@ import {
     PathfindingService,
     calcSeparationForce,
     getSurroundOffset,
+    calcKnockbackVelocity,
 } from './logic';
 
 // ─── Entity ──────────────────────────────────────────────────────────────
@@ -141,6 +148,8 @@ export class Monster {
     state: MonsterState = 'idle';
     lastAttackAt = 0;
     lastHitAt = 0;
+    hitFlashUntil = 0;
+    hitStunUntil = 0;
     /** Set by MonsterController when killed — used to suppress further collisions. */
     dead = false;
     hitboxBody?: MatterJS.BodyType;
@@ -340,10 +349,10 @@ export interface MonsterControllerCallbacks {
 export interface MonsterProjectile {
     body: MatterJS.BodyType;
     rect:
-    | Phaser.GameObjects.Shape
-    | Phaser.GameObjects.Sprite
-    | Phaser.GameObjects.Image
-    | Phaser.GameObjects.Graphics;
+        | Phaser.GameObjects.Shape
+        | Phaser.GameObjects.Sprite
+        | Phaser.GameObjects.Image
+        | Phaser.GameObjects.Graphics;
     damage: number;
     monster: Monster;
     /** Spawn point of the projectile (world coords). The per-frame
@@ -388,6 +397,8 @@ export class MonsterController {
     /** Player's luck stat (1–10). Drives crit chance = luck/10.
      *  Injected via setPlayerLuck() after the character spec is loaded. */
     private playerLuck = 1;
+    private currentCombo = 0;
+    private lastComboHitAt = 0;
 
     /** Trigger-gated monster spawns awaiting their fire condition. Pairs the
      *  pure `PendingSpawn` (consumed by `advanceSpawnQueue`) with the heavy
@@ -398,13 +409,13 @@ export class MonsterController {
         scene: Phaser.Scene,
         spawns:
             | {
-                spec: MonsterSpec;
-                weapon: WeaponSpec;
-                x: number;
-                y: number;
-                trigger?: MonsterTrigger;
-                waveId?: string;
-            }[]
+                  spec: MonsterSpec;
+                  weapon: WeaponSpec;
+                  x: number;
+                  y: number;
+                  trigger?: MonsterTrigger;
+                  waveId?: string;
+              }[]
             | undefined,
         playerBody: MatterJS.BodyType,
         cb: MonsterControllerCallbacks,
@@ -419,15 +430,22 @@ export class MonsterController {
         const activeMonsters = Array.isArray(monsterSnapshot?.activeMonsters)
             ? monsterSnapshot!.activeMonsters
             : Array.isArray(monsterSnapshot)
-                ? (monsterSnapshot as any)
-                : undefined;
+              ? (monsterSnapshot as any)
+              : undefined;
 
         if (activeMonsters) {
             // Restore active monster entities from snapshot
             for (const snap of activeMonsters) {
                 const match = spawns?.find((s) => s.spec.id === snap.specId);
                 if (match) {
-                    const monster = new Monster(scene, match.spec, match.weapon, snap.x, snap.y, snap.waveId);
+                    const monster = new Monster(
+                        scene,
+                        match.spec,
+                        match.weapon,
+                        snap.x,
+                        snap.y,
+                        snap.waveId,
+                    );
                     monster.hp = snap.hp;
                     this.monsters.push(monster);
                 }
@@ -538,9 +556,7 @@ export class MonsterController {
     public static computeFootY(m: Monster): number {
         const mp = m.body.position;
         const monsterBodyHalfH = m.spec.body.halfH;
-        return Math.round(
-            mp.y + (m.sprite ? m.sprite.displayHeight / 2 - monsterBodyHalfH : 0),
-        );
+        return Math.round(mp.y + (m.sprite ? m.sprite.displayHeight / 2 - monsterBodyHalfH : 0));
     }
 
     /** Per-frame: AI tick + projectile sync + cleanup. */
@@ -689,9 +705,7 @@ export class MonsterController {
                     // Hysteresis Guard: do not replace active path mid-way unless target moved > 48px or stuck
                     const hasFinishedPath = !m.path || m.currentWaypointIdx >= m.path.length;
                     const shouldRecalc =
-                        hasFinishedPath ||
-                        distTargetMoved > 48 ||
-                        isStuckEmergency;
+                        hasFinishedPath || distTargetMoved > 48 || isStuckEmergency;
 
                     if (shouldRecalc) {
                         m.lastPathRecalcAt = time;
@@ -734,7 +748,8 @@ export class MonsterController {
                 const canUseLoS = time >= m.noLoSUntil;
                 const hasLoS =
                     canUseLoS &&
-                    (this.pathfinder?.hasLineOfSight(footPos, targetPos, monsterBodyRadius) ?? false);
+                    (this.pathfinder?.hasLineOfSight(footPos, targetPos, monsterBodyRadius) ??
+                        false);
 
                 if (m.path && m.currentWaypointIdx < m.path.length) {
                     // Smooth waypoint advancement. Reached distance is
@@ -776,12 +791,7 @@ export class MonsterController {
                 // cells; off-path straight-line chases get a small
                 // separation force to stop identical-position overlap.
                 if (!isFollowingPath) {
-                    const sep = calcSeparationForce(
-                        m,
-                        this.monsters,
-                        32,
-                        m.spec.moveSpeed * 0.4,
-                    );
+                    const sep = calcSeparationForce(m, this.monsters, 32, m.spec.moveSpeed * 0.4);
                     desiredVx += sep.x;
                     desiredVy += sep.y;
                 }
@@ -828,7 +838,9 @@ export class MonsterController {
 
             // Direct Velocity Execution when following A* path (100% path commitment, no wall friction)
             const isFollowingPath = !!m.path && m.currentWaypointIdx < m.path.length;
-            if (isFollowingPath && time >= m.wallEscapeUntil) {
+            if (time < m.hitStunUntil) {
+                // In hit-stun from knockback: let impulse carry the monster, skip steering overwrite
+            } else if (isFollowingPath && time >= m.wallEscapeUntil) {
                 this.matter.Body.setVelocity(m.body, { x: desiredVx, y: desiredVy });
             } else if (time >= m.wallEscapeUntil) {
                 const currVx = m.body.velocity.x;
@@ -864,6 +876,17 @@ export class MonsterController {
                 // Align sprite with feet and apply offset
                 m.sprite.setPosition(mp.x + offX, mp.y + offY);
                 m.sprite.setDepth(footY);
+
+                // Hit flash visual feedback (50% additive white highlight via Phaser 4 TintModes.ADD = 2)
+                const isHitFlashing = time < m.hitFlashUntil;
+                if (isHitFlashing) {
+                    m.sprite.setTint(0x808080);
+                    (m.sprite as any).setTintMode?.(2);
+                } else if ((m.sprite as any).tintMode !== 0) {
+                    m.sprite.clearTint();
+                    (m.sprite as any).setTintMode?.(0);
+                }
+                m.weaponVisual?.setHitFlash(isHitFlashing);
 
                 // Align Editor debug rect & sensor hitbox directly with sprite position
                 m.debugHitboxRect.setPosition(mp.x + offX, mp.y + offY);
@@ -956,6 +979,12 @@ export class MonsterController {
                 this.destroyProjectile(proj);
             }
         }
+
+        // Combo timeout tracking (reset to 0 after 2.0s without hits)
+        if (this.currentCombo > 0 && time - this.lastComboHitAt > 2000) {
+            this.currentCombo = 0;
+            EventBus.emit('combat:combo', { count: 0, resetAt: 0 });
+        }
     }
 
     /** Inject the player character's luck stat so crit calculations use
@@ -965,7 +994,11 @@ export class MonsterController {
     }
 
     /** Apply damage from a player bullet to a specific monster (or AoE later). */
-    applyBulletDamage(bulletDamage: number, hitBody: MatterJS.BodyType): void {
+    applyBulletDamage(
+        bulletDamage: number,
+        hitBody: MatterJS.BodyType,
+        bulletBody?: MatterJS.BodyType,
+    ): void {
         // Find monster whose main body or compound parts match hitBody
         const target =
             this.monsters.find((m) => {
@@ -982,7 +1015,9 @@ export class MonsterController {
         if (target && target.state !== 'dying') {
             // Crit: (luck/10) * COMBAT_CRIT_MULTIPLIER probability,
             // COMBAT_CRIT_DAMAGE_MULTIPLIER × damage, gold floating number.
-            const isCrit = !getCheats().oneHitKill && Math.random() < (this.playerLuck / 10) * COMBAT_CRIT_MULTIPLIER;
+            const isCrit =
+                !getCheats().oneHitKill &&
+                Math.random() < (this.playerLuck / 10) * COMBAT_CRIT_MULTIPLIER;
             const finalDamage = getCheats().oneHitKill
                 ? 999999
                 : isCrit
@@ -990,11 +1025,102 @@ export class MonsterController {
                   : bulletDamage;
             target.hp -= finalDamage;
             target.lastHitAt = this.scene.time.now;
+            target.hitFlashUntil = this.scene.time.now + COMBAT_HIT_FLASH_MS;
+            if (target.sprite) {
+                target.sprite.setTint(0x808080);
+                (target.sprite as any).setTintMode?.(2);
+            }
+            target.weaponVisual?.setHitFlash(true);
             target.statusHud.showFloatingNumber(finalDamage, isCrit ? 'crit' : 'damage');
             EventBus.emit(SFX_EVENT(target.spec.sfx?.hit ?? 'monster-hit'), {
                 key: `monster:${target.spec.id}`,
                 throttleMs: target.spec.sfx?.throttleMs,
             });
+
+            // Combo hit registration
+            const hitTime = this.scene.time.now;
+            if (hitTime - this.lastComboHitAt <= 2000) {
+                this.currentCombo++;
+            } else {
+                this.currentCombo = 1;
+            }
+            this.lastComboHitAt = hitTime;
+            EventBus.emit('combat:combo', { count: this.currentCombo, resetAt: hitTime + 2000 });
+
+            // 1. Knockback impulse & Hit-stun
+            const bulletVel = (bulletBody as any)?.bulletVelocity ?? bulletBody?.velocity;
+            const fallbackDir = dirTo(this.playerBody.position, target.body.position);
+            const kb = calcKnockbackVelocity(bulletVel, fallbackDir, finalDamage);
+            this.matter.Body.setVelocity(target.body, {
+                x: target.body.velocity.x + kb.vx,
+                y: target.body.velocity.y + kb.vy,
+            });
+            target.hitStunUntil = this.scene.time.now + COMBAT_HIT_STUN_MS;
+
+            // 2. Micro hit sparks and falling mosaic chips at impact point
+            const hitPos = bulletBody?.position ?? hitBody.position;
+            spawnHitSparks(this.scene, hitPos.x, hitPos.y, {
+                dir: { x: kb.vx, y: kb.vy },
+                color: isCrit ? 0xfbbf24 : undefined,
+                isCrit,
+            });
+
+            // 3. Screen shake on critical hits (controlled & subtle)
+            if (isCrit) {
+                this.scene.cameras.main.shake(
+                    COMBAT_SCREEN_SHAKE_CRIT.duration,
+                    COMBAT_SCREEN_SHAKE_CRIT.intensity,
+                );
+            }
+
+            // 4. AoE explosion if bullet specifies aoeRadius
+            const aoeRadius = (bulletBody as any)?.aoeRadius;
+            if (typeof aoeRadius === 'number' && aoeRadius > 0) {
+                this.scene.cameras.main.shake(
+                    COMBAT_SCREEN_SHAKE_EXPLOSION.duration,
+                    COMBAT_SCREEN_SHAKE_EXPLOSION.intensity,
+                );
+
+                // Expanding visual shockwave ring
+                const circle = this.scene.add.circle(hitPos.x, hitPos.y, 8, 0xffffff, 0.4);
+                circle.setDepth(DEPTH.BULLET + 40);
+                circle.setStrokeStyle(2, 0xf59e0b, 0.85);
+                this.scene.tweens.add({
+                    targets: circle,
+                    radius: aoeRadius,
+                    alpha: 0,
+                    duration: 180,
+                    ease: 'Cubic.out',
+                    onComplete: () => circle.destroy(),
+                });
+
+                for (const otherM of this.monsters) {
+                    if (otherM === target || otherM.dead || otherM.state === 'dying') continue;
+                    const d = distBetween(hitPos, otherM.body.position);
+                    if (d <= aoeRadius) {
+                        const falloff = 1 - (d / aoeRadius) * 0.4;
+                        const splashDamage = Math.max(1, Math.round(finalDamage * falloff));
+                        otherM.hp -= splashDamage;
+                        otherM.lastHitAt = this.scene.time.now;
+                        otherM.hitFlashUntil = this.scene.time.now + COMBAT_HIT_FLASH_MS;
+                        if (otherM.sprite) {
+                            otherM.sprite.setTint(0x808080);
+                            (otherM.sprite as any).setTintMode?.(2);
+                        }
+                        otherM.weaponVisual?.setHitFlash(true);
+                        otherM.statusHud.showFloatingNumber(splashDamage, 'damage');
+                        const outDir = dirTo(hitPos, otherM.body.position);
+                        this.matter.Body.setVelocity(otherM.body, {
+                            x: otherM.body.velocity.x + outDir.x * 5,
+                            y: otherM.body.velocity.y + outDir.y * 5,
+                        });
+                        otherM.hitStunUntil = this.scene.time.now + COMBAT_HIT_STUN_MS;
+                        if (otherM.hp <= 0) {
+                            this.kill(otherM);
+                        }
+                    }
+                }
+            }
 
             if (target.hp <= 0) {
                 this.kill(target);
@@ -1021,11 +1147,7 @@ export class MonsterController {
 
     // ─── internals ──────────────────────────────────────────────────────
 
-    private performAttack(
-        m: Monster,
-        dirToPlayer: { x: number; y: number },
-        footY: number,
-    ): void {
+    private performAttack(m: Monster, dirToPlayer: { x: number; y: number }, footY: number): void {
         const weapon = m.weapon;
         const projectile = weapon.projectile;
         const isMelee = projectile === undefined;
@@ -1122,7 +1244,12 @@ export class MonsterController {
 
         // Hide the held weapon during the death animation so it doesn't
         // float in mid-air beside the corpse.
+        m.weaponVisual?.setHitFlash(false);
         m.weaponVisual?.setVisible(false);
+        if (m.sprite) {
+            m.sprite.clearTint();
+            (m.sprite as any).setTintMode?.(0);
+        }
 
         // Disable collision filter so dead monster doesn't block player or bullets
         m.body.collisionFilter.mask = 0;
@@ -1294,8 +1421,8 @@ export class MonsterController {
                     a.label === 'monster-projectile'
                         ? a
                         : b.label === 'monster-projectile'
-                            ? b
-                            : null;
+                          ? b
+                          : null;
                 if (projBody) {
                     const other = projBody === a ? b : a;
                     if (other === this.playerBody) {
@@ -1341,18 +1468,15 @@ export class MonsterController {
                 // path is available. The wallEscapeUntil window
                 // prevents the per-frame loop from undoing the
                 // override before the monster clears the wall cell.
-                const monsterBody =
-                    a.label === 'monster' ? a : b.label === 'monster' ? b : null;
+                const monsterBody = a.label === 'monster' ? a : b.label === 'monster' ? b : null;
                 const wallBody =
                     monsterBody && typeof a.label === 'string' && a.label.startsWith('wall:')
                         ? a
                         : monsterBody && typeof b.label === 'string' && b.label.startsWith('wall:')
-                            ? b
-                            : null;
+                          ? b
+                          : null;
                 if (monsterBody && wallBody) {
-                    const monster = this.monsters.find(
-                        (mm) => mm.body === monsterBody && !mm.dead,
-                    );
+                    const monster = this.monsters.find((mm) => mm.body === monsterBody && !mm.dead);
                     if (monster && this.scene.time.now >= monster.wallEscapeUntil) {
                         this.applyWallEscape(monster, wallBody);
                         // Suppress further wall escapes for 150 ms —
@@ -1405,7 +1529,7 @@ export class MonsterController {
                 ? monster.path[monster.currentWaypointIdx + 1]
                 : null;
         const waypointAlsoInCorner = nextWp
-            ? this.pathfinder?.isPositionInCorner(nextWp) ?? false
+            ? (this.pathfinder?.isPositionInCorner(nextWp) ?? false)
             : true;
 
         if (nextWp && !waypointAlsoInCorner) {

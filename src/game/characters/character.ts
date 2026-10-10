@@ -259,8 +259,7 @@ export function loadCharacter(
     // via tickSaveState), and refreshes into the tavern (when the
     // player has already chosen a character) do the same so the
     // character doesn't spawn wherever the placeholder used to be.
-    const useSaved =
-        !opts.placeholder && !opts.ignoreSavedPosition;
+    const useSaved = !opts.placeholder && !opts.ignoreSavedPosition;
     // spawnOverride wins over everything — used by the tavern confirm
     // flow to place the real character at the NPC the player picked.
     const fallbackX = useSaved

@@ -136,9 +136,7 @@ export async function resolveScene(
     level.dropSpawns?.forEach((d) => {
         if (d.weaponId) spawnWeaponIds.add(d.weaponId);
     });
-    const savedSlotIds = new Set<string>(
-        (useGameStore.getState().slots ?? []).map((s) => s.id),
-    );
+    const savedSlotIds = new Set<string>((useGameStore.getState().slots ?? []).map((s) => s.id));
     // Player-pickupable weapons: spec hotbar + tavern dropSpawn ids +
     // persisted player pickups. These get their in-hand texture
     // loaded because the player holds them and they're rendered as

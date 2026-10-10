@@ -117,14 +117,14 @@ Bulk-queues every `source:` via Phaser's loader. Call from `preload()` (scene). 
 
 ### Methods
 
-| Method                                  | Purpose                                               |
-| --------------------------------------- | ----------------------------------------------------- |
+| Method                                  | Purpose                                                                                                                                                                                                                |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `playSfx(id, opts?)`                    | play one-shot, respects `volume`/`rate`/`loop`. `opts.key` lets the throttle bucket differ from the sfx id (e.g. `monster:${id}` so different monsters don't share a window); `opts.throttleMs` overrides the default. |
-| `playMusic(id)`                         | cross-fade to new track (`fadeIn`/`fadeOut` honoured) — see **BGM singleton** below |
-| `stopMusic()`                           | stop currently-playing music (with `fadeOut`)         |
-| `pauseMusic()` / `resumeMusic()`        | pause / resume (operates on the singleton sound)      |
-| `setSfxVolume(v)` / `setMusicVolume(v)` | master sound volume                                   |
-| `destroy()`                             | teardown — but the BGM singleton itself is **not** destroyed |
+| `playMusic(id)`                         | cross-fade to new track (`fadeIn`/`fadeOut` honoured) — see **BGM singleton** below                                                                                                                                    |
+| `stopMusic()`                           | stop currently-playing music (with `fadeOut`)                                                                                                                                                                          |
+| `pauseMusic()` / `resumeMusic()`        | pause / resume (operates on the singleton sound)                                                                                                                                                                       |
+| `setSfxVolume(v)` / `setMusicVolume(v)` | master sound volume                                                                                                                                                                                                    |
+| `destroy()`                             | teardown — but the BGM singleton itself is **not** destroyed                                                                                                                                                           |
 
 ## The BGM singleton (cross-scene, cross-fade)
 
@@ -159,14 +159,14 @@ This guarantees the singleton never leaks BGM into a scene that didn't ask for o
 
 ## Events subscribed
 
-| Event                       | When                                  |
-| --------------------------- | ------------------------------------- |
-| `sfx:<id>`                  | play that sfx (e.g. `sfx:pickup-hp`)  |
-| `music:<id>`                | switch to that music track            |
-| `music:stop`                | stop current track                    |
-| `music:pause`               | pause                                 |
-| `music:resume`              | resume                                |
-| `dev:cheat:muted`           | dev Mute toggle (zero master volume)  |
+| Event                          | When                                          |
+| ------------------------------ | --------------------------------------------- |
+| `sfx:<id>`                     | play that sfx (e.g. `sfx:pickup-hp`)          |
+| `music:<id>`                   | switch to that music track                    |
+| `music:stop`                   | stop current track                            |
+| `music:pause`                  | pause                                         |
+| `music:resume`                 | resume                                        |
+| `dev:cheat:muted`              | dev Mute toggle (zero master volume)          |
 | `Phaser.Sound.Events.UNLOCKED` | browser autoplay unlocked — play pendingMusic |
 
 Event-name helpers (from `src/lib/constants.ts`):

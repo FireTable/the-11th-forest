@@ -57,14 +57,14 @@ Every module has `src/lib/<module>/schema.ts` with the source-of-truth
 Zod schema. Read the file. **Do not guess field names** — copy them
 from the schema. Common pitfalls:
 
-| Module     | Schema file                              | Type of enum / range notes                                |
-| ---------- | ---------------------------------------- | --------------------------------------------------------- |
-| characters | `src/lib/characters/schema.ts`           | `gender: 'male' \| 'female'`; `weaponMax: 1..8`; `stats.strength`: 1..10 |
-| monsters   | `src/lib/monsters/schema.ts`             | `hp >= 0`; `moveSpeed > 0`; `drops[].chance`: 0..1        |
-| weapons    | `src/lib/weapons/schema.ts`              | Ranged needs `projectile`; melee needs `hitWidth`+`hitHeight`; both is rejected by `superRefine` |
-| drops      | `src/lib/drops/schema.ts`                | `effect.type` is the discriminator — exactly one of `instant`/`refill-ammo`/`weapon` |
-| audios     | `src/lib/audios/schema.ts`               | `kind: 'sfx' \| 'music'`; `id` must match filename; music `volume` default 0.5 |
-| levels     | `src/lib/levels/schema.ts`               | `imageSize: 'WxH'`; `airWalls[].kind: 'tall' \| 'short'`; `materials[].mode: 'background' \| 'y-sort' \| 'foreground'` |
+| Module     | Schema file                    | Type of enum / range notes                                                                                             |
+| ---------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| characters | `src/lib/characters/schema.ts` | `gender: 'male' \| 'female'`; `weaponMax: 1..8`; `stats.strength`: 1..10                                               |
+| monsters   | `src/lib/monsters/schema.ts`   | `hp >= 0`; `moveSpeed > 0`; `drops[].chance`: 0..1                                                                     |
+| weapons    | `src/lib/weapons/schema.ts`    | Ranged needs `projectile`; melee needs `hitWidth`+`hitHeight`; both is rejected by `superRefine`                       |
+| drops      | `src/lib/drops/schema.ts`      | `effect.type` is the discriminator — exactly one of `instant`/`refill-ammo`/`weapon`                                   |
+| audios     | `src/lib/audios/schema.ts`     | `kind: 'sfx' \| 'music'`; `id` must match filename; music `volume` default 0.5                                         |
+| levels     | `src/lib/levels/schema.ts`     | `imageSize: 'WxH'`; `airWalls[].kind: 'tall' \| 'short'`; `materials[].mode: 'background' \| 'y-sort' \| 'foreground'` |
 
 ### 2. Check that the schema validates your idea
 
@@ -117,7 +117,7 @@ pnpm test           # vitest run — covers parsers, planDropEffect,
 ```
 
 A schema change is a **refactor** and must keep tests green. A new
-field added to the schema with no consumer is fine; a *removed* field
+field added to the schema with no consumer is fine; a _removed_ field
 breaks parsers and tests.
 
 ## Adding a character
@@ -136,9 +136,9 @@ This is the most common task. Walk it end to end:
     pnpm tsx scripts/split-sheet.ts --id=<id> --in-place
     ```
 
-   The split-sheet step down-samples + chroma-keys. Result goes to
-   `public/assets/image/characters/<id>.png`. Verify the cell
-   layout matches the schema (4×4, 15 frames + 1 empty cell).
+    The split-sheet step down-samples + chroma-keys. Result goes to
+    `public/assets/image/characters/<id>.png`. Verify the cell
+    layout matches the schema (4×4, 15 frames + 1 empty cell).
 
 3. **Write the yaml** at `public/data/characters/<id>.yaml`. Required
    fields: `id`, `name`, `hp`, `sp`, `moveSpeed`, `spRegenMs`, `body`,
@@ -161,13 +161,13 @@ the entity, before pushing the bounds.
 
 ### Characters (player)
 
-| Stat        | Range       | Notes                                                            |
-| ----------- | ----------- | ---------------------------------------------------------------- |
-| `hp`        | 85..100     | kitty = 85, wanderer/otaku = 100 — visible spread in tavern radar |
-| `sp`        | 60..90      | kitty = 90 (caster), wanderer/otaku = 60 (melee bias)            |
-| `moveSpeed` | 4..5        | 4 = Matter velocity ≈ 4 px/tick (≈ 1.6 m/s). 5 = fast scout      |
-| `spRegenMs` | 4000..5000  | 4000 = aggressive caster, 5000 = conservative                    |
-| `weaponMax` | 3..4        | otaku = 4 (carry more, lower sp); rest = 3                       |
+| Stat        | Range      | Notes                                                             |
+| ----------- | ---------- | ----------------------------------------------------------------- |
+| `hp`        | 85..100    | kitty = 85, wanderer/otaku = 100 — visible spread in tavern radar |
+| `sp`        | 60..90     | kitty = 90 (caster), wanderer/otaku = 60 (melee bias)             |
+| `moveSpeed` | 4..5       | 4 = Matter velocity ≈ 4 px/tick (≈ 1.6 m/s). 5 = fast scout       |
+| `spRegenMs` | 4000..5000 | 4000 = aggressive caster, 5000 = conservative                     |
+| `weaponMax` | 3..4       | otaku = 4 (carry more, lower sp); rest = 3                        |
 
 **Dodge** is a per-character multiplier on `moveSpeed` with its own
 i-frame budget. Keep the budget tight (`durationMs: 200..240`,
@@ -176,11 +176,11 @@ weapon-tick to land.
 
 ### Monsters
 
-| Stat        | Range        | Notes                                                       |
-| ----------- | ------------ | ----------------------------------------------------------- |
-| `hp`        | 90..1200     | sniper = 90 (fragile), keeper = 1200 (boss)                 |
-| `moveSpeed` | 2.5..6       | sniper/warden = 2.5 (slow heavy), stalker = 6 (rusher)      |
-| `body`      | 14×14..24×24 | default 14×14, larger bosses 24×24                          |
+| Stat        | Range        | Notes                                                  |
+| ----------- | ------------ | ------------------------------------------------------ |
+| `hp`        | 90..1200     | sniper = 90 (fragile), keeper = 1200 (boss)            |
+| `moveSpeed` | 2.5..6       | sniper/warden = 2.5 (slow heavy), stalker = 6 (rusher) |
+| `body`      | 14×14..24×24 | default 14×14, larger bosses 24×24                     |
 
 **Design rule:** a monster's effective DPS = `weapon.damage / weapon.cooldownMs`.
 The player should be able to kill it in ~2–4 seconds of focused fire, and
@@ -190,14 +190,14 @@ attack cycles. If the math doesn't balance, fix the weapon's `damage` /
 
 ### Player weapons (range + dps envelope)
 
-| Weapon        | damage | cooldownMs | range | dps      | Role                       |
-| ------------- | ------ | ---------- | ----- | -------- | -------------------------- |
-| assault-rifle | 2      | 100        | 550   | 20       | chip / baseline            |
-| laser-cannon  | 2      | 60         | 700   | 33       | sustained beam             |
-| shotgun       | 5×5=25 | 800        | 400   | ~31 burst| close-quarters burst       |
-| plasma-sword  | 22     | 400        | 180   | 55       | melee AOE                  |
-| arcana-staff  | 14     | 350        | 1000  | 40       | long-range caster          |
-| rocket-launcher | 55   | 1200       | 800   | 46       | heavy burst                |
+| Weapon          | damage | cooldownMs | range | dps       | Role                 |
+| --------------- | ------ | ---------- | ----- | --------- | -------------------- |
+| assault-rifle   | 2      | 100        | 550   | 20        | chip / baseline      |
+| laser-cannon    | 2      | 60         | 700   | 33        | sustained beam       |
+| shotgun         | 5×5=25 | 800        | 400   | ~31 burst | close-quarters burst |
+| plasma-sword    | 22     | 400        | 180   | 55        | melee AOE            |
+| arcana-staff    | 14     | 350        | 1000  | 40        | long-range caster    |
+| rocket-launcher | 55     | 1200       | 800   | 46        | heavy burst          |
 
 When adding a new weapon, place its dps on the **same axis** as an
 existing one (rifle=20, laser=33, plasma=55) — don't sneak in 80 dps
@@ -207,13 +207,13 @@ costs balance budget.
 
 ### Drops (resource economy)
 
-| Drop            | hp | sp | ammoFraction | Notes                               |
-| --------------- | -- | -- | ------------ | ----------------------------------- |
-| hp-shard        | 25 | 0  | —            | baseline heal tick                  |
-| sp-fragment     | 0  | 30 | —            | baseline sp tick                    |
-| overcharge-core | 50 | 50 | —            | rare — both at once                 |
-| ammo-cache      | —  | —  | 0.3          | refill 30 % of active clip          |
-| weapon-drop     | —  | —  | —            | tavern-only, weaponId per spawn     |
+| Drop            | hp  | sp  | ammoFraction | Notes                           |
+| --------------- | --- | --- | ------------ | ------------------------------- |
+| hp-shard        | 25  | 0   | —            | baseline heal tick              |
+| sp-fragment     | 0   | 30  | —            | baseline sp tick                |
+| overcharge-core | 50  | 50  | —            | rare — both at once             |
+| ammo-cache      | —   | —   | 0.3          | refill 30 % of active clip      |
+| weapon-drop     | —   | —   | —            | tavern-only, weaponId per spawn |
 
 Keep `hp-shard`/`sp-fragment` cheap (25/30) so the player isn't starved
 between encounters. `overcharge-core` should be rare enough that a
@@ -292,16 +292,16 @@ is what stops the model from adding grid lines, watermarks, etc.
 
 ## Common pitfalls (with the fix)
 
-| Symptom                                                    | Cause                                                                | Fix                                                                                       |
-| ---------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Schema validation error on `superRefine` ("must be either…") | weapon yaml has both `projectile` AND `hitWidth`                      | pick one (ranged vs melee)                                                                 |
-| `Monster.spec` `weaponId` not found                         | referenced weapon id not in `weapons/index.yaml`                      | add the weapon yaml first                                                                 |
-| Monster won't aggro the player                              | `weaponId` points to a weapon with `cooldownMs: 0` and no projectile  | the controller treats `cooldownMs: 0` as "never fires" — set to ≥ 50                       |
-| Tavern HUD radar looks flat                                 | every character sits in the same stat band                            | widen the spread: at least one stat should differ ≥ 20% from the others                    |
-| Character restore lands at (0, 0)                           | missing `playerSnapshot` and `characterSpawn`                          | ensure the level YAML has `characterSpawn:` or the camera centres on image mid             |
-| BGM doubles up when crossing scenes                        | you emitted `MUSIC_EVENT` from a place that bypassed the scene's `create()`  | scenes should be the only emitter; remove the manual emit                                |
-| `parseWeaponYaml` rejects `projectile.visual.color: 0x...` | color must be **string** (`'0xE0C071'`) not number                    | hex literal in `bullet.color` only — `projectile.visual.color` is the legacy numeric path  |
-| `?scene=` URL is ignored                                    | a save exists with `currentLevelId`                                   | `useGameStore.getState().clearSaveData()` or use the editor's jump-to-scene                 |
+| Symptom                                                      | Cause                                                                       | Fix                                                                                       |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Schema validation error on `superRefine` ("must be either…") | weapon yaml has both `projectile` AND `hitWidth`                            | pick one (ranged vs melee)                                                                |
+| `Monster.spec` `weaponId` not found                          | referenced weapon id not in `weapons/index.yaml`                            | add the weapon yaml first                                                                 |
+| Monster won't aggro the player                               | `weaponId` points to a weapon with `cooldownMs: 0` and no projectile        | the controller treats `cooldownMs: 0` as "never fires" — set to ≥ 50                      |
+| Tavern HUD radar looks flat                                  | every character sits in the same stat band                                  | widen the spread: at least one stat should differ ≥ 20% from the others                   |
+| Character restore lands at (0, 0)                            | missing `playerSnapshot` and `characterSpawn`                               | ensure the level YAML has `characterSpawn:` or the camera centres on image mid            |
+| BGM doubles up when crossing scenes                          | you emitted `MUSIC_EVENT` from a place that bypassed the scene's `create()` | scenes should be the only emitter; remove the manual emit                                 |
+| `parseWeaponYaml` rejects `projectile.visual.color: 0x...`   | color must be **string** (`'0xE0C071'`) not number                          | hex literal in `bullet.color` only — `projectile.visual.color` is the legacy numeric path |
+| `?scene=` URL is ignored                                     | a save exists with `currentLevelId`                                         | `useGameStore.getState().clearSaveData()` or use the editor's jump-to-scene               |
 
 ## When to write new code (not just yaml)
 
@@ -339,19 +339,19 @@ run `pnpm test` first and fix the parser tests before committing.
 
 ## Quick reference — commands
 
-| Task                              | Command                                              |
-| --------------------------------- | ---------------------------------------------------- |
-| Dev server                        | `pnpm dev`                                           |
-| Run all tests                     | `pnpm test`                                          |
-| Watch tests                       | `pnpm test:watch`                                    |
-| Type-check                        | `pnpm type-check`                                    |
-| Format                            | `pnpm format`                                        |
-| Lint                              | `pnpm lint`                                          |
-| Validate level yamls              | `pnpm tsx scripts/validate-levels.ts`                |
-| Generate one image                | `pnpm tsx scripts/generate-image.ts <id>`            |
-| Re-chroma-key an existing sprite  | `pnpm tsx scripts/split-sheet.ts --id=<id> --in-place` |
-| Regenerate one / all SFX          | `pnpm tsx scripts/elevenlabs-sfx.ts [id]`            |
-| Editor panel                      | open `http://localhost:8080/?editor=1`               |
+| Task                             | Command                                                |
+| -------------------------------- | ------------------------------------------------------ |
+| Dev server                       | `pnpm dev`                                             |
+| Run all tests                    | `pnpm test`                                            |
+| Watch tests                      | `pnpm test:watch`                                      |
+| Type-check                       | `pnpm type-check`                                      |
+| Format                           | `pnpm format`                                          |
+| Lint                             | `pnpm lint`                                            |
+| Validate level yamls             | `pnpm tsx scripts/validate-levels.ts`                  |
+| Generate one image               | `pnpm tsx scripts/generate-image.ts <id>`              |
+| Re-chroma-key an existing sprite | `pnpm tsx scripts/split-sheet.ts --id=<id> --in-place` |
+| Regenerate one / all SFX         | `pnpm tsx scripts/elevenlabs-sfx.ts [id]`              |
+| Editor panel                     | open `http://localhost:8080/?editor=1`                 |
 
 ## Closing thought
 

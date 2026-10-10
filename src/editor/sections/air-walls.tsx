@@ -42,8 +42,9 @@ export function AirWallsSection({ level, setLevel, drawing, setDrawing, onAddWal
             <div className="flex gap-2">
                 <Button
                     variant={drawing ? 'default' : 'outline'}
-                    className={`flex-1 gap-2 ${drawing ? 'bg-cyan-500 hover:bg-cyan-400 text-black' : 'bg-transparent'
-                        }`}
+                    className={`flex-1 gap-2 ${
+                        drawing ? 'bg-cyan-500 hover:bg-cyan-400 text-black' : 'bg-transparent'
+                    }`}
                     onClick={() => setDrawing((d) => !d)}
                 >
                     {drawing ? (

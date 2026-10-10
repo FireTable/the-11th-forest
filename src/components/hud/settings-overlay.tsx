@@ -163,7 +163,9 @@ export function SettingsOverlay() {
                                 </span>
                                 <span className="flex-1 h-px bg-amber-800/50" />
                             </div>
-                            <div className="text-[8px] tracking-[0.3em] text-stone-500 uppercase">— paused —</div>
+                            <div className="text-[8px] tracking-[0.3em] text-stone-500 uppercase">
+                                — paused —
+                            </div>
                         </div>
 
                         <div className="flex w-full flex-col gap-2">

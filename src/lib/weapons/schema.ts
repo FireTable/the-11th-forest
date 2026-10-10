@@ -83,6 +83,7 @@ export const WeaponPairedBulletSchema = z
         anchor: z.tuple([z.number(), z.number()]).optional(),
         rotationOffset: z.number().optional(),
         spawnOffset: z.tuple([z.number(), z.number()]).optional(),
+        aoeRadius: z.number().gt(0).optional(),
     })
     .strict();
 
@@ -93,6 +94,7 @@ export const WeaponSpecSchema = z
         damage: z.number().gt(0),
         cooldownMs: z.number().gte(0),
         range: z.number().gt(0),
+        aoeRadius: z.number().gt(0).optional(),
         // Visual & Procedural Controls
         visual: WeaponVisualSchema.optional(),
         // Paired 1-to-1 Bullet / Attack Spec

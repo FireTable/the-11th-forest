@@ -163,28 +163,38 @@ export function TeleportersSection({ level, setLevel }: Props) {
                         <div className="flex flex-col gap-2">
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <Label className="text-[10px] text-neutral-400">X Position</Label>
+                                    <Label className="text-[10px] text-neutral-400">
+                                        X Position
+                                    </Label>
                                     <Input
                                         type="number"
                                         value={t.x}
                                         onKeyDown={(e) => e.stopPropagation()}
                                         onChange={(e) =>
                                             handleUpdate(idx, {
-                                                x: e.target.value === '' ? 0 : Number(e.target.value),
+                                                x:
+                                                    e.target.value === ''
+                                                        ? 0
+                                                        : Number(e.target.value),
                                             })
                                         }
                                         className="h-6 text-xs bg-neutral-900 border-neutral-700 font-mono text-neutral-200"
                                     />
                                 </div>
                                 <div>
-                                    <Label className="text-[10px] text-neutral-400">Y Position</Label>
+                                    <Label className="text-[10px] text-neutral-400">
+                                        Y Position
+                                    </Label>
                                     <Input
                                         type="number"
                                         value={t.y}
                                         onKeyDown={(e) => e.stopPropagation()}
                                         onChange={(e) =>
                                             handleUpdate(idx, {
-                                                y: e.target.value === '' ? 0 : Number(e.target.value),
+                                                y:
+                                                    e.target.value === ''
+                                                        ? 0
+                                                        : Number(e.target.value),
                                             })
                                         }
                                         className="h-6 text-xs bg-neutral-900 border-neutral-700 font-mono text-neutral-200"

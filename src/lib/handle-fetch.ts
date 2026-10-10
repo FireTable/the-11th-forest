@@ -43,7 +43,10 @@ async function ensureNodeOverride(): Promise<void> {
                     : input instanceof URL
                       ? input.href
                       : (input as Request).url;
-            if (typeof url === 'string' && (url.startsWith('/data/') || url.startsWith('/assets/'))) {
+            if (
+                typeof url === 'string' &&
+                (url.startsWith('/data/') || url.startsWith('/assets/'))
+            ) {
                 const text = readFileSync(resolve('public' + url), 'utf8');
                 return Promise.resolve(new Response(text));
             }
@@ -77,7 +80,7 @@ export async function fetch(input: RequestInfo | URL, init?: RequestInit): Promi
 
     if (isCacheable && responseCache.has(url)) {
         const cached = await responseCache.get(url)!;
-        return cached.clone();
+        return typeof cached.clone === 'function' ? cached.clone() : cached;
     }
 
     const fetchPromise = (async () => {
@@ -93,5 +96,5 @@ export async function fetch(input: RequestInfo | URL, init?: RequestInit): Promi
     }
 
     const res = await fetchPromise;
-    return res.clone();
+    return typeof res.clone === 'function' ? res.clone() : res;
 }

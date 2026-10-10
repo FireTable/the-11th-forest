@@ -311,13 +311,13 @@ Both reset on shutdown via `setLevelElapsedMs(0)` when the next scene boots.
 
 ## Events emitted by `LoadScene`
 
-| Event                 | Payload                                   | When                           |
-| --------------------- | ----------------------------------------- | ------------------------------ |
-| `level-loaded`        | `{ id, level }`                           | end of `create()`              |
-| `current-scene-ready` | `this` (the scene)                        | end of `create()`              |
-| `character-position`  | `{ x, y }`                                | per-frame while alive — tavern weapon-replace hub listens |
-| `music:<id>` or `music:stop` | —                                   | if `level.music` set, or `MUSIC_STOP` if unset |
-| `editor-open`         | listened by the scene (not emitted by it) | toggles HUD + debug rectangles |
+| Event                        | Payload                                   | When                                                      |
+| ---------------------------- | ----------------------------------------- | --------------------------------------------------------- |
+| `level-loaded`               | `{ id, level }`                           | end of `create()`                                         |
+| `current-scene-ready`        | `this` (the scene)                        | end of `create()`                                         |
+| `character-position`         | `{ x, y }`                                | per-frame while alive — tavern weapon-replace hub listens |
+| `music:<id>` or `music:stop` | —                                         | if `level.music` set, or `MUSIC_STOP` if unset            |
+| `editor-open`                | listened by the scene (not emitted by it) | toggles HUD + debug rectangles                            |
 
 The `music` event is **not** auto-emitted on every scene; it is only emitted by `LoadScene.create()` based on `level.music`. See [`AUDIOS.md`](./AUDIOS.md#the-bgm-singleton-cross-scene-cross-fade) for the singleton semantics that prevent two scenes from stacking BGM.
 

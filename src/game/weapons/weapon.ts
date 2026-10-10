@@ -38,11 +38,7 @@ export function loadWeaponAssets(
 ): void {
     const loadVisual = options.loadVisualTexture !== false;
     for (const spec of weaponSpecs) {
-        if (
-            loadVisual &&
-            spec.visual?.texture &&
-            !scene.textures.exists(spec.visual.texture)
-        ) {
+        if (loadVisual && spec.visual?.texture && !scene.textures.exists(spec.visual.texture)) {
             const url = spec.visual.texture.startsWith('/')
                 ? spec.visual.texture
                 : `/${spec.visual.texture}`;
@@ -103,6 +99,7 @@ export interface ProjectileSpawnOptions {
      *  depth slot — bullets never Y-sort independently of their owner.
      *  Defaults to `DEPTH.BULLET` (flat layer above the character). */
     depth?: number;
+    aoeRadius?: number;
 }
 
 /**
@@ -127,10 +124,15 @@ export function spawnProjectile(
             mask: opts.mask,
         },
     });
+    const velX = (direction.x / len) * opts.speed;
+    const velY = (direction.y / len) * opts.speed;
     matter.Body.setVelocity(body, {
-        x: (direction.x / len) * opts.speed,
-        y: (direction.y / len) * opts.speed,
+        x: velX,
+        y: velY,
     });
+    (body as any).bulletDamage = opts.damage;
+    (body as any).bulletVelocity = { x: velX, y: velY };
+    (body as any).aoeRadius = opts.aoeRadius;
 
     let visualObj: Phaser.GameObjects.Shape | Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
 
@@ -161,7 +163,7 @@ export function spawnProjectile(
         originX: origin.x,
         originY: origin.y,
         maxDistance: opts.maxDistance ?? 800,
-        spawnAt: scene.time.now,
+        spawnAt: scene.time?.now ?? 0,
         lifeMs: opts.lifeMs ?? 1500,
         rotationOffset: rotRad,
         trail: [],
@@ -230,6 +232,12 @@ export function spawnMeleeHitbox(
             mask: opts.mask ?? PROJECTILE_PLAYER_MASK,
         },
     });
+    (body as any).bulletDamage = opts.damage;
+    (body as any).bulletVelocity = {
+        x: Math.cos(opts.angle) * 10,
+        y: Math.sin(opts.angle) * 10,
+    };
+    (body as any).isMelee = true;
     scene.matter.world.add(body);
 
     let visualObj:
@@ -316,14 +324,7 @@ export function spawnMeleeHitbox(
             const alpha = 0.015 + 0.21 * wave;
             g.lineStyle(1.5, arcColor, alpha);
             g.beginPath();
-            g.arc(
-                0,
-                0,
-                outerR,
-                -halfRad + i * segSweep,
-                -halfRad + (i + 0.4) * segSweep,
-                false,
-            );
+            g.arc(0, 0, outerR, -halfRad + i * segSweep, -halfRad + (i + 0.4) * segSweep, false);
             g.strokePath();
         }
 

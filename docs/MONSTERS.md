@@ -37,6 +37,8 @@ name: Thorn Drone
 imageSize: 2048x2048 # AI-gen template size, optional (regex /^\d+x\d+$/)
 prompt: | # AI image-gen template (chroma-key sprite sheet)
 
+
+
 hp: 160
 moveSpeed: 4 # Matter velocity (tunable range ~3..8 in current set)
 
@@ -71,10 +73,10 @@ sprite: # optional; debug rectangle used if absent
         pad: 2
 
 anims: # required when sprite is set; common keys: idle / move / hit / death
-    idle:   { frames: [0, 3],   frameRate: 6,  repeat: -1 }
-    move:   { frames: [4, 7],   frameRate: 10, repeat: -1 }
-    hit:    { frames: [8, 11],  frameRate: 12, repeat: 0 }
-    death:  { frames: [12, 14], frameRate: 10, repeat: 0 }
+    idle: { frames: [0, 3], frameRate: 6, repeat: -1 }
+    move: { frames: [4, 7], frameRate: 10, repeat: -1 }
+    hit: { frames: [8, 11], frameRate: 12, repeat: 0 }
+    death: { frames: [12, 14], frameRate: 10, repeat: 0 }
 ```
 
 `AnimSpecSchema.frames` is a 2-tuple `[start, end]` with `end >= start`. Each common anim (idle / move / hit / death) is laid out as one row of the sprite sheet so the controller can play them straight from `frames`.

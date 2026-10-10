@@ -157,17 +157,16 @@ export function ScenesListSection({
                     return (
                         <div
                             key={s.id}
-                            className={`border rounded ${isCurrent
-                                ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200'
-                                : 'bg-neutral-900 border-neutral-800 text-neutral-300'
-                                }`}
+                            className={`border rounded ${
+                                isCurrent
+                                    ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200'
+                                    : 'bg-neutral-900 border-neutral-800 text-neutral-300'
+                            }`}
                         >
                             <div className="flex items-center gap-2 px-2 py-1.5">
                                 <button
                                     type="button"
-                                    onClick={() =>
-                                        onToggleExpand(isExpanded ? null : s.id)
-                                    }
+                                    onClick={() => onToggleExpand(isExpanded ? null : s.id)}
                                     className="text-neutral-400 hover:text-neutral-100"
                                     aria-label={isExpanded ? 'Collapse' : 'Expand'}
                                 >
@@ -220,7 +219,8 @@ export function ScenesListSection({
                             )}
                             {isExpanded && !isCurrent && (
                                 <div className="border-t border-neutral-800 px-2 py-2 text-[10px] text-neutral-500 italic">
-                                    Jump to this scene to edit its background, settings &amp; teleporters.
+                                    Jump to this scene to edit its background, settings &amp;
+                                    teleporters.
                                 </div>
                             )}
                         </div>

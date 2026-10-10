@@ -49,8 +49,9 @@ sp: 60 # starting SP
 moveSpeed: 4 # Matter velocity (px per physics tick at 60 fps; tunable range ~3..8)
 spRegenMs: 5000 # ms between SP ticks
 
-gender: female # 'male' | 'female' — picks hurtFemale / hurtMale from sfx
-                # omit to use the gender-neutral sfx.hurt
+gender:
+    female # 'male' | 'female' — picks hurtFemale / hurtMale from sfx
+    # omit to use the gender-neutral sfx.hurt
 
 body: # Matter rectangle half-extents — required
     halfW: 28
@@ -63,17 +64,18 @@ dodge: # Shift-dash tuning — required
     cooldownMs: 600
 
 hotbar: [] # starting weapons in display order; usually empty —
-          # the tavern weapon-pickup phase is the default flow.
+    # the tavern weapon-pickup phase is the default flow.
 
-weaponMax: 3 # cap on weapons the character can carry in the tavern weapon-pickup
-             # phase (1..8, default 3 if omitted). Per-character; drives the
-             # tavern HUD radar + the replace-hub cap.
+weaponMax:
+    3 # cap on weapons the character can carry in the tavern weapon-pickup
+    # phase (1..8, default 3 if omitted). Per-character; drives the
+    # tavern HUD radar + the replace-hub cap.
 
 sfx: # per-character audio identity — all optional, all fall back to global ids
     dodge: dodge
     hurtFemale: player-hurt-female # used when gender=female
-    hurtMale: player-hurt-male     # used when gender=male
-    hurt: player-hurt              # gender-neutral fallback
+    hurtMale: player-hurt-male # used when gender=male
+    hurt: player-hurt # gender-neutral fallback
     footstep: footstep
     footstepThrottleMs: 200 # min gap between footstep sfx
     lowHpHeartbeat: low-hp-heartbeat
@@ -92,16 +94,16 @@ sprite:
         pad: 2
 
 anims:
-    idle:  { frames: [0, 4],  frameRate: 3,  repeat: -1 }
-    walk:  { frames: [5, 9],  frameRate: 12, repeat: -1 }
+    idle: { frames: [0, 4], frameRate: 3, repeat: -1 }
+    walk: { frames: [5, 9], frameRate: 12, repeat: -1 }
     dodge: { frames: [10, 14], frameRate: 16, repeat: 0 }
 
 stats: # OPTIONAL display-only stats shown in the tavern HUD radar (1..10).
-       # Do NOT affect gameplay values — purely cosmetic flavour.
+    # Do NOT affect gameplay values — purely cosmetic flavour.
     strength: 5 # physical attack power
-    agility:  7 # movement and dodge speed
+    agility: 7 # movement and dodge speed
     vitality: 6 # max HP and resilience
-    spirit:   4 # max SP and skill potency
+    spirit: 4 # max SP and skill potency
 ```
 
 ## Public API (`src/lib/characters/index.ts`)
@@ -191,9 +193,10 @@ interface TavernFocusPayload {
     sp: number;
     moveSpeed: number;
     spRegenMs: number;
-    description?: string;          // from the character spec
+    description?: string; // from the character spec
     stats?: { hp; sp; moveSpeed; weaponMax };
-    statRange?: {                  // [min, max] across all loaded characters
+    statRange?: {
+        // [min, max] across all loaded characters
         hp: { min; max };
         sp: { min; max };
         moveSpeed: { min; max };
@@ -202,9 +205,9 @@ interface TavernFocusPayload {
     phase: 'selection' | 'pickup';
     weaponCount: number;
     weaponMax: number;
-    viewportX?: number;            // NPC head position in CSS pixels (selection only)
+    viewportX?: number; // NPC head position in CSS pixels (selection only)
     viewportY?: number;
-    holding?: boolean;             // F / mouse long-press active
+    holding?: boolean; // F / mouse long-press active
 }
 ```
 
@@ -214,25 +217,25 @@ The controller updates the cursor (pixel crosshair + `aim-crosshair-update` even
 
 ## Events emitted
 
-| Event                                          | When                                                     |
-| ---------------------------------------------- | -------------------------------------------------------- |
-| `sfx:dodge`                                    | Shift-dash triggered                                     |
-| `sfx:hurtFemale` / `sfx:hurtMale` / `sfx:hurt` | took damage (gender-routed by `resolveHurtSfx`)          |
-| `sfx:footstep`                                 | periodic, throttled by `sfx.footstepThrottleMs`          |
-| `sfx:low-hp-heartbeat`                         | every `lowHpPulseMs` while HP ≤ `lowHpThreshold * maxHp` |
-| `aim-crosshair-update`                         | every frame the aim moves (cursor + crosshair sync)      |
-| `tavern-focus`                                 | tavern selection / phase change (from `TavernController`)|
-| `player-died`                                  | HP reached 0                                             |
+| Event                                          | When                                                      |
+| ---------------------------------------------- | --------------------------------------------------------- |
+| `sfx:dodge`                                    | Shift-dash triggered                                      |
+| `sfx:hurtFemale` / `sfx:hurtMale` / `sfx:hurt` | took damage (gender-routed by `resolveHurtSfx`)           |
+| `sfx:footstep`                                 | periodic, throttled by `sfx.footstepThrottleMs`           |
+| `sfx:low-hp-heartbeat`                         | every `lowHpPulseMs` while HP ≤ `lowHpThreshold * maxHp`  |
+| `aim-crosshair-update`                         | every frame the aim moves (cursor + crosshair sync)       |
+| `tavern-focus`                                 | tavern selection / phase change (from `TavernController`) |
+| `player-died`                                  | HP reached 0                                              |
 
 ## Events subscribed
 
-| Event                      | Purpose                                          |
-| -------------------------- | ------------------------------------------------ |
-| `mobile:move`              | touch-stick movement vector (vx, vy)             |
-| `mobile:firing`            | touch fire button state                          |
-| `mobile:dodge`             | touch dodge button state                         |
-| `mobile:weapon:switch`     | touch weapon HUD slot tap (`{ index }`)          |
-| `dev:cheat:infiniteHp`     | keep HP at max while toggled on                  |
+| Event                  | Purpose                                 |
+| ---------------------- | --------------------------------------- |
+| `mobile:move`          | touch-stick movement vector (vx, vy)    |
+| `mobile:firing`        | touch fire button state                 |
+| `mobile:dodge`         | touch dodge button state                |
+| `mobile:weapon:switch` | touch weapon HUD slot tap (`{ index }`) |
+| `dev:cheat:infiniteHp` | keep HP at max while toggled on         |
 
 Damage comes in via `controller.heal(-x, 0)`.
 

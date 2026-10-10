@@ -73,9 +73,7 @@ const StatRow: React.FC<StatRowProps> = React.memo(
                 so the icon sits flush against its label). */}
             <div className="flex items-center gap-1 shrink-0">
                 <span className={`${color} flex items-center`}>{icon}</span>
-                <span
-                    className={`uppercase tracking-widest shrink-0 text-[9px] text-stone-200`}
-                >
+                <span className={`uppercase tracking-widest shrink-0 text-[9px] text-stone-200`}>
                     {label}
                 </span>
             </div>
@@ -84,11 +82,7 @@ const StatRow: React.FC<StatRowProps> = React.memo(
             >
                 {value}
                 {suffix && <span className="text-stone-500 text-[8px] ml-1">{suffix}</span>}
-                {subValue && (
-                    <span className="text-stone-500 text-[8px] ml-1">
-                        / {subValue}
-                    </span>
-                )}
+                {subValue && <span className="text-stone-500 text-[8px] ml-1">/ {subValue}</span>}
             </span>
         </div>
     ),
@@ -256,15 +250,7 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                 {/* Vertex dots */}
                 {points.map((p, i) => {
                     const v = vertex(i, scaleFor(p));
-                    return (
-                        <circle
-                            key={i}
-                            cx={v.x}
-                            cy={v.y}
-                            r="1.6"
-                            fill={color}
-                        />
-                    );
+                    return <circle key={i} cx={v.x} cy={v.y} r="1.6" fill={color} />;
                 })}
                 {/* Axis labels — icon + stat name, sit just outside the
                     outer ring. foreignObject lets us embed lucide SVG
@@ -273,17 +259,9 @@ const RadarPolygon: React.FC<RadarPolygonProps> = React.memo(
                 {points.map((p, i) => {
                     const lp = vertex(i, 1.22);
                     return (
-                        <foreignObject
-                            key={i}
-                            x={lp.x - 14}
-                            y={lp.y - 7}
-                            width="28"
-                            height="14"
-                        >
+                        <foreignObject key={i} x={lp.x - 14} y={lp.y - 7} width="28" height="14">
                             <div className="flex items-center justify-center gap-0.5 text-[6px] leading-none font-mono text-stone-300">
-                                <span className={`${p.iconColor} flex items-center`}>
-                                    {p.icon}
-                                </span>
+                                <span className={`${p.iconColor} flex items-center`}>{p.icon}</span>
                                 <span>{p.label}</span>
                             </div>
                         </foreignObject>
@@ -398,9 +376,7 @@ export const TavernHud: React.FC = () => {
             }
 
             const nextHolding =
-                payload !== null &&
-                payload.phase === 'selection' &&
-                payload.holding === true;
+                payload !== null && payload.phase === 'selection' && payload.holding === true;
 
             setHolding((prev) => (prev === nextHolding ? prev : nextHolding));
 
@@ -419,20 +395,23 @@ export const TavernHud: React.FC = () => {
     const outerStyle: React.CSSProperties =
         width > 0
             ? {
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: `${width / scale}px`,
-                height: `${height / scale}px`,
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left',
-            }
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: `${width / scale}px`,
+                  height: `${height / scale}px`,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
+              }
             : { position: 'absolute', inset: 0 };
 
     const isSelection = focus.phase === 'selection';
 
     return (
-        <div className="pointer-events-none [&>*]:pointer-events-none select-none cursor-none overflow-hidden" style={outerStyle}>
+        <div
+            className="pointer-events-none [&>*]:pointer-events-none select-none cursor-none overflow-hidden"
+            style={outerStyle}
+        >
             {/* Precise 396px-perimeter close animation, 1.5s */}
             <style>{`
                 @keyframes tavern-f-fill {
@@ -480,20 +459,26 @@ export const TavernHud: React.FC = () => {
                                     {/* Left column: numerical stats with icons */}
                                     <div className="flex flex-col justify-center gap-2 flex-1 min-w-0">
                                         <StatRow
-                                            icon={<Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />}
+                                            icon={
+                                                <Heart className="w-3.5 h-3.5 fill-red-500 text-red-400" />
+                                            }
                                             label="HP"
                                             value={focus.hp}
                                             color="text-red-400"
                                         />
                                         <StatRow
-                                            icon={<Zap className="w-3.5 h-3.5 fill-sky-400 text-sky-300" />}
+                                            icon={
+                                                <Zap className="w-3.5 h-3.5 fill-sky-400 text-sky-300" />
+                                            }
                                             label="SP"
                                             value={focus.sp}
                                             subValue={`${spRegenToSec(focus.spRegenMs)}s`}
                                             color="text-sky-400"
                                         />
                                         <StatRow
-                                            icon={<Sparkles className="w-3.5 h-3.5 text-yellow-300" />}
+                                            icon={
+                                                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                            }
                                             label="LCK"
                                             value={focus.stats?.luck ?? 1}
                                             suffix="/10"
@@ -525,7 +510,9 @@ export const TavernHud: React.FC = () => {
                                                         min: focus.statRange.hp.min,
                                                         max: focus.statRange.hp.max,
                                                         label: 'HP',
-                                                        icon: <Heart className="w-2.5 h-2.5 fill-red-500 text-red-400" />,
+                                                        icon: (
+                                                            <Heart className="w-2.5 h-2.5 fill-red-500 text-red-400" />
+                                                        ),
                                                         iconColor: 'text-red-400',
                                                     },
                                                     {
@@ -533,7 +520,9 @@ export const TavernHud: React.FC = () => {
                                                         min: focus.statRange.sp.min,
                                                         max: focus.statRange.sp.max,
                                                         label: 'SP',
-                                                        icon: <Zap className="w-2.5 h-2.5 fill-sky-400 text-sky-300" />,
+                                                        icon: (
+                                                            <Zap className="w-2.5 h-2.5 fill-sky-400 text-sky-300" />
+                                                        ),
                                                         iconColor: 'text-sky-400',
                                                     },
                                                     {
@@ -557,7 +546,9 @@ export const TavernHud: React.FC = () => {
                                                         min: focus.statRange.luck.min,
                                                         max: focus.statRange.luck.max,
                                                         label: 'LCK',
-                                                        icon: <Sparkles className="w-2.5 h-2.5 text-yellow-300" />,
+                                                        icon: (
+                                                            <Sparkles className="w-2.5 h-2.5 text-yellow-300" />
+                                                        ),
                                                         iconColor: 'text-yellow-300',
                                                     },
                                                 ]}
@@ -572,9 +563,13 @@ export const TavernHud: React.FC = () => {
                                 {/* Keyboard hints */}
                                 <div className="flex flex-col gap-2">
                                     <div className="flex items-center gap-2 text-[9px] text-stone-500">
-                                        <span className="inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">A</span>
+                                        <span className="inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">
+                                            A
+                                        </span>
                                         <span>/</span>
-                                        <span className="inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">D</span>
+                                        <span className="inline-flex min-w-[18px] items-center justify-center px-1 py-0.5 bg-stone-800 border border-stone-600 text-stone-300">
+                                            D
+                                        </span>
                                         <span>Cycle</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-[9px] text-amber-400">
@@ -610,15 +605,18 @@ export const TavernHud: React.FC = () => {
 
                                 {/* Weapon count */}
                                 <div className="mb-3">
-                                    <div className="text-[9px] text-stone-400 mb-1.5">Weapon Slots</div>
+                                    <div className="text-[9px] text-stone-400 mb-1.5">
+                                        Weapon Slots
+                                    </div>
                                     <div className="flex gap-2">
                                         {Array.from({ length: focus.weaponMax }, (_, i) => (
                                             <div
                                                 key={i}
-                                                className={`w-10 h-10 border-2 flex items-center justify-center ${i < focus.weaponCount
-                                                    ? 'border-amber-500 bg-amber-900/40'
-                                                    : 'border-stone-700 bg-stone-900/40'
-                                                    }`}
+                                                className={`w-10 h-10 border-2 flex items-center justify-center ${
+                                                    i < focus.weaponCount
+                                                        ? 'border-amber-500 bg-amber-900/40'
+                                                        : 'border-stone-700 bg-stone-900/40'
+                                                }`}
                                             >
                                                 {i < focus.weaponCount && (
                                                     <Swords className="w-4 h-4 text-amber-400" />
@@ -627,7 +625,8 @@ export const TavernHud: React.FC = () => {
                                         ))}
                                     </div>
                                     <div className="text-[9px] text-stone-500 mt-1">
-                                        {focus.weaponCount}/{focus.weaponMax} · max {focus.weaponMax} weapons
+                                        {focus.weaponCount}/{focus.weaponMax} · max{' '}
+                                        {focus.weaponMax} weapons
                                     </div>
                                 </div>
 

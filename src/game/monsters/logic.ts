@@ -13,6 +13,8 @@
 import EasyStarPkg from 'easystarjs';
 const EasyStarCtor = (EasyStarPkg as unknown as { js: new () => EasyStarInstance }).js;
 
+import { COMBAT_KNOCKBACK_BASE_MULT, COMBAT_KNOCKBACK_MAX_SPEED } from '@/lib/constants';
+
 export type MonsterAIState = 'chase' | 'attack';
 
 /** Subset of easystar.js API we use. Kept local to avoid leaking the
@@ -93,11 +95,7 @@ export function decideAIState(
  * threshold by this amount prevents the monster from "arriving"
  * at a waypoint that still sits inside its own body box.
  */
-export function isWaypointReached(
-    distance: number,
-    bodyHalf: number,
-    flushOffset = 1,
-): boolean {
+export function isWaypointReached(distance: number, bodyHalf: number, flushOffset = 1): boolean {
     return distance <= bodyHalf + flushOffset;
 }
 
@@ -223,12 +221,7 @@ export class PathfindingService {
                         if (dx === 0 && dy === 0) continue;
                         const ny = gy + dy;
                         const nx = gx + dx;
-                        if (
-                            ny < 0 ||
-                            ny >= this.gridHeight ||
-                            nx < 0 ||
-                            nx >= this.gridWidth
-                        )
+                        if (ny < 0 || ny >= this.gridHeight || nx < 0 || nx >= this.gridWidth)
                             continue;
                         if (this.grid[ny][nx] !== 0) return 1;
                     }
@@ -509,20 +502,14 @@ export class PathfindingService {
         const es = this.getEasystarForInflation(inflation);
         let result: { x: number; y: number }[] | null = null;
         let found = false;
-        es.findPath(
-            startG.x,
-            startG.y,
-            endG.x,
-            endG.y,
-            (path: { x: number; y: number }[]) => {
-                if (!path || path.length === 0) return;
-                const worldPoints = path.map((p) => this.gridToWorldFlush(p, bodyHalfW, bodyHalfH));
-                worldPoints[0] = start;
-                const bodyRadius = Math.max(bodyHalfW, bodyHalfH);
-                result = this.smoothPath(worldPoints, bodyRadius);
-                found = true;
-            },
-        );
+        es.findPath(startG.x, startG.y, endG.x, endG.y, (path: { x: number; y: number }[]) => {
+            if (!path || path.length === 0) return;
+            const worldPoints = path.map((p) => this.gridToWorldFlush(p, bodyHalfW, bodyHalfH));
+            worldPoints[0] = start;
+            const bodyRadius = Math.max(bodyHalfW, bodyHalfH);
+            result = this.smoothPath(worldPoints, bodyRadius);
+            found = true;
+        });
         es.calculate();
         return found ? result : null;
     }
@@ -576,16 +563,10 @@ export class PathfindingService {
         return { x, y };
     }
 
-
-
     /** If a grid cell sits on an inflated wall, walk outward to the nearest
      *  non-wall cell in the same inflation's grid. Prevents null results
      *  when the endpoint or start is on a wall. */
-    private snapToWalkable(
-        start: PathGridPoint,
-        inflation: number,
-        maxRadius = 2,
-    ): PathGridPoint {
+    private snapToWalkable(start: PathGridPoint, inflation: number, maxRadius = 2): PathGridPoint {
         const inflated = this.inflateGrid(inflation);
         const w = inflated[0]?.length ?? 0;
         const h = inflated.length;
@@ -614,8 +595,6 @@ export class PathfindingService {
         // outer fallback retries with smaller inflation.
         return start;
     }
-
-
 
     /** Simple Point-in-Polygon check (Ray casting). */
     private pointInPolygon(px: number, py: number, poly: readonly [number, number][]): boolean {
@@ -813,4 +792,32 @@ export function getPathLookAheadPoint(
         target: candidate,
         nextIdx: idx,
     };
+}
+
+/**
+ * Compute the knockback velocity vector applied to a monster when struck by an attack.
+ * Clamps within [minSpeed, maxSpeed] with square-root scaling based on damage.
+ */
+export function calcKnockbackVelocity(
+    bulletVelocity: { x: number; y: number } | undefined,
+    fallbackDir: { x: number; y: number },
+    damage: number,
+    baseMultiplier = COMBAT_KNOCKBACK_BASE_MULT,
+    maxSpeed = COMBAT_KNOCKBACK_MAX_SPEED,
+): { vx: number; vy: number } {
+    let kx = 0;
+    let ky = 0;
+    if (bulletVelocity && (bulletVelocity.x !== 0 || bulletVelocity.y !== 0)) {
+        const len = Math.hypot(bulletVelocity.x, bulletVelocity.y);
+        kx = bulletVelocity.x / len;
+        ky = bulletVelocity.y / len;
+    } else {
+        const len = Math.hypot(fallbackDir.x, fallbackDir.y);
+        if (len > 0) {
+            kx = fallbackDir.x / len;
+            ky = fallbackDir.y / len;
+        }
+    }
+    const speed = Math.min(maxSpeed, Math.max(1.5, Math.sqrt(damage) * baseMultiplier));
+    return { vx: kx * speed, vy: ky * speed };
 }

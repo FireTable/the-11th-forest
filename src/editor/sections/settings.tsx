@@ -99,12 +99,14 @@ export function SettingsSection({ level, setLevel }: Props) {
         // `character` is the CharacterController instance; it exposes
         // `body` (Matter body) and the sprite directly on itself — the
         // `parts` object is private and not reachable from here.
-        const character = (scene as unknown as {
-            character?: {
-                body?: { position?: { x: number; y: number } };
-                parts?: { sprite?: { flipX?: boolean } };
-            };
-        }).character;
+        const character = (
+            scene as unknown as {
+                character?: {
+                    body?: { position?: { x: number; y: number } };
+                    parts?: { sprite?: { flipX?: boolean } };
+                };
+            }
+        ).character;
         const pos = character?.body?.position;
         if (!pos) return;
         // The sprite's flipX reflects horizontal facing. flipX === true

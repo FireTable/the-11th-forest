@@ -974,13 +974,9 @@ async function handleListMonsterTypes(res) {
                 );
                 const spec = parseYaml(specText) || {};
                 const cols =
-                    typeof spec?.sprite?.grid?.cols === 'number'
-                        ? spec.sprite.grid.cols
-                        : 4;
+                    typeof spec?.sprite?.grid?.cols === 'number' ? spec.sprite.grid.cols : 4;
                 const rows =
-                    typeof spec?.sprite?.grid?.rows === 'number'
-                        ? spec.sprite.grid.rows
-                        : 4;
+                    typeof spec?.sprite?.grid?.rows === 'number' ? spec.sprite.grid.rows : 4;
                 const idle = spec?.anims?.idle;
                 const idleFrames = Array.isArray(idle?.frames) ? idle.frames : null;
                 const idleStart =
@@ -988,11 +984,8 @@ async function handleListMonsterTypes(res) {
                         ? idleFrames[0]
                         : 0;
                 const idleCount =
-                    idleFrames && idleFrames.length === 2
-                        ? idleFrames[1] - idleFrames[0] + 1
-                        : 4;
-                const idleFrameRate =
-                    typeof idle?.frameRate === 'number' ? idle.frameRate : 6;
+                    idleFrames && idleFrames.length === 2 ? idleFrames[1] - idleFrames[0] + 1 : 4;
+                const idleFrameRate = typeof idle?.frameRate === 'number' ? idle.frameRate : 6;
                 const texture =
                     typeof spec?.sprite?.texture === 'string'
                         ? spec.sprite.texture

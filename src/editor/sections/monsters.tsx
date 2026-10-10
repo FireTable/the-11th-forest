@@ -60,7 +60,7 @@ export function MonstersSection({ level, setLevel }: Props) {
         const last = monsters[monsters.length - 1];
         const nextWaveId = last?.waveId ?? 'wave-1';
         const first = availableTypes[0];
-        const fallbackType = typeof first === 'string' ? first : first?.id ?? 'drone';
+        const fallbackType = typeof first === 'string' ? first : (first?.id ?? 'drone');
         const newSpawn: MonsterSpawn = {
             type: fallbackType,
             x: Math.round(level.imageSize.width / 2),
@@ -145,8 +145,6 @@ export function MonstersSection({ level, setLevel }: Props) {
                     />
                 ))}
             </div>
-
-
         </div>
     );
 }

@@ -619,7 +619,9 @@ export class TeleporterController {
 
         // Update persistent level store to next scene ID and reset level entity snapshots
         useGameStore.getState().setCurrentLevelId(nextSceneId);
-        useGameStore.getState().setEntitySnapshots({ player: undefined, monsters: undefined, drops: undefined });
+        useGameStore
+            .getState()
+            .setEntitySnapshots({ player: undefined, monsters: undefined, drops: undefined });
 
         // AudioController subscribes to `sfx:*` globally — emit the new
         // id and the portal-ignition chime plays under the fade. We
@@ -681,9 +683,12 @@ export class TeleporterController {
     /** Linear interpolation of 24-bit RGB at rate `r` per second. */
     private static lerpRgb(from: number, to: number, dtMs: number): number {
         const t = 1 - Math.exp(-TeleporterController.COLOR_LERP_PER_SEC * (dtMs / 1000));
-        const a = (from >> 16) & 0xff, b = (to >> 16) & 0xff;
-        const g = (from >> 8) & 0xff, h = (to >> 8) & 0xff;
-        const bl = from & 0xff, br = to & 0xff;
+        const a = (from >> 16) & 0xff,
+            b = (to >> 16) & 0xff;
+        const g = (from >> 8) & 0xff,
+            h = (to >> 8) & 0xff;
+        const bl = from & 0xff,
+            br = to & 0xff;
         return (
             (Math.round(a + (b - a) * t) << 16) |
             (Math.round(g + (h - g) * t) << 8) |
@@ -718,9 +723,7 @@ export class TeleporterController {
 
     private advanceWaves(view: SingleTeleporterView, now: number): void {
         // Drop expired waves
-        view.waves = view.waves.filter(
-            (t) => now - t < TeleporterController.WAVE_LIFETIME_MS,
-        );
+        view.waves = view.waves.filter((t) => now - t < TeleporterController.WAVE_LIFETIME_MS);
         // Spawn?
         const interval = view.isActive
             ? TeleporterController.WAVE_INTERVAL_ACTIVE_MS
@@ -750,7 +753,7 @@ export class TeleporterController {
             const eased = 1 - Math.pow(1 - u, 3);
             const radius = r + (maxR - r) * eased;
             // Alpha dies fast; line thins as it spreads
-            const alpha = (0.6 * (1 - u * u)) * view.appearAlpha;
+            const alpha = 0.6 * (1 - u * u) * view.appearAlpha;
             const width = 2.5 * (1 - u * 0.7);
             g.lineStyle(width, primaryColor, alpha);
             g.strokeCircle(0, 0, radius);

@@ -69,6 +69,7 @@ interface FloatingText {
     startY: number;
     createdAt: number;
     durationMs: number;
+    isCrit?: boolean;
 }
 
 export class StatusHud extends BaseHud {
@@ -173,6 +174,10 @@ export class StatusHud extends BaseHud {
             .setResolution(2)
             .setOrigin(0, 0.5);
 
+        if (isCrit) {
+            textObj.setScale(1.45);
+        }
+
         this.root.add(textObj);
 
         this.floatingTexts.push({
@@ -181,9 +186,9 @@ export class StatusHud extends BaseHud {
             startY,
             createdAt: this.scene.time.now,
             durationMs: isCrit ? 1100 : 800,
+            isCrit,
         });
     }
-
 
     /**
      * Reposition above body (hitbox top) + draw.
@@ -329,6 +334,13 @@ export class StatusHud extends BaseHud {
                 item.textObj.setX(item.startX);
                 item.textObj.setY(item.startY - progress * 24);
                 item.textObj.setAlpha(1 - progress);
+
+                // Crit bounce / pop: starts at 1.45x scale and smoothly settles to 1.0x in 140ms
+                if (item.isCrit) {
+                    const popProgress = Math.min(1, elapsed / 140);
+                    const currentScale = 1.0 + 0.45 * Math.sin((1 - popProgress) * (Math.PI / 2));
+                    item.textObj.setScale(currentScale);
+                }
             }
         }
     }

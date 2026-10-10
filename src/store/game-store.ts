@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-
 export interface WeaponSlotData {
     id: string;
     name: string;
@@ -198,7 +197,8 @@ export const useGameStore = create<GameUIState>()(
                         levelProgressMap: {
                             ...state.levelProgressMap,
                             [targetLevelId]: {
-                                currentWaveIndex: progress.currentWaveIndex ?? existing.currentWaveIndex,
+                                currentWaveIndex:
+                                    progress.currentWaveIndex ?? existing.currentWaveIndex,
                                 clearedWaveIds: progress.clearedWaveIds ?? existing.clearedWaveIds,
                             },
                         },
@@ -280,7 +280,11 @@ export const useGameStore = create<GameUIState>()(
                 } catch {
                     // Fallback
                 }
-                set(() => ({ ...initialGameState, tavernCleared: false, selectedCharacterId: null, }));
+                set(() => ({
+                    ...initialGameState,
+                    tavernCleared: false,
+                    selectedCharacterId: null,
+                }));
             },
 
             setSelectedCharacterId: (id) => set({ selectedCharacterId: id }),
@@ -307,6 +311,6 @@ export const useGameStore = create<GameUIState>()(
                 selectedCharacterId: state.selectedCharacterId,
                 tavernCleared: state.tavernCleared,
             }),
-        }
-    )
+        },
+    ),
 );

@@ -18,11 +18,11 @@ export function CornerPixels({ hideBottom = false }: { hideBottom?: boolean }) {
     const corners = hideBottom
         ? ['-top-[3px] -left-[3px]', '-top-[3px] -right-[3px]']
         : [
-            '-top-[3px] -left-[3px]',
-            '-top-[3px] -right-[3px]',
-            '-bottom-[3px] -left-[3px]',
-            '-bottom-[3px] -right-[3px]',
-        ];
+              '-top-[3px] -left-[3px]',
+              '-top-[3px] -right-[3px]',
+              '-bottom-[3px] -left-[3px]',
+              '-bottom-[3px] -right-[3px]',
+          ];
     return (
         <>
             {corners.map((c) => (

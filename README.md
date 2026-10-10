@@ -22,7 +22,7 @@
 
 ## 📖 Overview
 
-**The 11th Forest** is a top-down pixel action shooter combining hand-crafted gothic garden aesthetics with a strictly typed data-driven architecture built on Phaser 4 + React 19, inspired by titles like *Brotato* and *Vampire Survivors*.
+**The 11th Forest** is a top-down pixel action shooter combining hand-crafted gothic garden aesthetics with a strictly typed data-driven architecture built on Phaser 4 + React 19, inspired by titles like _Brotato_ and _Vampire Survivors_.
 
 You play a lone hunter drawn into a forest that shouldn't exist — a place where roses shoot back and the trees remember every name spoken under their shade.
 
@@ -49,33 +49,36 @@ Beyond the core combat systems, the project features an **in-browser visual leve
 
 The project integrates native AI generation pipelines for graphics, sound, and soundtrack:
 
-| AI Service | Domain | Integration & Usage |
-| :--- | :--- | :--- |
-| **Google Gemini** *(Gemini 3 Pro Image)* | **Pixel Art & Sprites** | Asset prompt templates stored in `prompts/`. Generates chroma-key sprite sheets directly into `public/assets/image/`. |
-| **MiniMax** | **BGM Soundtracks** | Mood-keyed audio generation pipeline. Audio tracks and `.prompt.json` files saved under `public/assets/audio/`. |
-| **ElevenLabs** | **Character Voice & SFX** | Generates unique character hurt/dodge voice lines and monster/weapon combat SFX via `scripts/elevenlabs-sfx.ts`. |
+| AI Service                               | Domain                    | Integration & Usage                                                                                                   |
+| :--------------------------------------- | :------------------------ | :-------------------------------------------------------------------------------------------------------------------- |
+| **Google Gemini** _(Gemini 3 Pro Image)_ | **Pixel Art & Sprites**   | Asset prompt templates stored in `prompts/`. Generates chroma-key sprite sheets directly into `public/assets/image/`. |
+| **MiniMax**                              | **BGM Soundtracks**       | Mood-keyed audio generation pipeline. Audio tracks and `.prompt.json` files saved under `public/assets/audio/`.       |
+| **ElevenLabs**                           | **Character Voice & SFX** | Generates unique character hurt/dodge voice lines and monster/weapon combat SFX via `scripts/elevenlabs-sfx.ts`.      |
 
 ---
 
 ## ✨ Key Features
 
 ### 🎮 Core Gameplay & Systems
-* **Inspirations**: Drawing movement, weapon positioning, and stat-building ideas from titles like *Brotato*.
-* **Dynamic Character Selection & Tavern Hub**: Multiple characters (Bunny, Kitty, Wanderer) with unique voice acting, radar stats, and damage routing; tavern selection scene and persistent save files.
-* **Physics & Monster AI State Machine**: Integrated **Matter.js** rigid body physics, monster knockback/stagger state machine, foot-based BodyBox A* pathfinding, and wave-triggered monster queue.
-* **Seamless Teleporter System**: Inter-scene travel via configurable Teleporter trigger zones.
-* **Projectile Dynamics & Z-Depth Layering**: Trajectory gravity, weapon swing/orbit paths, and dynamic Z-depth sorting.
+
+- **Inspirations**: Drawing movement, weapon positioning, and stat-building ideas from titles like _Brotato_.
+- **Dynamic Character Selection & Tavern Hub**: Multiple characters (Bunny, Kitty, Wanderer) with unique voice acting, radar stats, and damage routing; tavern selection scene and persistent save files.
+- **Physics & Monster AI State Machine**: Integrated **Matter.js** rigid body physics, monster knockback/stagger state machine, foot-based BodyBox A* pathfinding, and wave-triggered monster queue.
+- **Seamless Teleporter System**: Inter-scene travel via configurable Teleporter trigger zones.
+- **Projectile Dynamics & Z-Depth Layering**: Trajectory gravity, weapon swing/orbit paths, and dynamic Z-depth sorting.
 
 ### 🛠️ In-Browser Visual Level Editor
-* Launch `http://localhost:8080/?editor=1` to toggle the side editor panel.
-* **No Traditional Backend Required**: Disk reads/writes are served locally via Vite Node plugin API (`vite/plugins/editor-api.mjs`).
-* **Air Wall Canvas**: Polygon drawing overlay powered by Konva, supporting Tall vs. Short collision properties.
-* **Monsters & Teleporters**: Visual placement of spawn points, wave trigger conditions, and scene transition teleporters.
-* **Sprite & Material Manager**: Tile palette placement, sprite slicing inspector, and direct YAML persistence back to `public/data/`.
+
+- Launch `http://localhost:8080/?editor=1` to toggle the side editor panel.
+- **No Traditional Backend Required**: Disk reads/writes are served locally via Vite Node plugin API (`vite/plugins/editor-api.mjs`).
+- **Air Wall Canvas**: Polygon drawing overlay powered by Konva, supporting Tall vs. Short collision properties.
+- **Monsters & Teleporters**: Visual placement of spawn points, wave trigger conditions, and scene transition teleporters.
+- **Sprite & Material Manager**: Tile palette placement, sprite slicing inspector, and direct YAML persistence back to `public/data/`.
 
 ### ⚙️ Data-Driven Architecture
-* Levels (`levels/`), characters (`characters/`), monsters (`monsters/`), weapons (`weapons/`), drops (`drops/`), and audio rules (`audios/`) are **100% driven by YAML**.
-* Every module is validated by strict **Zod Schemas** to ensure offline testability and robust runtime execution.
+
+- Levels (`levels/`), characters (`characters/`), monsters (`monsters/`), weapons (`weapons/`), drops (`drops/`), and audio rules (`audios/`) are **100% driven by YAML**.
+- Every module is validated by strict **Zod Schemas** to ensure offline testability and robust runtime execution.
 
 ---
 
@@ -117,13 +120,13 @@ The data and asset folders share names deliberately: `data/monsters/keeper.yaml`
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology | Description |
-| :--- | :--- | :--- |
-| **Game Engine** | [Phaser 4](https://github.com/phaserjs/phaser) + Matter.js | Renderer, physics engine, sprite animations & scene management |
-| **App & HUD UI** | [React 19](https://react.dev) | Interactive HUD overlays, tavern cards, settings & level editor |
-| **Local API** | [Vite 6](https://vite.dev) Dev Plugin API | Replaces traditional backend; provides local YAML save API |
-| **Language** | [TypeScript 5.7](https://www.typescriptlang.org) | Strict type system with full-stack schema validation |
-| **State & Save** | [Zustand 5](https://github.com/pmndrs/zustand) | HUD state mirror with persisted 1Hz save tick |
+| Layer            | Technology                                                 | Description                                                     |
+| :--------------- | :--------------------------------------------------------- | :-------------------------------------------------------------- |
+| **Game Engine**  | [Phaser 4](https://github.com/phaserjs/phaser) + Matter.js | Renderer, physics engine, sprite animations & scene management  |
+| **App & HUD UI** | [React 19](https://react.dev)                              | Interactive HUD overlays, tavern cards, settings & level editor |
+| **Local API**    | [Vite 6](https://vite.dev) Dev Plugin API                  | Replaces traditional backend; provides local YAML save API      |
+| **Language**     | [TypeScript 5.7](https://www.typescriptlang.org)           | Strict type system with full-stack schema validation            |
+| **State & Save** | [Zustand 5](https://github.com/pmndrs/zustand)             | HUD state mirror with persisted 1Hz save tick                   |
 
 ---
 
@@ -168,11 +171,11 @@ the-11th-forest/
 
 Deep-dive documentation lives under [`docs/`](./docs):
 
-* 📘 [`docs/SCENES.md`](./docs/SCENES.md) — Scene loading pipeline, teleporter transitions & tavern hub.
-* 📘 [`docs/EDITOR.md`](./docs/EDITOR.md) — Visual level editor sections & Vite local persistence API.
-* 📘 [`docs/MODULES.md`](./docs/MODULES.md) — YAML → Schema → Parser → Loader → Logic design pattern.
-* 📘 [`docs/SKILL.md`](./docs/SKILL.md) — Data maintenance, balance math & AI asset pipeline.
-* 📙 References: [`MONSTERS.md`](./docs/MONSTERS.md) · [`WEAPONS.md`](./docs/WEAPONS.md) · [`CHARACTERS.md`](./docs/CHARACTERS.md) · [`DROPS.md`](./docs/DROPS.md) · [`AUDIOS.md`](./docs/AUDIOS.md) · [`PERSIST.md`](./docs/PERSIST.md)
+- 📘 [`docs/SCENES.md`](./docs/SCENES.md) — Scene loading pipeline, teleporter transitions & tavern hub.
+- 📘 [`docs/EDITOR.md`](./docs/EDITOR.md) — Visual level editor sections & Vite local persistence API.
+- 📘 [`docs/MODULES.md`](./docs/MODULES.md) — YAML → Schema → Parser → Loader → Logic design pattern.
+- 📘 [`docs/SKILL.md`](./docs/SKILL.md) — Data maintenance, balance math & AI asset pipeline.
+- 📙 References: [`MONSTERS.md`](./docs/MONSTERS.md) · [`WEAPONS.md`](./docs/WEAPONS.md) · [`CHARACTERS.md`](./docs/CHARACTERS.md) · [`DROPS.md`](./docs/DROPS.md) · [`AUDIOS.md`](./docs/AUDIOS.md) · [`PERSIST.md`](./docs/PERSIST.md)
 
 ---
 

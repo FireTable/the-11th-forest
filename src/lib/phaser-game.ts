@@ -61,7 +61,11 @@ export async function restartSceneWith(resolved: ResolvedScene): Promise<void> {
     useGameStore.getState().clearSceneSnapshots();
 
     const key = `LoadScene:${resolved.id}`;
-    const newScene = game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+    const newScene = game.scene.add(
+        key,
+        new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)),
+        true,
+    );
 
     // Ensure the newly added scene is active and unpaused
     newScene?.scene.resume();
@@ -101,7 +105,11 @@ export async function restartAtTavern(): Promise<void> {
     // 3. Start fresh tavern scene and force resume in case game was paused
     if (game) {
         const key = `LoadScene:${resolved.id}`;
-        const newScene = game.scene.add(key, new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)), true);
+        const newScene = game.scene.add(
+            key,
+            new LoadScene(resolved.id, resolved.level, toSceneAssets(resolved)),
+            true,
+        );
         newScene?.scene.resume();
     }
 }

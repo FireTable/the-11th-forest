@@ -155,13 +155,13 @@ destroyBulletVisual(scene, bullet)
 
 ## Events emitted
 
-| Event                                    | When                                                                                              |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `sfx:weapon-switch`                      | hotbar swap                                                                                       |
-| `sfx:reload-start` / `sfx:reload-finish` | manual reload lifecycle (falls back to global `reload-start`/`reload-finish` if spec omits sfx)   |
-| `sfx:dry-fire`                           | trigger with empty magazine                                                                       |
-| `sfx:bullet-wall`                        | bullet hit tall wall (throttled per weapon by `sfx.throttleMs`)                                   |
-| `sfx:<weapon>.shoot` or `sfx:player-shoot` / `sfx:monster-shoot` | ranged fire (uses `weapon.sfx?.shoot` or falls back by holder) |
+| Event                                                            | When                                                                                            |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `sfx:weapon-switch`                                              | hotbar swap                                                                                     |
+| `sfx:reload-start` / `sfx:reload-finish`                         | manual reload lifecycle (falls back to global `reload-start`/`reload-finish` if spec omits sfx) |
+| `sfx:dry-fire`                                                   | trigger with empty magazine                                                                     |
+| `sfx:bullet-wall`                                                | bullet hit tall wall (throttled per weapon by `sfx.throttleMs`)                                 |
+| `sfx:<weapon>.shoot` or `sfx:player-shoot` / `sfx:monster-shoot` | ranged fire (uses `weapon.sfx?.shoot` or falls back by holder)                                  |
 
 ## Events subscribed
 

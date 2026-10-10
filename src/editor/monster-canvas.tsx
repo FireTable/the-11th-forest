@@ -153,10 +153,7 @@ export function MonsterCanvas({ level, active = true, onSpawnMove }: Props) {
 
     const scale = useMemo(() => {
         if (box.width === 0 || box.height === 0) return 1;
-        return Math.min(
-            box.width / level.imageSize.width,
-            box.height / level.imageSize.height,
-        );
+        return Math.min(box.width / level.imageSize.width, box.height / level.imageSize.height);
     }, [box, level.imageSize]);
 
     const typeById = useMemo(() => {

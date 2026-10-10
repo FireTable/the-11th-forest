@@ -214,6 +214,26 @@ export const COMBAT_CRIT_DAMAGE_MULTIPLIER = 2;
  *  not stall combat flow. */
 export const MONSTER_DEATH_FADE_MS = 800;
 
+// ─── Combat: Hit feedback & Juice ──────────────────────────────────────
+
+/** Hit flash duration in milliseconds. Monster sprite turns solid white. */
+export const COMBAT_HIT_FLASH_MS = 80;
+
+/** Short hit-stun duration where monster chase movement pauses to allow knockback. */
+export const COMBAT_HIT_STUN_MS = 80;
+
+/** Base impulse multiplier for bullet knockback calculation. */
+export const COMBAT_KNOCKBACK_BASE_MULT = 1.2;
+
+/** Max knockback velocity cap. */
+export const COMBAT_KNOCKBACK_MAX_SPEED = 7.5;
+
+/** Screen shake on critical hits (duration ms, intensity). */
+export const COMBAT_SCREEN_SHAKE_CRIT = { duration: 60, intensity: 0.003 };
+
+/** Screen shake on heavy explosive impacts. */
+export const COMBAT_SCREEN_SHAKE_EXPLOSION = { duration: 100, intensity: 0.005 };
+
 // ─── Render: shared visual constants ──────────────────────────────────
 
 /** Max trail positions kept per bullet for the bullet trail. */

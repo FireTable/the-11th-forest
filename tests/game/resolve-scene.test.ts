@@ -11,6 +11,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getSceneIdFromUrl, resolveDefaultSceneId } from '@/game/resolve-scene';
+import { clearFetchCache } from '@/lib/handle-fetch';
 
 const originalLocation = window.location;
 
@@ -21,6 +22,8 @@ afterEach(() => {
         writable: true,
         value: originalLocation,
     });
+    clearFetchCache();
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
 });
 

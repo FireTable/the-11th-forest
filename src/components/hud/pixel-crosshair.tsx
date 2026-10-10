@@ -44,7 +44,9 @@ export const PixelCrosshair: React.FC = () => {
     const wrapRef = useRef<HTMLDivElement | null>(null);
 
     // High-frequency / live refs (bypass React re-render)
-    const rectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+    const rectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(
+        null,
+    );
     const lastCoordRef = useRef<{ x: number; y: number }>({ x: -100, y: -100 });
     const visibleRef = useRef(false);
 
@@ -163,8 +165,9 @@ export const PixelCrosshair: React.FC = () => {
             <div
                 // Only animate the transform property; avoid full-attribute
                 // interpolation / reflow during animation.
-                className={`transition-transform duration-150 ease-out ${isLocked ? 'animate-crosshair-breathe' : 'scale-100'
-                    }`}
+                className={`transition-transform duration-150 ease-out ${
+                    isLocked ? 'animate-crosshair-breathe' : 'scale-100'
+                }`}
             >
                 <svg
                     width={34}

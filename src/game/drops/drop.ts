@@ -175,7 +175,11 @@ export class DropInstance {
         this.rect.setStrokeStyle(1.5, 0x22c55e, 1);
         this.rect.setVisible(false);
 
-        if (weaponSpec && weaponSpec.visual?.texture && scene.textures.exists(weaponSpec.visual.texture)) {
+        if (
+            weaponSpec &&
+            weaponSpec.visual?.texture &&
+            scene.textures.exists(weaponSpec.visual.texture)
+        ) {
             // Weapon pickups show the weapon's own in-hand texture so the
             // drop on the ground is visually identical to the gun you're
             // about to pick up. No spritesheet / anim — weapons are
@@ -352,18 +356,9 @@ export class DropController {
         if (dropSnapshots && dropSnapshots.length > 0) {
             for (const s of dropSnapshots) {
                 try {
-                    const weaponOverride = s.weaponId
-                        ? this.getWeapon?.(s.weaponId)
-                        : undefined;
+                    const weaponOverride = s.weaponId ? this.getWeapon?.(s.weaponId) : undefined;
                     this.runtimeDrops.push(
-                        new DropInstance(
-                            scene,
-                            getDrop(s.specId),
-                            s.x,
-                            s.y,
-                            false,
-                            weaponOverride,
-                        ),
+                        new DropInstance(scene, getDrop(s.specId), s.x, s.y, false, weaponOverride),
                     );
                 } catch {
                     // Ignore missing specs
@@ -375,14 +370,7 @@ export class DropController {
             for (const s of spawns) {
                 const weaponOverride = s.weaponId ? this.getWeapon?.(s.weaponId) : undefined;
                 this.staticDrops.push(
-                    new DropInstance(
-                        scene,
-                        getDrop(s.type),
-                        s.x,
-                        s.y,
-                        false,
-                        weaponOverride,
-                    ),
+                    new DropInstance(scene, getDrop(s.type), s.x, s.y, false, weaponOverride),
                 );
             }
         }

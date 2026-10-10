@@ -282,7 +282,8 @@ export class LoadScene extends Phaser.Scene {
             this.pathDebugOverlay.setVisible(visible === true);
         };
         EventBus.on('path-debug-visible', onPathDebugVisible);
-        const unbindPathDebug = () => EventBus.removeListener('path-debug-visible', onPathDebugVisible);
+        const unbindPathDebug = () =>
+            EventBus.removeListener('path-debug-visible', onPathDebugVisible);
         this.events.once('shutdown', unbindPathDebug);
         this.events.once('destroy', unbindPathDebug);
 
@@ -413,10 +414,10 @@ export class LoadScene extends Phaser.Scene {
                 const other = bullet === a ? b : a;
                 if (other.label !== 'monster' && other.label !== 'monster-hitbox') continue;
                 const weapon = this.character.weapons;
-                if (!weapon) continue;
-                const active = weapon.getActive();
-                if (!active) continue;
-                this.monsterSystem.applyBulletDamage(active.damage, other);
+                const active = weapon?.getActive();
+                const bulletDamage = (bullet as any).bulletDamage ?? active?.damage;
+                if (bulletDamage === undefined) continue;
+                this.monsterSystem.applyBulletDamage(bulletDamage, other, bullet);
             }
         });
 
@@ -498,7 +499,10 @@ export class LoadScene extends Phaser.Scene {
 
         this.events.on('update', (_time: number, delta: number) => {
             this.monsterSystem.update(this.time.now);
-            this.pathDebugOverlay.refresh(this.monsterSystem.getDebugMonsters(), this.character.body);
+            this.pathDebugOverlay.refresh(
+                this.monsterSystem.getDebugMonsters(),
+                this.character.body,
+            );
             this.dropSystem.update();
             this.materialManager.update();
             this.teleporterSystem.update(delta);
@@ -555,8 +559,7 @@ export class LoadScene extends Phaser.Scene {
                 // placeholder snapshot.
                 const allChars = this.assets.allCharacters ?? [];
                 const pickedSpec =
-                    allChars.find((c) => c.id === selectedId) ??
-                    this.assets.character;
+                    allChars.find((c) => c.id === selectedId) ?? this.assets.character;
                 this.character.destroy();
                 (this.assets as any).character = pickedSpec;
                 if (pickedSpec.sprite) {
@@ -571,15 +574,9 @@ export class LoadScene extends Phaser.Scene {
                     activeMonstersSnapshot: undefined,
                     groundDropsSnapshot: undefined,
                 });
-                this.character = loadCharacter(
-                    this,
-                    this.level,
-                    pickedSpec,
-                    this.assets.weapons,
-                    {
-                        weaponsById: this.assets.weaponsById,
-                    },
-                );
+                this.character = loadCharacter(this, this.level, pickedSpec, this.assets.weapons, {
+                    weaponsById: this.assets.weaponsById,
+                });
                 this.monsterSystem.setPlayerBody(this.character.body);
                 this.monsterSystem.setPlayerLuck(pickedSpec.luck ?? 1);
                 this.dropSystem.setCharacter(this.character);

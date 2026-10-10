@@ -52,12 +52,20 @@ describe('monsters/spawn-queue — clear trigger', () => {
 
     it('fires when field is empty and delayMs is 0', () => {
         // hasSeenAlive pre-stamped — target wave was already observed.
-        const p: PendingSpawn = { ...clearSpawn(undefined), clearReadyAt: 1000, hasSeenAlive: true };
+        const p: PendingSpawn = {
+            ...clearSpawn(undefined),
+            clearReadyAt: 1000,
+            hasSeenAlive: true,
+        };
         expect(spawnReady(p, 1000, EMPTY)).toBe(true);
     });
 
     it('does not fire until post-clear delayMs has elapsed', () => {
-        const p: PendingSpawn = { ...clearSpawn(undefined, 500), clearReadyAt: 1000, hasSeenAlive: true };
+        const p: PendingSpawn = {
+            ...clearSpawn(undefined, 500),
+            clearReadyAt: 1000,
+            hasSeenAlive: true,
+        };
         expect(spawnReady(p, 1499, EMPTY)).toBe(false);
         expect(spawnReady(p, 1500, EMPTY)).toBe(true);
     });

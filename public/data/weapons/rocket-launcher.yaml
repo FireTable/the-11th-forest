@@ -1,5 +1,6 @@
 name: Rocket Launcher
 damage: 55
+aoeRadius: 85
 cooldownMs: 1200
 range: 800
 clipSize: 2

@@ -146,11 +146,11 @@ Owns the array of active drops + collision wiring. Per-frame `update()` animates
 new DropController(scene, matter, characterBody, specMap, cb);
 ```
 
-| Method              | Purpose                                     |
-| ------------------- | ------------------------------------------- |
+| Method                          | Purpose                                                                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `spawn(spec, x, y, overrides?)` | create new DropInstance, add to active list. `overrides` carries `DropSpawn.weaponId` for the generic weapon-drop path. |
-| `update()`          | per-frame animation tick                    |
-| `destroy()`         | teardown all drops                          |
+| `update()`                      | per-frame animation tick                                                                                                |
+| `destroy()`                     | teardown all drops                                                                                                      |
 
 Collision handler listens for `collisionstart` between a drop sensor and the character body. On overlap:
 

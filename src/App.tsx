@@ -28,7 +28,9 @@ import { useGameStore } from '@/store/game-store';
  * from TavernController via EventBus and shows the selection panel.
  */
 const EditorPanel = lazy(() => import('@/editor/panel').then((m) => ({ default: m.EditorPanel })));
-const TavernHud   = lazy(() => import('@/components/hud/tavern-hud').then((m) => ({ default: m.TavernHud })));
+const TavernHud = lazy(() =>
+    import('@/components/hud/tavern-hud').then((m) => ({ default: m.TavernHud })),
+);
 
 function App() {
     const tavernCleared = useGameStore((s) => s.tavernCleared);

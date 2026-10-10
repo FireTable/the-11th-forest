@@ -55,7 +55,9 @@ export function DeathOverlay() {
 
                 {/* Subtitle */}
                 <div className="text-[10px] uppercase tracking-wider text-stone-500 text-center leading-relaxed">
-                    The forest claims<br />another wanderer.
+                    The forest claims
+                    <br />
+                    another wanderer.
                 </div>
 
                 {/* Restart button */}

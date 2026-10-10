@@ -1,8 +1,8 @@
 monsters:
-  - drone
-  - drone-ultra
-  - gunner
-  - stalker
-  - sniper
-  - warden
-  - keeper
+    - drone
+    - drone-ultra
+    - gunner
+    - stalker
+    - sniper
+    - warden
+    - keeper
