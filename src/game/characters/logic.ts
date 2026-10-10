@@ -673,7 +673,9 @@ export class CharacterController {
         ghost.setScale(sprite.scaleX, sprite.scaleY);
         ghost.setDepth(footY - 1);
         ghost.setAlpha(0.55);
-        ghost.setTint(0x38bdf8);
+        // Soft silver-white micro-glow (clean additive shimmer over original colors)
+        ghost.setTint(0x606060);
+        (ghost as any).setTintMode?.(2); // TintModes.ADD = 2
         this.activeDodgeGhosts.push(ghost);
 
         this.scene.tweens.add({
