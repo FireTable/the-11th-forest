@@ -4,11 +4,9 @@ import { EventBus } from '@/lib/events/bus';
 /**
  * HurtVignetteOverlay
  * --------------------------------------------------------------------------
- * Visual juice: flashes a crimson 4-corner radial vignette + edge glow across
- * the viewport when the player takes damage ("暗角闪红").
- *
- * Driven via high-performance requestAnimationFrame directly on the DOM node's
- * opacity for smooth 60/120Hz decay without React re-render overhead.
+ * Visual juice: subtle, silky crimson 4-corner micro-vignette flash when taking damage.
+ * Confined strictly to the outermost 4 corner tips (center 75%+ remains clear),
+ * with soft transparency and smooth 380ms ease-out decay to avoid eye strain.
  */
 export const HurtVignetteOverlay: React.FC = () => {
     const overlayRef = useRef<HTMLDivElement>(null);
@@ -19,7 +17,7 @@ export const HurtVignetteOverlay: React.FC = () => {
         const handlePlayerHurt = () => {
             lastHurtTimeRef.current = performance.now();
             if (overlayRef.current) {
-                overlayRef.current.style.opacity = '1';
+                overlayRef.current.style.opacity = '0.5';
                 overlayRef.current.style.display = 'block';
             }
 
@@ -29,13 +27,14 @@ export const HurtVignetteOverlay: React.FC = () => {
 
             const tick = () => {
                 const elapsed = performance.now() - lastHurtTimeRef.current;
-                const duration = 280; // 280ms visceral hurt vignette decay
+                const duration = 380; // 380ms silky smooth hurt decay
                 const ratio = Math.max(0, 1 - elapsed / duration);
 
                 if (overlayRef.current) {
-                    // Ease-out curve for natural camera lens flash decay
-                    const easedOpacity = Math.pow(ratio, 1.5);
-                    overlayRef.current.style.opacity = easedOpacity.toFixed(3);
+                    // Soft cubic ease-out decay capped at 0.5 peak opacity
+                    const eased = Math.pow(ratio, 1.8);
+                    const opacity = (eased * 0.5).toFixed(3);
+                    overlayRef.current.style.opacity = opacity;
                 }
 
                 if (ratio > 0) {
@@ -69,15 +68,15 @@ export const HurtVignetteOverlay: React.FC = () => {
             style={{
                 display: 'none',
                 opacity: 0,
-                // Multi-layered 4-corner vignette gradient + inset perimeter glow
+                // Soft micro-vignette strictly in outer corner tips (center 75% 100% clear)
                 background: `
-                    radial-gradient(ellipse at center, transparent 40%, rgba(220, 38, 38, 0.25) 70%, rgba(185, 28, 28, 0.65) 100%),
-                    radial-gradient(circle at 0% 0%, rgba(239, 68, 68, 0.75) 0%, transparent 45%),
-                    radial-gradient(circle at 100% 0%, rgba(239, 68, 68, 0.75) 0%, transparent 45%),
-                    radial-gradient(circle at 0% 100%, rgba(239, 68, 68, 0.75) 0%, transparent 45%),
-                    radial-gradient(circle at 100% 100%, rgba(239, 68, 68, 0.75) 0%, transparent 45%)
+                    radial-gradient(ellipse at center, transparent 72%, rgba(220, 38, 38, 0.12) 88%, rgba(185, 28, 28, 0.35) 100%),
+                    radial-gradient(circle at 0% 0%, rgba(220, 38, 38, 0.45) 0%, transparent 22%),
+                    radial-gradient(circle at 100% 0%, rgba(220, 38, 38, 0.45) 0%, transparent 22%),
+                    radial-gradient(circle at 0% 100%, rgba(220, 38, 38, 0.45) 0%, transparent 22%),
+                    radial-gradient(circle at 100% 100%, rgba(220, 38, 38, 0.45) 0%, transparent 22%)
                 `,
-                boxShadow: 'inset 0 0 90px 25px rgba(239, 68, 68, 0.55)',
+                boxShadow: 'inset 0 0 35px 8px rgba(220, 38, 38, 0.25)',
             }}
         />
     );

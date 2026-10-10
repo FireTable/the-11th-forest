@@ -65,6 +65,7 @@ export function installCanvasFit(game: Phaser.Game): () => void {
                 const rect = phaserCanvas.getBoundingClientRect();
                 game.scale.canvasBounds.setTo(rect.left, rect.top, rect.width, rect.height);
             }
+            EventBus.emit('canvas-bounds-changed');
         }
     };
 

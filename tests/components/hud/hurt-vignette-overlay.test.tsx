@@ -52,7 +52,7 @@ describe('HurtVignetteOverlay', () => {
         });
 
         expect(overlay.style.display).toBe('block');
-        expect(overlay.style.opacity).toBe('1');
+        expect(overlay.style.opacity).toBe('0.5');
         expect(window.requestAnimationFrame).toHaveBeenCalled();
     });
 });

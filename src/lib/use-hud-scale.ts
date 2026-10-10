@@ -1,21 +1,17 @@
 /**
  * src/lib/use-hud-scale.ts
  * --------------------------------------------------------------------------
- * One scale factor shared by every DOM HUD layer (`GameHUDLayer`,
- * `TouchControls`) so panels, weapon slots and the joystick shrink
- * together on small screens.
+ * One scale factor + canvas bounding rect shared by every DOM HUD layer
+ * (`GameHUDLayer`, `TouchControls`).
  *
- * Two curves, because the two layouts have different floors:
- *   - desktop chrome is designed against a 1536x864 canvas, so it scales
- *     with the viewport and may go down to half size;
- *   - mobile chrome is already compact and contains *touch targets*,
- *     so it scales off viewport height against a typical phone-landscape
- *     height and never drops below 0.7 (a 56px weapon slot stays ~39px,
- *     still a comfortable tap target).
+ * Anchors the HUD coordinate space strictly to the rendered Phaser game
+ * canvas rect (16:9 full view), ensuring all UI chrome stays perfectly
+ * within the game screen and never bleeds into letterbox black bars.
  */
 
 import { useEffect, useState } from 'react';
 
+import { EventBus } from '@/lib/events/bus';
 import { appRect, appViewport, isMobileLike } from '@/lib/mobile';
 
 /** Height (app-space px) at which the mobile HUD renders at 1×. */
@@ -30,7 +26,7 @@ export function hudScale(width: number, height: number, mobile: boolean): number
     return clamp(Math.min(width / 1536, height / 864), 0.5, 1);
 }
 
-/** Live HUD scale + the app-space canvas / container bounds it is anchored to. */
+/** Live HUD scale + the app-space canvas bounds it is anchored to. */
 export function useHudScale(): {
     scale: number;
     width: number;
@@ -40,11 +36,16 @@ export function useHudScale(): {
 } {
     const [box, setBox] = useState(() => {
         const vp = appViewport();
+        const zoom = Math.min(vp.width / 1536, vp.height / 864);
+        const cw = 1536 * zoom;
+        const ch = 864 * zoom;
+        const cl = (vp.width - cw) / 2;
+        const ct = (vp.height - ch) / 2;
         return {
-            left: 0,
-            top: 0,
-            width: vp.width,
-            height: vp.height,
+            left: cl > 0 ? cl : 0,
+            top: ct > 0 ? ct : 0,
+            width: cw > 0 ? cw : vp.width,
+            height: ch > 0 ? ch : vp.height,
             mobile: isMobileLike(),
         };
     });
@@ -62,6 +63,9 @@ export function useHudScale(): {
                 canvas = document.querySelector(
                     '#game-container canvas',
                 ) as HTMLCanvasElement | null;
+                if (canvas && ro) {
+                    ro.observe(canvas);
+                }
             }
 
             if (canvas) {
@@ -85,7 +89,7 @@ export function useHudScale(): {
                 }
             }
 
-            // Fallback: estimate canvas bounds within #game-container
+            // Fallback: estimate 16:9 canvas bounds within #game-container
             const container = document.getElementById('game-container');
             if (container) {
                 const cr = appRect(container);
@@ -131,8 +135,14 @@ export function useHudScale(): {
         };
 
         evaluate();
+        const rafId = requestAnimationFrame(evaluate);
+
         window.addEventListener('resize', evaluate);
         window.visualViewport?.addEventListener('resize', evaluate);
+
+        EventBus.on('canvas-bounds-changed', evaluate);
+        EventBus.on('current-scene-ready', evaluate);
+        EventBus.on('level-loaded', evaluate);
 
         const container = document.getElementById('game-container');
         if (container) {
@@ -141,13 +151,18 @@ export function useHudScale(): {
 
             observer = new MutationObserver(() => {
                 evaluate();
+                requestAnimationFrame(evaluate);
             });
             observer.observe(container, { childList: true, subtree: true });
         }
 
         return () => {
+            cancelAnimationFrame(rafId);
             window.removeEventListener('resize', evaluate);
             window.visualViewport?.removeEventListener('resize', evaluate);
+            EventBus.removeListener('canvas-bounds-changed', evaluate);
+            EventBus.removeListener('current-scene-ready', evaluate);
+            EventBus.removeListener('level-loaded', evaluate);
             ro?.disconnect();
             observer?.disconnect();
         };
