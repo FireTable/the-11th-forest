@@ -90,10 +90,24 @@ export function spawnHitSparks(
         const chipColor =
             opts.color ?? palette[Math.floor(Math.random() * palette.length)];
 
+        // Gentle semi-transparent mist opacity: fine specks (2-3px) around 0.65~0.75, droplets around 0.8~0.85
+        const initialAlpha =
+            size <= 3
+                ? 0.68 + Math.random() * 0.1
+                : 0.82 + Math.random() * 0.08;
+
         // Crisp pixel block with subtle outline on droplets to keep retro pixel fidelity
-        const chip = scene.add.rectangle(spawnX, spawnY, size, size, chipColor);
+        const chip = scene.add.rectangle(
+            spawnX,
+            spawnY,
+            size,
+            size,
+            chipColor,
+            initialAlpha,
+        );
+        chip.alpha = initialAlpha;
         chip.setDepth(renderDepth);
-        chip.setStrokeStyle(1, 0x1f0000, size >= 4 ? 0.7 : 0.3);
+        chip.setStrokeStyle(1, 0x1f0000, (size >= 4 ? 0.45 : 0.2) * initialAlpha);
 
         // Speed variation: suspended floating mist specks vs bursting droplets
         const speedMult =
