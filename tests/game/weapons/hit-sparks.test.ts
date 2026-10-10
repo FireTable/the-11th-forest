@@ -36,7 +36,7 @@ describe('weapons/hit-sparks — spawnHitSparks', () => {
         spawnHitSparks(mockScene, 100, 200, { count: 6, isCrit: true });
 
         expect(addedRectangles).toHaveLength(6);
-        expect(addedTweens).toHaveLength(6);
+        expect(addedTweens).toHaveLength(12); // Two-stage pop & fall tweens per chip
 
         // Every chip was configured with a depth, stroke style and destroyed upon tween finish
         for (const rect of addedRectangles) {

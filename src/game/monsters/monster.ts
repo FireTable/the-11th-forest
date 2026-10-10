@@ -1058,8 +1058,10 @@ export class MonsterController {
             target.hitStunUntil = this.scene.time.now + COMBAT_HIT_STUN_MS;
 
             // 2. Micro hit sparks and falling mosaic chips at impact point
-            const hitPos = bulletBody?.position ?? hitBody.position;
-            spawnHitSparks(this.scene, hitPos.x, hitPos.y, {
+            const sparkX = bulletBody?.position?.x ?? target.body.position.x;
+            const sparkY = bulletBody?.position?.y ?? target.body.position.y;
+            const hitPos = { x: sparkX, y: sparkY };
+            spawnHitSparks(this.scene, sparkX, sparkY, {
                 dir: { x: kb.vx, y: kb.vy },
                 isCrit,
             });

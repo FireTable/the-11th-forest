@@ -2,9 +2,8 @@
  * src/game/weapons/hit-sparks.ts
  * --------------------------------------------------------------------------
  * Visceral physical mosaic pixel blood & impact debris particle effect.
- * Spawns chunky, high-contrast square mosaic blood cubes (4x4 ~ 7x7 px) with
- * dark coagulated pixel outlines, explosive directional pop, and a parabolic
- * gravity drop arc that splatters down before dissolving.
+ * Temporarily magnified 10x (28px ~ 48px massive square blocks with 3px outlines)
+ * per user request for visual verification of physics, blood palette, and trajectory.
  */
 
 import type * as Phaser from 'phaser';
@@ -20,29 +19,26 @@ export interface HitSparksOptions {
     depth?: number;
 }
 
-// Vivid pixel blood & flesh mosaic palette:
-// arterial crimson, vivid scarlet, deep coagulated maroon, ruby blood, flesh tone, with occasional specular gleam
+// Vivid high-contrast pixel blood mosaic palette:
+// blazing arterial red, deep crimson, ruby gore, coagulated dark blood, and specular white gleam
 const BLOOD_PALETTE = [
-    0xdc2626, // red-600 — arterial blood
-    0xb91c1c, // red-700 — deep crimson blood
-    0xef4444, // red-500 — bright fresh blood splatter
-    0x991b1b, // red-800 — dark blood
-    0x7f1d1d, // red-900 — coagulated maroon
-    0xf87171, // red-400 — fresh flesh droplet
-    0xdc2626, // repeated for higher arterial frequency
-    0xffffff, // specular highlight glint
+    0xff0000, // vibrant pure blood red
+    0xdc2626, // red-600 — arterial crimson
+    0xef4444, // red-500 — fresh splatter
+    0xb91c1c, // red-700 — deep blood
+    0x990000, // dark coagulated maroon
+    0xff3366, // vivid ruby flesh
+    0xffffff, // specular impact glint
 ];
 
-// On crits: add explosive fiery sparks alongside abundant blood
 const CRIT_BLOOD_PALETTE = [
-    0xef4444,
+    0xff0000,
     0xdc2626,
-    0xb91c1c,
+    0xef4444,
     0xfbbf24, // gold crit spark
-    0xf59e0b, // amber flame
-    0xffffff, // brilliant white
-    0x991b1b,
-    0xf87171,
+    0xf59e0b, // amber fire
+    0xffffff, // brilliant white flash
+    0x990000,
 ];
 
 /**
@@ -60,10 +56,10 @@ export function spawnHitSparks(
         opts.dir && (opts.dir.x !== 0 || opts.dir.y !== 0)
             ? Math.atan2(opts.dir.y, opts.dir.x)
             : -Math.PI / 2; // Default burst upwards if no direction
-    const baseSpeed = opts.speed ?? 140;
+    const baseSpeed = opts.speed ?? 180;
 
-    // Render depth: guaranteed foreground layer above monster sprites, weapons, and foreground tiles
-    const renderDepth = opts.depth ?? DEPTH.MELEE_SLASH + 100;
+    // Guaranteed top rendering depth above all map materials and entities
+    const renderDepth = opts.depth ?? DEPTH.HUD + 5000;
 
     const palette = isCrit ? CRIT_BLOOD_PALETTE : BLOOD_PALETTE;
 
@@ -72,43 +68,54 @@ export function spawnHitSparks(
         const spread = (Math.random() - 0.5) * 2.5;
         const angle = baseAngle + Math.PI + spread;
 
-        // Upward pop and parabolic gravity drop distances
-        const speedMult = 0.4 + Math.random() * 0.7;
-        const horizDist = (18 + Math.random() * (baseSpeed * 0.35 * speedMult)) * Math.cos(angle);
-        const vertPop = -(16 + Math.random() * (isCrit ? 36 : 24)); // Explosive pop up
-        const gravityDrop = 32 + Math.random() * (isCrit ? 48 : 36); // Heavy fall down to ground
-
-        // Chunky mosaic pixel cube size: 4px, 5px, 6px (7px on crits)
+        // Magnified 10x: 28px ~ 48px chunky square mosaic cubes
         const size = isCrit
-            ? Math.random() < 0.35 ? 5 : Math.random() < 0.7 ? 6 : 7
-            : Math.random() < 0.4 ? 4 : Math.random() < 0.75 ? 5 : 6;
+            ? Math.random() < 0.4 ? 36 : Math.random() < 0.7 ? 42 : 48
+            : Math.random() < 0.4 ? 28 : Math.random() < 0.75 ? 34 : 40;
 
         const chipColor =
             opts.color ?? palette[Math.floor(Math.random() * palette.length)];
 
-        // Create chunky mosaic rectangle with dark coagulated pixel stroke for high readability
+        // Bold mosaic block with 3px dark stroke for unmistakable visibility
         const chip = scene.add.rectangle(x, y, size, size, chipColor);
         chip.setDepth(renderDepth);
-        chip.setStrokeStyle(1, 0x450a0a, 0.95); // 1px dark coagulated maroon/black outline
+        chip.setStrokeStyle(3, 0x000000, 1.0);
 
+        // Trajectory distances
+        const horizDist = (35 + Math.random() * (baseSpeed * 0.45)) * Math.cos(angle);
+        const vertPop = -(30 + Math.random() * (isCrit ? 60 : 45)); // High explosive pop up
+        const gravityDrop = 60 + Math.random() * (isCrit ? 90 : 70); // Heavy downward drop to floor
+
+        const midX = x + horizDist * 0.45;
         const midY = y + vertPop;
         const targetX = x + horizDist;
         const targetY = y + vertPop + gravityDrop;
 
-        // Two-phase parabolic pop & gravity fall tween (420ms ~ 600ms total duration)
-        const duration = 420 + Math.random() * 180;
+        const duration = 550 + Math.random() * 250; // 550ms ~ 800ms
+        const popTime = duration * 0.38;
+        const fallTime = duration * 0.62;
 
+        // Two-stage sequential tweens: Stage 1 Pop Upward -> Stage 2 Splatter Downward & Fade
         scene.tweens.add({
             targets: chip,
-            x: { from: x, to: targetX },
-            y: [
-                { value: midY, duration: duration * 0.35, ease: 'Quad.easeOut' },
-                { value: targetY, duration: duration * 0.65, ease: 'Quad.easeIn' },
-            ],
-            alpha: { from: 1, to: 0, delay: duration * 0.55, duration: duration * 0.45 },
-            scale: { from: 1, to: 0.7, delay: duration * 0.6, duration: duration * 0.4 },
+            x: midX,
+            y: midY,
+            duration: popTime,
+            ease: 'Quad.easeOut',
             onComplete: () => {
-                chip.destroy();
+                scene.tweens.add({
+                    targets: chip,
+                    x: targetX,
+                    y: targetY,
+                    alpha: 0,
+                    scaleX: 0.6,
+                    scaleY: 0.6,
+                    duration: fallTime,
+                    ease: 'Quad.easeIn',
+                    onComplete: () => {
+                        chip.destroy();
+                    },
+                });
             },
         });
     }
