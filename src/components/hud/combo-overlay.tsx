@@ -17,7 +17,7 @@ export const ComboOverlay: React.FC = () => {
             lastHitTimeRef.current = performance.now();
             setCombo(payload.count);
             setPunch(true);
-            setTimeout(() => setPunch(false), 120);
+            setTimeout(() => setPunch(false), 130);
         };
 
         EventBus.on('combat:combo', handleCombo);
@@ -26,7 +26,7 @@ export const ComboOverlay: React.FC = () => {
         };
     }, []);
 
-    // Progress bar decay ticker (2000ms combo decay)
+    // Progress bar decay ticker (3000ms combo decay)
     useEffect(() => {
         if (combo < 2) {
             setRemainingRatio(0);
@@ -35,7 +35,7 @@ export const ComboOverlay: React.FC = () => {
 
         const tick = () => {
             const elapsed = performance.now() - lastHitTimeRef.current;
-            const ratio = Math.max(0, 1 - elapsed / 2000);
+            const ratio = Math.max(0, 1 - elapsed / 3000);
             setRemainingRatio(ratio);
 
             if (ratio > 0) {
@@ -55,61 +55,65 @@ export const ComboOverlay: React.FC = () => {
 
     // Aesthetic color styling based on combo threshold
     let tierColor = '#38bdf8'; // Sky blue
-    let tierGlow = 'rgba(56, 189, 248, 0.45)';
+    let tierGlow = 'rgba(56, 189, 248, 0.6)';
     let tierTitle = 'HIT';
 
     if (combo >= 50) {
         tierColor = '#f43f5e'; // Rose / crimson
-        tierGlow = 'rgba(244, 63, 94, 0.65)';
+        tierGlow = 'rgba(244, 63, 94, 0.8)';
         tierTitle = 'MAX FEVER';
     } else if (combo >= 25) {
-        tierColor = '#f97316'; // Orange
-        tierGlow = 'rgba(249, 115, 22, 0.6)';
+        tierColor = '#f97316'; // Vivid orange
+        tierGlow = 'rgba(249, 115, 22, 0.75)';
         tierTitle = 'RAMPAGE';
     } else if (combo >= 10) {
         tierColor = '#fbbf24'; // Gold
-        tierGlow = 'rgba(251, 191, 36, 0.55)';
+        tierGlow = 'rgba(251, 191, 36, 0.7)';
         tierTitle = 'COMBO';
     }
 
     return (
         <div
-            className="absolute top-24 right-8 pointer-events-none select-none transition-transform duration-100 ease-out z-20"
+            className="absolute top-20 right-8 pointer-events-none select-none transition-transform duration-100 ease-out z-20"
             style={{
-                transform: punch ? 'scale(1.25)' : 'scale(1)',
-                filter: `drop-shadow(0 4px 12px ${tierGlow})`,
+                transform: punch ? 'scale(1.35)' : 'scale(1)',
+                filter: `drop-shadow(0 4px 16px ${tierGlow})`,
             }}
         >
             <div className="flex flex-col items-end">
-                <div className="flex items-baseline gap-1.5 font-black italic tracking-wider font-mono">
+                <div className="flex items-baseline gap-2 font-black italic tracking-wider font-mono">
                     <span
-                        className="text-xs uppercase font-extrabold tracking-widest px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm border border-white/20"
-                        style={{ color: tierColor }}
+                        className="text-xs uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-sm bg-black/75 backdrop-blur-sm border shadow-sm"
+                        style={{
+                            color: tierColor,
+                            borderColor: `${tierColor}66`,
+                            boxShadow: `0 0 8px ${tierGlow}`,
+                        }}
                     >
                         {tierTitle}
                     </span>
                     <span
-                        className="text-4xl text-white font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
+                        className={`${combo >= 25 ? 'text-6xl' : 'text-5xl'} font-black drop-shadow-[0_3px_6px_rgba(0,0,0,0.95)]`}
                         style={{
                             color: tierColor,
-                            textShadow: `0 0 10px ${tierGlow}, 0 2px 0 #000, 2px 2px 0 #000, -2px -2px 0 #000`,
+                            textShadow: `0 0 16px ${tierGlow}, 0 2px 0 #000, 3px 3px 0 #000, -2px -2px 0 #000`,
                         }}
                     >
                         {combo}
                     </span>
-                    <span className="text-sm text-white/80 font-bold uppercase tracking-tighter">
+                    <span className="text-base text-white/90 font-black uppercase tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                         HITS
                     </span>
                 </div>
 
-                {/* Shrinking combo timeout timer bar */}
-                <div className="w-28 h-1.5 bg-black/50 rounded-full overflow-hidden mt-1 border border-white/10 backdrop-blur-xs">
+                {/* 3s shrinking combo timeout timer bar (larger & more luminous) */}
+                <div className="w-36 h-2 bg-black/60 rounded-full overflow-hidden mt-1.5 border border-white/20 backdrop-blur-xs p-[1px]">
                     <div
                         className="h-full rounded-full transition-[width] duration-75"
                         style={{
                             width: `${remainingRatio * 100}%`,
                             backgroundColor: tierColor,
-                            boxShadow: `0 0 6px ${tierColor}`,
+                            boxShadow: `0 0 10px ${tierColor}`,
                         }}
                     />
                 </div>

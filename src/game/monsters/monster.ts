@@ -980,8 +980,8 @@ export class MonsterController {
             }
         }
 
-        // Combo timeout tracking (reset to 0 after 2.0s without hits)
-        if (this.currentCombo > 0 && time - this.lastComboHitAt > 2000) {
+        // Combo timeout tracking (reset to 0 after 3.0s without hits)
+        if (this.currentCombo > 0 && time - this.lastComboHitAt > 3000) {
             this.currentCombo = 0;
             EventBus.emit('combat:combo', { count: 0, resetAt: 0 });
         }
@@ -1037,15 +1037,15 @@ export class MonsterController {
                 throttleMs: target.spec.sfx?.throttleMs,
             });
 
-            // Combo hit registration
+            // Combo hit registration (3.0s window)
             const hitTime = this.scene.time.now;
-            if (hitTime - this.lastComboHitAt <= 2000) {
+            if (hitTime - this.lastComboHitAt <= 3000) {
                 this.currentCombo++;
             } else {
                 this.currentCombo = 1;
             }
             this.lastComboHitAt = hitTime;
-            EventBus.emit('combat:combo', { count: this.currentCombo, resetAt: hitTime + 2000 });
+            EventBus.emit('combat:combo', { count: this.currentCombo, resetAt: hitTime + 3000 });
 
             // 1. Knockback impulse & Hit-stun (subtle flinch impulse, capped without compounding)
             const bulletVel = (bulletBody as any)?.bulletVelocity ?? bulletBody?.velocity;

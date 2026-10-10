@@ -17,6 +17,7 @@ describe('weapons/hit-sparks — spawnHitSparks', () => {
                         h,
                         color,
                         setDepth: vi.fn(),
+                        setStrokeStyle: vi.fn(),
                         destroy: vi.fn(),
                     };
                     addedRectangles.push(rect);
@@ -37,21 +38,22 @@ describe('weapons/hit-sparks — spawnHitSparks', () => {
         expect(addedRectangles).toHaveLength(6);
         expect(addedTweens).toHaveLength(6);
 
-        // Every chip was configured with a depth and destroyed upon tween finish
+        // Every chip was configured with a depth, stroke style and destroyed upon tween finish
         for (const rect of addedRectangles) {
             expect(rect.setDepth).toHaveBeenCalled();
+            expect(rect.setStrokeStyle).toHaveBeenCalled();
             expect(rect.destroy).toHaveBeenCalled();
         }
     });
 
-    it('defaults to 5 chips on regular hits and 7 on crits', () => {
+    it('defaults to 7 chips on regular hits and 10 on crits', () => {
         const createMockScene = () => {
             let count = 0;
             return {
                 add: {
                     rectangle: vi.fn(() => {
                         count++;
-                        return { setDepth: vi.fn(), destroy: vi.fn() };
+                        return { setDepth: vi.fn(), setStrokeStyle: vi.fn(), destroy: vi.fn() };
                     }),
                 },
                 tweens: { add: vi.fn() },
@@ -61,10 +63,10 @@ describe('weapons/hit-sparks — spawnHitSparks', () => {
 
         const normalScene = createMockScene();
         spawnHitSparks(normalScene as any, 50, 50, {});
-        expect(normalScene.getCount()).toBe(5);
+        expect(normalScene.getCount()).toBe(7);
 
         const critScene = createMockScene();
         spawnHitSparks(critScene as any, 50, 50, { isCrit: true });
-        expect(critScene.getCount()).toBe(7);
+        expect(critScene.getCount()).toBe(10);
     });
 });
