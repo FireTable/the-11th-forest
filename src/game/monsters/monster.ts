@@ -1047,13 +1047,13 @@ export class MonsterController {
             this.lastComboHitAt = hitTime;
             EventBus.emit('combat:combo', { count: this.currentCombo, resetAt: hitTime + 2000 });
 
-            // 1. Knockback impulse & Hit-stun
+            // 1. Knockback impulse & Hit-stun (subtle flinch impulse, capped without compounding)
             const bulletVel = (bulletBody as any)?.bulletVelocity ?? bulletBody?.velocity;
             const fallbackDir = dirTo(this.playerBody.position, target.body.position);
             const kb = calcKnockbackVelocity(bulletVel, fallbackDir, finalDamage);
             this.matter.Body.setVelocity(target.body, {
-                x: target.body.velocity.x + kb.vx,
-                y: target.body.velocity.y + kb.vy,
+                x: kb.vx,
+                y: kb.vy,
             });
             target.hitStunUntil = this.scene.time.now + COMBAT_HIT_STUN_MS;
 
@@ -1111,8 +1111,8 @@ export class MonsterController {
                         otherM.statusHud.showFloatingNumber(splashDamage, 'damage');
                         const outDir = dirTo(hitPos, otherM.body.position);
                         this.matter.Body.setVelocity(otherM.body, {
-                            x: otherM.body.velocity.x + outDir.x * 5,
-                            y: otherM.body.velocity.y + outDir.y * 5,
+                            x: outDir.x * 1.5,
+                            y: outDir.y * 1.5,
                         });
                         otherM.hitStunUntil = this.scene.time.now + COMBAT_HIT_STUN_MS;
                         if (otherM.hp <= 0) {

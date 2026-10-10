@@ -424,8 +424,8 @@ describe('monsters/logic — calcKnockbackVelocity', () => {
         const dir = { x: 1, y: 0 };
         const lightKb = calcKnockbackVelocity(dir, dir, 2);
         const heavyKb = calcKnockbackVelocity(dir, dir, 55);
-        expect(lightKb.vx).toBeGreaterThanOrEqual(1.5);
+        expect(lightKb.vx).toBeGreaterThanOrEqual(0.4);
         expect(heavyKb.vx).toBeGreaterThan(lightKb.vx);
-        expect(heavyKb.vx).toBeLessThanOrEqual(7.5);
+        expect(heavyKb.vx).toBeLessThanOrEqual(2.2);
     });
 });

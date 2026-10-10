@@ -226,10 +226,10 @@ export const CHARACTER_HURT_FLASH_MS = 100;
 export const COMBAT_HIT_STUN_MS = 80;
 
 /** Base impulse multiplier for bullet knockback calculation. */
-export const COMBAT_KNOCKBACK_BASE_MULT = 1.2;
+export const COMBAT_KNOCKBACK_BASE_MULT = 0.35;
 
 /** Max knockback velocity cap. */
-export const COMBAT_KNOCKBACK_MAX_SPEED = 7.5;
+export const COMBAT_KNOCKBACK_MAX_SPEED = 2.2;
 
 /** Screen shake on critical hits (duration ms, intensity). */
 export const COMBAT_SCREEN_SHAKE_CRIT = { duration: 60, intensity: 0.003 };

@@ -818,6 +818,6 @@ export function calcKnockbackVelocity(
             ky = fallbackDir.y / len;
         }
     }
-    const speed = Math.min(maxSpeed, Math.max(1.5, Math.sqrt(damage) * baseMultiplier));
+    const speed = Math.min(maxSpeed, Math.max(0.4, Math.sqrt(damage) * baseMultiplier));
     return { vx: kx * speed, vy: ky * speed };
 }
