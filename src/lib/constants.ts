@@ -219,6 +219,9 @@ export const MONSTER_DEATH_FADE_MS = 800;
 /** Hit flash duration in milliseconds. Monster sprite turns solid white. */
 export const COMBAT_HIT_FLASH_MS = 80;
 
+/** Player character hurt flash duration in milliseconds. Flashes danger crimson red. */
+export const CHARACTER_HURT_FLASH_MS = 100;
+
 /** Short hit-stun duration where monster chase movement pauses to allow knockback. */
 export const COMBAT_HIT_STUN_MS = 80;
 

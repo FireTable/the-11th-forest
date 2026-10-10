@@ -35,6 +35,7 @@ import {
     KEY_W,
     SFX_EVENT,
     AIM_ASSIST,
+    CHARACTER_HURT_FLASH_MS,
 } from '@/lib/constants';
 import { getCheats } from '@/lib/dev/cheats';
 import { EventBus } from '@/lib/events/bus';
@@ -257,6 +258,7 @@ export class CharacterController {
     // Mutable runtime state.
     private hp: number;
     private sp: number;
+    private hurtFlashUntil = 0;
     private dodgeActiveUntil = 0;
     private lastDodgeEndAt = 0;
     private lastGhostAt = 0;
@@ -361,6 +363,9 @@ export class CharacterController {
                 );
             }
             if (hpDelta < 0) {
+                this.hurtFlashUntil = this.scene.time.now + CHARACTER_HURT_FLASH_MS;
+                this.parts.sprite.setTint(0x992222);
+                (this.parts.sprite as any).setTintMode?.(2);
                 const sfx = resolveHurtSfx(this.spec);
                 if (sfx) {
                     EventBus.emit(SFX_EVENT(sfx), {
@@ -495,6 +500,15 @@ export class CharacterController {
         // draws in front of a player at footY=200 just because 900 > 20.
         const footY = Math.round(pos.y + (sprite.displayHeight / 2 - this.spec.body.halfH));
         sprite.setDepth(footY);
+
+        // Player hurt flash visual feedback (danger crimson additive highlight)
+        if (now < this.hurtFlashUntil) {
+            sprite.setTint(0x992222);
+            (sprite as any).setTintMode?.(2);
+        } else if ((sprite as any).tintMode !== 0) {
+            sprite.clearTint();
+            (sprite as any).setTintMode?.(0);
+        }
 
         // Dodge roll afterimage trail (semi-transparent fading cyan/sky blue ghosts)
         if (now < this.dodgeActiveUntil && now - this.lastGhostAt >= 40) {
@@ -1033,6 +1047,8 @@ export class CharacterController {
      * constructor reseeds HP from the spec.
      */
     private handleDeath(): void {
+        this.parts.sprite.clearTint();
+        (this.parts.sprite as any).setTintMode?.(0);
         useGameStore.getState().setDead(true);
         EventBus.emit('player-died');
         // Pause stops the matter physics step + animation ticks. The
