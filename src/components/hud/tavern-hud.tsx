@@ -396,10 +396,6 @@ export const TavernHud: React.FC = () => {
 
     const isSelection = focus.phase === 'selection';
 
-    // On mobile devices (forced/auto landscape), character intro card positioning
-    // is unusable and blocks the small touch viewport; hide it during selection phase.
-    if (isSelection && mobile) return null;
-
     const outerStyle: React.CSSProperties =
         width > 0
             ? {
@@ -412,6 +408,36 @@ export const TavernHud: React.FC = () => {
                   transformOrigin: 'top left',
               }
             : { position: 'absolute', inset: 0 };
+
+    // On mobile devices (forced/auto landscape), character intro card positioning
+    // is unusable and blocks the small touch viewport; hide desktop card and provide a
+    // touch-friendly confirm button instead of desktop A/D/F keys.
+    if (isSelection && mobile) {
+        return (
+            <div
+                className="pointer-events-none select-none cursor-none overflow-hidden"
+                style={outerStyle}
+            >
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            EventBus.emit('tavern-confirm-selection');
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-stone-950/85 border border-amber-400 text-amber-200 active:bg-amber-900/60 transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.6)] cursor-pointer"
+                        style={{ fontFamily: "'Silkscreen', monospace" }}
+                    >
+                        <span className="text-[11px] uppercase font-bold tracking-wider">
+                            CONFIRM {focus.name}
+                        </span>
+                        <span className="text-[9px] text-amber-400/80">
+                            (TAP TO START)
+                        </span>
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div

@@ -18,7 +18,8 @@
 import * as Phaser from 'phaser';
 
 import { EventBus } from '@/lib/events/bus';
-import { SFX_EVENT, SFX_STOP } from '@/lib/constants';
+import { SFX_EVENT, SFX_STOP, DEPTH } from '@/lib/constants';
+import { isMobileLike } from '@/lib/mobile';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 import type { CharacterRuntime } from '@/game/characters/character';
@@ -123,6 +124,9 @@ export class TavernController {
     private cursorCleanup: (() => void) | undefined;
 
     private weaponCount = 0;
+    private selectionArrow: Phaser.GameObjects.Triangle | null = null;
+    private arrowTween: Phaser.Tweens.Tween | null = null;
+    private hasSelectedOnce = false;
 
     constructor(
         private readonly scene: Phaser.Scene,
@@ -166,6 +170,7 @@ export class TavernController {
             this.spawnNpcs();
             this.buildSelectionVisuals();
             this.emitFocusEvent();
+            EventBus.on('tavern-confirm-selection', this.handleConfirmEvent);
         }
         // `startPhase === 'pickup'` skips NPC spawn — used when the
         // player refreshes into the tavern after already choosing a
@@ -177,6 +182,10 @@ export class TavernController {
         scene.events.once('shutdown', this.destroy, this);
         scene.events.once('destroy', this.destroy, this);
     }
+
+    private handleConfirmEvent = (): void => {
+        this.confirmSelection();
+    };
 
     // ─── Keyboard ────────────────────────────────────────────────────────
 
@@ -290,12 +299,19 @@ export class TavernController {
             sprite.on('pointerdown', () => {
                 if (this.selectedIndex !== idx) {
                     this.selectedIndex = idx;
+                    this.hasSelectedOnce = true;
                     this.updateHighlight();
                     this.emitFocusEvent();
                     // SFX on NPC selection change — mirrors the A/D
                     // keyboard cycle so mouse and keyboard feel the
                     // same.
                     EventBus.emit(SFX_EVENT('weapon-switch'));
+                } else if (isMobileLike() && this.hasSelectedOnce) {
+                    // Tap already-selected character to confirm directly on mobile
+                    this.confirmSelection();
+                    return;
+                } else if (isMobileLike()) {
+                    this.hasSelectedOnce = true;
                 }
                 this.mouseHoldingIdx = idx;
                 this.holdElapsed = 0;
@@ -319,15 +335,49 @@ export class TavernController {
     // ─── Selection visuals ───────────────────────────────────────────────
 
     private buildSelectionVisuals(): void {
-        // The selection arrow lives in the React TavernHud, bobs via
-        // CSS (`tavern-hud-bob`). Nothing to wire up here — kept as a
-        // hook for future selection visuals (e.g. a highlight ring).
+        const entry = this.npcs[this.selectedIndex];
+        if (!entry) return;
+        const arrowY = this.headWorldY(entry) - 14;
+        this.selectionArrow = this.scene.add.triangle(
+            entry.x,
+            arrowY,
+            0,
+            0,
+            14,
+            0,
+            7,
+            9,
+            0xfbbf24,
+        );
+        this.selectionArrow.setStrokeStyle(1.5, 0x1c1917);
+        this.selectionArrow.setDepth(DEPTH.FOREGROUND_MATERIAL + 500);
+
+        this.arrowTween = this.scene.tweens.add({
+            targets: this.selectionArrow,
+            y: arrowY - 6,
+            duration: 650,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+        });
     }
 
     private updateHighlight(): void {
-        // No-op: the arrow is owned by React. Kept as a hook in case
-        // future visuals (e.g. a highlight ring) need a callback on
-        // selection change.
+        const entry = this.npcs[this.selectedIndex];
+        if (!entry || !this.selectionArrow) return;
+        const arrowY = this.headWorldY(entry) - 14;
+        this.selectionArrow.setPosition(entry.x, arrowY);
+        if (this.arrowTween) {
+            this.arrowTween.remove();
+        }
+        this.arrowTween = this.scene.tweens.add({
+            targets: this.selectionArrow,
+            y: arrowY - 6,
+            duration: 650,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+        });
     }
 
     // ─── EventBus → React ────────────────────────────────────────────────
@@ -473,7 +523,15 @@ export class TavernController {
         const spawnPos = { x: entry.x, y: entry.y };
         useGameStore.getState().setSelectedCharacterId(spec.id);
 
-        // Destroy NPC visuals (the selection arrow now lives in the React HUD)
+        // Destroy NPC visuals and selection arrow
+        if (this.arrowTween) {
+            this.arrowTween.remove();
+            this.arrowTween = null;
+        }
+        if (this.selectionArrow) {
+            this.selectionArrow.destroy();
+            this.selectionArrow = null;
+        }
         for (const npc of this.npcs) {
             npc.sprite.destroy();
             npc.shadow.destroy();
@@ -566,6 +624,15 @@ export class TavernController {
 
     destroy(): void {
         this.scene.events.off('update', this.update, this);
+        EventBus.off('tavern-confirm-selection', this.handleConfirmEvent);
+        if (this.arrowTween) {
+            this.arrowTween.remove();
+            this.arrowTween = null;
+        }
+        if (this.selectionArrow) {
+            this.selectionArrow.destroy();
+            this.selectionArrow = null;
+        }
         // Stop emitting aim events so the crosshair hides when the
         // tavern tears down (gameplay re-takes over via the character
         // aim logic, which also reads these events).

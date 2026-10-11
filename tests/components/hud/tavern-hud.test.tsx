@@ -62,7 +62,7 @@ describe('TavernHud', () => {
         expect(container.textContent).toContain('HP');
     });
 
-    it('hides character selection intro card on mobile viewports', () => {
+    it('hides character selection intro card and shows mobile confirm button on mobile', () => {
         vi.spyOn(mobileModule, 'isMobileLike').mockReturnValue(true);
 
         act(() => {
@@ -85,7 +85,14 @@ describe('TavernHud', () => {
             });
         });
 
-        expect(container.firstChild).toBeNull();
+        // Desktop card content (lore, stats, A/D/F keys) is hidden
+        expect(container.textContent).not.toContain('A bookish shut-in');
+        expect(container.textContent).not.toContain('Cycle');
+        expect(container.textContent).not.toContain('Hold 1.5s');
+
+        // Mobile confirm button is displayed
+        expect(container.textContent).toContain('CONFIRM Otaku');
+        expect(container.textContent).toContain('TAP TO START');
     });
 
     it('still renders weapon slots on mobile during pickup phase', () => {
