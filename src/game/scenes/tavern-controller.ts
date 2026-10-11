@@ -169,6 +169,7 @@ export class TavernController {
             this.buildSelectionVisuals();
             this.emitFocusEvent();
             EventBus.on('tavern-confirm-selection', this.handleConfirmEvent);
+        EventBus.on('tavern-cycle-selection', this.handleCycleEvent);
         }
         // `startPhase === 'pickup'` skips NPC spawn — used when the
         // player refreshes into the tavern after already choosing a
@@ -183,6 +184,15 @@ export class TavernController {
 
     private handleConfirmEvent = (): void => {
         this.confirmSelection();
+    };
+
+    private handleCycleEvent = (dir: number): void => {
+        if (this.phase !== 'selection' || this.npcs.length === 0) return;
+        this.selectedIndex =
+            (this.selectedIndex + dir + this.npcs.length) % this.npcs.length;
+        this.updateHighlight();
+        this.emitFocusEvent();
+        EventBus.emit(SFX_EVENT('weapon-switch'));
     };
 
     // ─── Keyboard ────────────────────────────────────────────────────────
@@ -581,6 +591,7 @@ export class TavernController {
     destroy(): void {
         this.scene.events.off('update', this.update, this);
         EventBus.off('tavern-confirm-selection', this.handleConfirmEvent);
+        EventBus.off('tavern-cycle-selection', this.handleCycleEvent);
         // Stop emitting aim events so the crosshair hides when the
         // tavern tears down (gameplay re-takes over via the character
         // aim logic, which also reads these events).

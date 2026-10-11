@@ -50,7 +50,7 @@ function App() {
                 <EditorPanel />
             </Suspense>
             <PixelCrosshair />
-            <TouchControls />
+            {tavernCleared && <TouchControls />}
         </div>
     );
 }

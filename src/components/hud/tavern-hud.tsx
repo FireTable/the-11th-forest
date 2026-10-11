@@ -446,10 +446,34 @@ export const TavernHud: React.FC = () => {
                             mobile ? (
                                 /* ── Mobile Phase 1: Streamlined character info ── */
                                 <>
-                                    {/* Name + Status tag */}
+                                    {/* Name + Status tag + Cycle buttons */}
                                     <div className="flex items-center justify-between mb-1.5">
-                                        <div className="text-sm font-bold text-amber-200 uppercase tracking-wider drop-shadow-[1px_1px_0px_#000]">
-                                            {focus.name}
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    EventBus.emit('tavern-cycle-selection', -1);
+                                                }}
+                                                className="w-5 h-5 flex items-center justify-center bg-stone-800 border border-stone-600 text-stone-300 active:bg-amber-900/60 active:text-amber-200 pointer-events-auto cursor-pointer text-xs font-bold transition-colors"
+                                                aria-label="Previous character"
+                                            >
+                                                &lt;
+                                            </button>
+                                            <div className="text-sm font-bold text-amber-200 uppercase tracking-wider drop-shadow-[1px_1px_0px_#000]">
+                                                {focus.name}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    EventBus.emit('tavern-cycle-selection', 1);
+                                                }}
+                                                className="w-5 h-5 flex items-center justify-center bg-stone-800 border border-stone-600 text-stone-300 active:bg-amber-900/60 active:text-amber-200 pointer-events-auto cursor-pointer text-xs font-bold transition-colors"
+                                                aria-label="Next character"
+                                            >
+                                                &gt;
+                                            </button>
                                         </div>
                                         <span className="text-[8px] px-1.5 py-0.5 bg-amber-950/70 border border-amber-500/50 text-amber-300 font-mono">
                                             SELECT
