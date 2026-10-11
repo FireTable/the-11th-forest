@@ -18,8 +18,8 @@
 import * as Phaser from 'phaser';
 
 import { EventBus } from '@/lib/events/bus';
-import { SFX_EVENT, SFX_STOP, DEPTH } from '@/lib/constants';
-import { isMobileLike } from '@/lib/mobile';
+import { SFX_EVENT, SFX_STOP } from '@/lib/constants';
+import { isMobileLike, appRect } from '@/lib/mobile';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 import type { CharacterRuntime } from '@/game/characters/character';
@@ -124,8 +124,6 @@ export class TavernController {
     private cursorCleanup: (() => void) | undefined;
 
     private weaponCount = 0;
-    private selectionArrow: Phaser.GameObjects.Triangle | null = null;
-    private arrowTween: Phaser.Tweens.Tween | null = null;
     private hasSelectedOnce = false;
 
     constructor(
@@ -335,49 +333,11 @@ export class TavernController {
     // ─── Selection visuals ───────────────────────────────────────────────
 
     private buildSelectionVisuals(): void {
-        const entry = this.npcs[this.selectedIndex];
-        if (!entry) return;
-        const arrowY = this.headWorldY(entry) - 14;
-        this.selectionArrow = this.scene.add.triangle(
-            entry.x,
-            arrowY,
-            0,
-            0,
-            14,
-            0,
-            7,
-            9,
-            0xfbbf24,
-        );
-        this.selectionArrow.setStrokeStyle(1.5, 0x1c1917);
-        this.selectionArrow.setDepth(DEPTH.FOREGROUND_MATERIAL + 500);
-
-        this.arrowTween = this.scene.tweens.add({
-            targets: this.selectionArrow,
-            y: arrowY - 6,
-            duration: 650,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut',
-        });
+        // Selection visuals (card + bobbing arrow) are owned by the React TavernHud.
     }
 
     private updateHighlight(): void {
-        const entry = this.npcs[this.selectedIndex];
-        if (!entry || !this.selectionArrow) return;
-        const arrowY = this.headWorldY(entry) - 14;
-        this.selectionArrow.setPosition(entry.x, arrowY);
-        if (this.arrowTween) {
-            this.arrowTween.remove();
-        }
-        this.arrowTween = this.scene.tweens.add({
-            targets: this.selectionArrow,
-            y: arrowY - 6,
-            duration: 650,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut',
-        });
+        // Selection change is propagated via emitFocusEvent().
     }
 
     // ─── EventBus → React ────────────────────────────────────────────────
@@ -395,7 +355,8 @@ export class TavernController {
         let viewportX: number | undefined;
         let viewportY: number | undefined;
         if (this.phase === 'selection') {
-            const head = this.worldToViewport(entry.x, this.headWorldY(entry));
+            const headX = entry.sprite ? entry.sprite.x : entry.x;
+            const head = this.worldToViewport(headX, this.headWorldY(entry));
             viewportX = head.x;
             viewportY = head.y;
         }
@@ -484,31 +445,34 @@ export class TavernController {
      *  so the result tracks the sprite's actual visible top (not just the
      *  origin). */
     private headWorldY(entry: TavernNpcEntry): number {
-        const spriteH = entry.sprite.displayHeight;
+        const sprite = entry.sprite;
+        if (sprite && sprite.displayHeight > 0) {
+            return sprite.y - sprite.displayHeight - 2;
+        }
+        const spriteH = entry.sprite?.displayHeight ?? 0;
         const halfH = entry.spec.body.halfH;
         const topOffset = Math.max(halfH, spriteH - halfH);
         const offBottom = entry.spec.sprite?.offset?.bottom ?? 0;
-        return entry.y - halfH - topOffset + offBottom;
+        return entry.y - halfH - topOffset + offBottom - 2;
     }
 
-    /** World (x, y) → viewport pixels.
+    /** World (x, y) → canvas-relative viewport pixels in app space.
      *  - cam.scrollX/Y + cam.zoom: camera transform in world coords.
      *  - rect.width / canvas.width: CSS scale applied by `canvas-fit` to
-     *    fit the canvas's internal (imageSize) pixels to the display rect.
-     *    Phaser's `ScaleManager.setZoom()` only changes CSS, not the
-     *    camera, so we must multiply by the CSS ratio explicitly.
+     *    fit the canvas's internal pixels to the display rect in app space.
+     *  TavernHud anchors its root to (rect.left, rect.top) with scale factor,
+     *  so coords returned here are relative to the canvas origin.
      */
     private worldToViewport(worldX: number, worldY: number): { x: number; y: number } {
         const cam = this.scene.cameras.main;
         const canvas = this.scene.game.canvas as HTMLCanvasElement | null;
-        const rect = canvas?.getBoundingClientRect();
-        const offsetX = rect?.left ?? 0;
-        const offsetY = rect?.top ?? 0;
-        const ratioX = rect && canvas ? rect.width / canvas.width : 1;
-        const ratioY = rect && canvas ? rect.height / canvas.height : 1;
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = appRect(canvas);
+        const ratioX = canvas.width > 0 ? rect.width / canvas.width : 1;
+        const ratioY = canvas.height > 0 ? rect.height / canvas.height : 1;
         return {
-            x: offsetX + (worldX - cam.scrollX) * cam.zoom * ratioX,
-            y: offsetY + (worldY - cam.scrollY) * cam.zoom * ratioY,
+            x: (worldX - cam.scrollX) * cam.zoom * ratioX,
+            y: (worldY - cam.scrollY) * cam.zoom * ratioY,
         };
     }
 
@@ -523,15 +487,7 @@ export class TavernController {
         const spawnPos = { x: entry.x, y: entry.y };
         useGameStore.getState().setSelectedCharacterId(spec.id);
 
-        // Destroy NPC visuals and selection arrow
-        if (this.arrowTween) {
-            this.arrowTween.remove();
-            this.arrowTween = null;
-        }
-        if (this.selectionArrow) {
-            this.selectionArrow.destroy();
-            this.selectionArrow = null;
-        }
+        // Destroy NPC visuals
         for (const npc of this.npcs) {
             npc.sprite.destroy();
             npc.shadow.destroy();
@@ -625,14 +581,6 @@ export class TavernController {
     destroy(): void {
         this.scene.events.off('update', this.update, this);
         EventBus.off('tavern-confirm-selection', this.handleConfirmEvent);
-        if (this.arrowTween) {
-            this.arrowTween.remove();
-            this.arrowTween = null;
-        }
-        if (this.selectionArrow) {
-            this.selectionArrow.destroy();
-            this.selectionArrow = null;
-        }
         // Stop emitting aim events so the crosshair hides when the
         // tavern tears down (gameplay re-takes over via the character
         // aim logic, which also reads these events).

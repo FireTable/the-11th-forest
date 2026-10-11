@@ -343,7 +343,7 @@ function applyWrapPosition(
         wrap.style.transform = `translate3d(${lx}px, ${ly}px, 0px) translate(-50%, -100%)`;
     } else if (payload) {
         const rx = 24 / s;
-        wrap.style.transform = `translate3d(calc(100vw / ${s} - ${rx}px), -50%, 0px) translate(-100%, 0px)`;
+        wrap.style.transform = `translate3d(calc(100% - ${rx}px), 50%, 0px) translate(-100%, -50%)`;
     }
 }
 
@@ -356,7 +356,7 @@ export const TavernHud: React.FC = () => {
     const wrapRef = useRef<HTMLDivElement>(null);
     const focusRef = useRef<TavernFocusPayload | null>(null);
 
-    const { scale, width, height } = useHudScale();
+    const { scale, width, height, left, top } = useHudScale();
     const scaleRef = useRef(scale);
     const mobile = useIsMobile();
 
@@ -400,8 +400,8 @@ export const TavernHud: React.FC = () => {
         width > 0
             ? {
                   position: 'absolute',
-                  left: 0,
-                  top: 0,
+                  left: `${left}px`,
+                  top: `${top}px`,
                   width: `${width / scale}px`,
                   height: `${height / scale}px`,
                   transform: `scale(${scale})`,
@@ -409,39 +409,9 @@ export const TavernHud: React.FC = () => {
               }
             : { position: 'absolute', inset: 0 };
 
-    // On mobile devices (forced/auto landscape), character intro card positioning
-    // is unusable and blocks the small touch viewport; hide desktop card and provide a
-    // touch-friendly confirm button instead of desktop A/D/F keys.
-    if (isSelection && mobile) {
-        return (
-            <div
-                className="pointer-events-none select-none cursor-none overflow-hidden"
-                style={outerStyle}
-            >
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            EventBus.emit('tavern-confirm-selection');
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-stone-950/85 border border-amber-400 text-amber-200 active:bg-amber-900/60 transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.6)] cursor-pointer"
-                        style={{ fontFamily: "'Silkscreen', monospace" }}
-                    >
-                        <span className="text-[11px] uppercase font-bold tracking-wider">
-                            CONFIRM {focus.name}
-                        </span>
-                        <span className="text-[9px] text-amber-400/80">
-                            (TAP TO START)
-                        </span>
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div
-            className="pointer-events-none [&>*]:pointer-events-none select-none cursor-none overflow-hidden"
+            className="pointer-events-none [&>*]:pointer-events-none select-none cursor-none z-20"
             style={outerStyle}
         >
             {/* Precise 396px-perimeter close animation, 1.5s */}
@@ -469,16 +439,71 @@ export const TavernHud: React.FC = () => {
                 }}
             >
                 <div className="tavern-hud-bob flex flex-col items-center">
-                    <div className={`${RETRO_BOX} relative p-4 w-[320px]`}>
+                    <div className={`${RETRO_BOX} relative ${mobile ? 'p-2.5 w-[210px]' : 'p-4 w-[320px]'}`}>
                         <CornerPixels hideBottom={isSelection} />
 
                         {isSelection ? (
-                            /* ── Phase 1: Character info ── */
-                            <>
-                                {/* Name */}
-                                <div className="text-base font-bold text-amber-200 uppercase tracking-wider mb-1 drop-shadow-[1px_1px_0px_#000]">
-                                    {focus.name}
-                                </div>
+                            mobile ? (
+                                /* ── Mobile Phase 1: Streamlined character info ── */
+                                <>
+                                    {/* Name + Status tag */}
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <div className="text-sm font-bold text-amber-200 uppercase tracking-wider drop-shadow-[1px_1px_0px_#000]">
+                                            {focus.name}
+                                        </div>
+                                        <span className="text-[8px] px-1.5 py-0.5 bg-amber-950/70 border border-amber-500/50 text-amber-300 font-mono">
+                                            SELECT
+                                        </span>
+                                    </div>
+
+                                    {/* Compact stats grid */}
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 my-1.5 py-1.5 border-y border-stone-800">
+                                        <div className="flex items-center justify-between text-[9px]">
+                                            <span className="flex items-center gap-1 text-red-400">
+                                                <Heart className="w-3 h-3 fill-red-500" /> HP
+                                            </span>
+                                            <span className="font-mono text-stone-200">{focus.hp}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[9px]">
+                                            <span className="flex items-center gap-1 text-sky-400">
+                                                <Zap className="w-3 h-3 fill-sky-400" /> SP
+                                            </span>
+                                            <span className="font-mono text-stone-200">{focus.sp}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[9px]">
+                                            <span className="flex items-center gap-1 text-emerald-400">
+                                                <Gauge className="w-3 h-3" /> SPD
+                                            </span>
+                                            <span className="font-mono text-stone-200">{moveSpeedToMps(focus.moveSpeed)}m/s</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[9px]">
+                                            <span className="flex items-center gap-1 text-orange-400">
+                                                <Layers className="w-3 h-3" /> SLT
+                                            </span>
+                                            <span className="font-mono text-stone-200">{focus.weaponMax} max</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Mobile tap-to-confirm button */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            EventBus.emit('tavern-confirm-selection');
+                                        }}
+                                        className="w-full mt-1 py-1 px-2 pointer-events-auto bg-amber-500/20 active:bg-amber-500/40 border border-amber-400 text-amber-200 text-[9px] uppercase font-bold tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                        <span>CONFIRM</span>
+                                        <span className="text-[8px] text-amber-300/80">(TAP TO START)</span>
+                                    </button>
+                                </>
+                            ) : (
+                                /* ── Desktop Phase 1: Full character info ── */
+                                <>
+                                    {/* Name */}
+                                    <div className="text-base font-bold text-amber-200 uppercase tracking-wider mb-1 drop-shadow-[1px_1px_0px_#000]">
+                                        {focus.name}
+                                    </div>
 
                                 {/* Description */}
                                 {focus.description && (
@@ -630,9 +655,10 @@ export const TavernHud: React.FC = () => {
                                     </div>
                                 </div>
                             </>
-                        ) : (
-                            /* ── Phase 2: Weapon pickup ── */
-                            <>
+                        )
+                    ) : (
+                        /* ── Phase 2: Weapon pickup ── */
+                        <>
                                 <div className="text-sm font-bold text-amber-200 mb-3">
                                     {focus.name}
                                 </div>

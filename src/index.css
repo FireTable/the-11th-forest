@@ -147,14 +147,6 @@
             transform: translateX(100dvw) rotate(90deg);
         }
     }
-
-    /* On mobile / coarse-pointer viewports, hide the tavern character intro card
-       as its desktop hovering positioning and 320px footprint cover the touch screen. */
-    @media (pointer: coarse), (orientation: portrait) and (pointer: coarse) {
-        .tavern-selection-card {
-            display: none !important;
-        }
-    }
 }
 
 /* Reusable button skin — kept for legacy callers (e.g. the editor

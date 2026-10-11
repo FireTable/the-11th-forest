@@ -85,13 +85,16 @@ describe('TavernHud', () => {
             });
         });
 
-        // Desktop card content (lore, stats, A/D/F keys) is hidden
+        // Desktop card content (long lore, radar, A/D/F keys) is omitted on mobile
         expect(container.textContent).not.toContain('A bookish shut-in');
         expect(container.textContent).not.toContain('Cycle');
         expect(container.textContent).not.toContain('Hold 1.5s');
 
-        // Mobile confirm button is displayed
-        expect(container.textContent).toContain('CONFIRM Otaku');
+        // Mobile compact card contains character name, core stats and tap confirm
+        expect(container.textContent).toContain('Otaku');
+        expect(container.textContent).toContain('HP');
+        expect(container.textContent).toContain('SP');
+        expect(container.textContent).toContain('CONFIRM');
         expect(container.textContent).toContain('TAP TO START');
     });
 
