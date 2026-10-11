@@ -9,7 +9,7 @@ import { isMobileLike } from '@/lib/mobile';
  * client-side effect fires.
  */
 export function useIsMobile(): boolean {
-    const [mobile, setMobile] = useState<boolean>(false);
+    const [mobile, setMobile] = useState<boolean>(() => isMobileLike());
     useEffect(() => {
         const evaluate = (): void => setMobile(isMobileLike());
         evaluate();

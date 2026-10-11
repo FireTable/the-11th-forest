@@ -33,6 +33,7 @@ import { Heart, Zap, Swords, Gauge, Layers, Sparkles } from 'lucide-react';
 import { EventBus } from '@/lib/events/bus';
 import type { TavernFocusPayload } from '@/game/scenes/tavern-controller';
 import { useHudScale } from '@/lib/use-hud-scale';
+import { useIsMobile } from '@/lib/use-is-mobile';
 import { CornerPixels, RETRO_BOX } from './retro-box';
 
 // ─── Stat row (icon + label + value) ─────────────────────────────────────
@@ -357,6 +358,7 @@ export const TavernHud: React.FC = () => {
 
     const { scale, width, height } = useHudScale();
     const scaleRef = useRef(scale);
+    const mobile = useIsMobile();
 
     useEffect(() => {
         scaleRef.current = scale;
@@ -392,6 +394,12 @@ export const TavernHud: React.FC = () => {
 
     if (!focus) return null;
 
+    const isSelection = focus.phase === 'selection';
+
+    // On mobile devices (forced/auto landscape), character intro card positioning
+    // is unusable and blocks the small touch viewport; hide it during selection phase.
+    if (isSelection && mobile) return null;
+
     const outerStyle: React.CSSProperties =
         width > 0
             ? {
@@ -404,8 +412,6 @@ export const TavernHud: React.FC = () => {
                   transformOrigin: 'top left',
               }
             : { position: 'absolute', inset: 0 };
-
-    const isSelection = focus.phase === 'selection';
 
     return (
         <div
@@ -429,7 +435,9 @@ export const TavernHud: React.FC = () => {
 
             <div
                 ref={wrapRef}
-                className="absolute left-0 top-0 z-20 flex flex-col items-center will-change-transform"
+                className={`absolute left-0 top-0 z-20 flex flex-col items-center will-change-transform ${
+                    isSelection ? 'tavern-selection-card' : ''
+                }`}
                 style={{
                     fontFamily: "'Silkscreen', monospace",
                 }}
