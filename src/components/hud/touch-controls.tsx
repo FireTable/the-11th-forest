@@ -103,20 +103,14 @@ export const TouchControls: React.FC = () => {
         // Right half is reserved for the FIRE/DODGE cluster — ignore taps there
         if (layerX > layerW / 2) return;
 
-        // Position the joystick base centred on the touch point, clamped to canvas layer
         const radius = JOYSTICK_BASE_PX / 2;
-        const rawCx = layerX - radius;
-        const rawCy = layerY - radius;
-        const cx = Math.max(8, Math.min(layerW / 2 - JOYSTICK_BASE_PX - 8, rawCx));
-        const cy = Math.max(8, Math.min(layerH - JOYSTICK_BASE_PX - 8, rawCy));
-
-        const baseCenterX = cx + radius;
-        const baseCenterY = cy + radius;
+        const cx = Math.max(8, Math.min(layerW / 2 - JOYSTICK_BASE_PX - 8, layerX - radius));
+        const cy = Math.max(8, Math.min(layerH - JOYSTICK_BASE_PX - 8, layerY - radius));
 
         joystickRef.current = {
             pointerId: e.pointerId,
-            centerX: baseCenterX,
-            centerY: baseCenterY,
+            centerX: layerX,
+            centerY: layerY,
         };
         setJoystickPos({ x: cx, y: cy });
         setJoystickActive(true);

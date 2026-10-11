@@ -49,10 +49,16 @@ export function isPortraitViewport(): boolean {
 }
 
 /**
- * True while `#app` is rendered rotated 90°. Mirrors the CSS media
- * query — keep the two in sync.
+ * True while `#app` is rendered rotated 90°. Checks `#app` computed
+ * transform if mounted, falling back to the CSS media query.
  */
 export function isRotated(): boolean {
+    if (typeof window === 'undefined') return false;
+    const app = typeof document !== 'undefined' ? document.getElementById('app') : null;
+    if (app) {
+        const tr = window.getComputedStyle(app).transform;
+        if (tr && tr !== 'none') return true;
+    }
     return isMobileLike() && isPortraitViewport();
 }
 

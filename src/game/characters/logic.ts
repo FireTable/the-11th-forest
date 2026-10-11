@@ -1024,6 +1024,8 @@ export class CharacterController {
             if (r.width <= 0 || r.height <= 0) return;
             const { x: cx, y: cy } = toAppPoint(e.clientX, e.clientY);
             if (cx < r.left || cx > r.left + r.width || cy < r.top || cy > r.top + r.height) return;
+            // On touch devices, joystick dragging (left half) must not hijack the aiming crosshair
+            if (e.pointerType === 'touch' && cx < r.left + r.width / 2) return;
             onPointerEvent(e);
         };
         window.addEventListener('pointermove', onWindowMove);

@@ -19,7 +19,7 @@ import * as Phaser from 'phaser';
 
 import { EventBus } from '@/lib/events/bus';
 import { SFX_EVENT, SFX_STOP } from '@/lib/constants';
-import { isMobileLike, appRect } from '@/lib/mobile';
+import { isMobileLike, appRect, toAppPoint } from '@/lib/mobile';
 import type { CharacterSpec } from '@/lib/characters';
 import type { Level } from '@/lib/levels/types';
 import type { CharacterRuntime } from '@/game/characters/character';
@@ -626,26 +626,22 @@ export class TavernController {
     private bindCursor(): void {
         const canvas = this.scene.game.canvas as HTMLCanvasElement | null;
         if (!canvas) return;
-        const camera = this.scene.cameras.main;
 
         const onMove = (e: PointerEvent): void => {
-            const r = canvas.getBoundingClientRect();
+            const r = appRect(canvas);
             if (r.width <= 0 || r.height <= 0) return;
+            const p = toAppPoint(e.clientX, e.clientY);
             if (
-                e.clientX < r.left ||
-                e.clientX > r.left + r.width ||
-                e.clientY < r.top ||
-                e.clientY > r.top + r.height
+                p.x < r.left ||
+                p.x > r.left + r.width ||
+                p.y < r.top ||
+                p.y > r.top + r.height
             ) {
                 return;
             }
-            // World coord = camera-relative pixel; then scale to the
-            // 1536x864 HUD space PixelCrosshair expects.
-            const worldX = camera.scrollX + (e.clientX - r.left) * (camera.width / r.width);
-            const worldY = camera.scrollY + (e.clientY - r.top) * (camera.height / r.height);
             EventBus.emit('aim-crosshair-update', {
-                x: (worldX - camera.scrollX) * (1536 / camera.width),
-                y: (worldY - camera.scrollY) * (864 / camera.height),
+                x: ((p.x - r.left) / r.width) * 1536,
+                y: ((p.y - r.top) / r.height) * 864,
                 isLocked: false,
                 visible: true,
             });

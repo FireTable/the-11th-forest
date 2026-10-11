@@ -11,7 +11,7 @@
  */
 
 import { EventBus } from '@/lib/events/bus';
-import { appRect } from '@/lib/mobile';
+import { appRect, isRotated, toAppPoint } from '@/lib/mobile';
 
 /** Zoom that makes `game` fit entirely inside `box` (shows 100% full map, never crops). */
 export function fitZoom(boxW: number, boxH: number, gameW: number, gameH: number): number {
@@ -68,6 +68,43 @@ export function installCanvasFit(game: Phaser.Game): () => void {
             EventBus.emit('canvas-bounds-changed');
         }
     };
+
+    // Support rotated mobile viewports in Phaser pointer transform
+    if (game.input && !(game.input as any).__rotatedPointerHooked) {
+        (game.input as any).__rotatedPointerHooked = true;
+        const origTransformPointer = (game.input as any).transformPointer;
+        (game.input as any).transformPointer = function (
+            pointer: any,
+            pageX: number,
+            pageY: number,
+            wasMove: boolean,
+        ) {
+            if (isRotated()) {
+                const phaserCanvas = parent.querySelector<HTMLCanvasElement>(':scope > canvas');
+                if (phaserCanvas && game.scale) {
+                    const p0 = pointer.position;
+                    const p1 = pointer.prevPosition;
+                    p1.x = p0.x;
+                    p1.y = p0.y;
+                    const appP = toAppPoint(pageX, pageY);
+                    const r = appRect(phaserCanvas);
+                    const gameSize = game.scale.gameSize;
+                    const x = r.width > 0 ? ((appP.x - r.left) / r.width) * gameSize.width : 0;
+                    const y = r.height > 0 ? ((appP.y - r.top) / r.height) * gameSize.height : 0;
+                    const a = pointer.smoothFactor ?? 0;
+                    if (!wasMove || a === 0) {
+                        p0.x = x;
+                        p0.y = y;
+                    } else {
+                        p0.x = x * a + p1.x * (1 - a);
+                        p0.y = y * a + p1.y * (1 - a);
+                    }
+                    return;
+                }
+            }
+            origTransformPointer.call(this, pointer, pageX, pageY, wasMove);
+        };
+    }
 
     // rAF throttle — at most one apply per frame; eliminates redundant reflows.
     const scheduleApply = (): void => {
