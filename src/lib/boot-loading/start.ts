@@ -1,4 +1,4 @@
-import { BOOT_LOADING } from '@/lib/constants';
+import { BOOT_LOADING } from '@/lib/boot-loading/config';
 import {
     ART_W,
     ART_H,

@@ -1,5 +1,5 @@
 import { breath, breathGLSL, LAYER_RECT, type Rect } from '@/lib/boot-loading/layout';
-import { BOOT_LOADING } from '@/lib/constants';
+import { BOOT_LOADING } from '@/lib/boot-loading/config';
 
 export type LayerName = 'bg' | 'chars' | 'fg' | 'title';
 export type ForestImages = Record<LayerName | 'maskBg' | 'maskDepth' | 'maskChars', TexImageSource>;

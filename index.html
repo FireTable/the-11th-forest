@@ -25,6 +25,50 @@
             type="image/webp"
             fetchpriority="high"
         />
+        <!-- The animated layers, fetched in parallel with the key art so the canvas can take over
+             as soon as the splash script runs instead of waiting on a second round of requests. -->
+        <link
+            rel="preload"
+            href="/assets/image/ui/loading/forest-loading-bg.webp"
+            as="image"
+            type="image/webp"
+        />
+        <link
+            rel="preload"
+            href="/assets/image/ui/loading/forest-loading-chars.webp"
+            as="image"
+            type="image/webp"
+        />
+        <link
+            rel="preload"
+            href="/assets/image/ui/loading/forest-loading-title.webp"
+            as="image"
+            type="image/webp"
+        />
+        <link
+            rel="preload"
+            href="/assets/image/ui/loading/forest-loading-fg.webp"
+            as="image"
+            type="image/webp"
+        />
+        <link
+            rel="preload"
+            href="/assets/image/ui/loading/forest-loading-mask-bg.webp"
+            as="image"
+            type="image/webp"
+        />
+        <link
+            rel="preload"
+            href="/assets/image/ui/loading/forest-loading-mask-depth.webp"
+            as="image"
+            type="image/webp"
+        />
+        <link
+            rel="preload"
+            href="/assets/image/ui/loading/forest-loading-mask-chars.webp"
+            as="image"
+            type="image/webp"
+        />
 
         <style>
             @font-face {
@@ -206,6 +250,12 @@
                 height: 48px;
                 z-index: 15;
                 filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.55));
+                /* First paint, before any JS: frame 0 of the runner sprite inlined as a 20×24 PNG,
+                   so he is on screen with the bar. The canvas runner.ts mounts covers it exactly.
+                   tests/lib/boot-loading/runner-inline.test.ts fails if it drifts. */
+                background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAYCAYAAAD6S912AAAAxElEQVR42mNgoAdQkRL6TwxNtGFWWrJEYaIMhhkY4qAPxuiGIIsTNJAU1xHlSkKuw+ZaggZ+Oj6HKHx7RQ2YJspAERERojBJBp5/9gmOYQagiw2cC9ExSBybHCgciUo6xEYM0Qn7+7cPRGGC3oV5AaT4zu2LOA2CySHrwWsgKV4my0BCkUXQy7BcQCinEBXDIBydbUsUJjqWQYpdQwxwGgSTI8lAXBoIydPWQJCC379/wDEuAwmpoa2BO3dugmNcBuJTAwDvh4jDxpePLQAAAABJRU5ErkJggg==')
+                    center / 100% 100% no-repeat;
+                image-rendering: pixelated;
                 animation: boot-runner-move 10s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
             }
             #boot.boot-done .pixel-runner {
@@ -484,7 +534,7 @@
         </div>
 
         <div id="root"></div>
-        <script type="module" src="/src/boot.ts"></script>
+        <script type="module" async src="/src/boot.ts"></script>
         <script type="module" src="/src/main.tsx"></script>
     </body>
 </html>

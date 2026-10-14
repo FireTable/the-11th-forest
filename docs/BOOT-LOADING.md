@@ -20,6 +20,21 @@ whole experience — every effect is optional, none of them is load-bearing.
 | 7   | `#boot` removed    | ~400 ms after `boot-done` (`PhaserGame.tsx`). A `MutationObserver` notices and disposes the canvas.    |
 | 8   | Dispose            | rAF cancelled, listeners removed, canvas removed from the DOM, WebGL context released.                 |
 
+### First paint
+
+Everything the player sees first is on screen before any JS runs, and nothing waits on a second
+round of requests:
+
+- The key art `<img>` is preloaded with `fetchpriority="high"`; the seven animated layers and masks
+  are `<link rel="preload">`ed in `<head>` alongside it, so they are already cached when the
+  splash script asks for them.
+- `src/boot.ts` is an `async` module script, so it runs as soon as it arrives rather than after the
+  rest of the page. Its tunables live in the dependency-free `src/lib/boot-loading/config.ts`
+  (re-exported from `@/lib/constants`), so the splash never pulls in the game-wide constants.
+- The runner's frame 0 is inlined in `index.html` as a 20×24 PNG data URI on `.pixel-runner`, so he
+  stands on the bar from the first paint; the canvas `mountRunner` adds covers it pixel for pixel.
+  `tests/lib/boot-loading/runner-inline.test.ts` fails if the inline image and the sprite drift.
+
 ## Files
 
 | File                                    | Role                                                                           |

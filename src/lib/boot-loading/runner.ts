@@ -1,4 +1,4 @@
-import { BOOT_LOADING } from '@/lib/constants';
+import { BOOT_LOADING } from '@/lib/boot-loading/config';
 
 /**
  * The runner that walks the progress bar: the chubby boy on the left of the key art, redrawn as
