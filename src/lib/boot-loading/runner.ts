@@ -244,6 +244,9 @@ export function mountRunner(root: ParentNode): (() => void) | null {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
+    // The canvas is transparent, so the inline first-paint frame on .pixel-runner would show
+    // through every other frame (and the bob). Drop it the moment the canvas can draw.
+    el.style.backgroundImage = 'none';
 
     // Reduced motion: pose him, don't walk him. Same rule as the WebGL splash.
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {

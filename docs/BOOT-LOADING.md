@@ -32,7 +32,8 @@ round of requests:
   rest of the page. Its tunables live in the dependency-free `src/lib/boot-loading/config.ts`
   (re-exported from `@/lib/constants`), so the splash never pulls in the game-wide constants.
 - The runner's frame 0 is inlined in `index.html` as a 20×24 PNG data URI on `.pixel-runner`, so he
-  stands on the bar from the first paint; the canvas `mountRunner` adds covers it pixel for pixel.
+  stands on the bar from the first paint; the canvas `mountRunner` adds draws the same frame, and the inline image is removed as soon as the
+  canvas has a context (the canvas is transparent, so leaving it would show a second runner).
   `tests/lib/boot-loading/runner-inline.test.ts` fails if the inline image and the sprite drift.
 
 ## Files
