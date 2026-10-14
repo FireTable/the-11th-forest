@@ -1,18 +1,16 @@
 import { BOOT_LOADING } from '@/lib/boot-loading/config';
 import {
-    ART_W,
-    ART_H,
     backingSize,
     capDpr,
+    coverFit,
     effectScale,
     fitTextureSize,
     isLowEnd,
     smoothTowards,
-    snapFit,
     stageBox,
-    stageFit,
     shouldUseStaticFallback,
     textureUploadScale,
+    type Fit,
     LOADING_ASSET_BASE,
     LOADING_ASSETS,
 } from '@/lib/boot-loading/layout';
@@ -87,26 +85,33 @@ function withinMaxTextureSize(img: HTMLImageElement, maxTextureSize: number): Te
 }
 
 /**
- * Pin the static `<img>` to the art rect the shader will use, so the no-WebGL fallback and the
- * animated frame always agree. This is `object-fit: cover` with a focal point: the box is always
- * at least as big as the stage, so no side of the viewport is ever left as an empty band.
+ * Where the art lands inside the canvas's own box, in CSS px relative to that box.
+ *
+ * The stylesheet owns the layout: `.forest-bg` fills the stage with `object-fit: cover`, and the
+ * shared wrapper was already snapped to whole device pixels by the inline script in index.html.
+ * So the art's position is READ, never computed independently — one source of truth, so the two
+ * renderers cannot disagree about it. Measured after the snap, which is why both rects are read
+ * live: the wrapper's translate cancels between them.
+ *
+ * No snapping here on purpose. `uFit` is in backing-store pixels and the caller scales it by the
+ * store's real `sx`/`sy`, so the art lands back at `fit * dpr` on the device grid — the exact spot
+ * the <img> is rasterised at. Snapping here would push it a whole device pixel outwards and break
+ * that. The wrapper's pre-paint snap is the only alignment there is.
  */
-function placeArt(
-    art: HTMLElement,
-    box: { left: number; top: number },
-    fit: ReturnType<typeof stageFit>,
-): void {
-    art.style.inset = 'auto';
-    art.style.left = `${box.left + fit.ox}px`;
-    art.style.top = `${box.top + fit.oy}px`;
-    art.style.width = `${ART_W * fit.s}px`;
-    art.style.height = `${ART_H * fit.s}px`;
+function measuredFit(art: HTMLElement, canvas: HTMLCanvasElement): Fit {
+    const img = art.getBoundingClientRect();
+    const cv = canvas.getBoundingClientRect();
+    // `coverFit` is the same arithmetic `object-fit: cover` does, so `f.ox/oy` is where the image
+    // sits inside the element box.
+    const f = coverFit(img.width, img.height);
+    return { ox: img.left + f.ox - cv.left, oy: img.top + f.oy - cv.top, s: f.s };
 }
 
 export async function startBootLoading(): Promise<void> {
     const boot = document.getElementById('boot');
     const art = document.getElementById('boot-art');
-    if (!boot || !art) return;
+    const canvas = document.getElementById('boot-gl') as HTMLCanvasElement | null;
+    if (!boot || !art || !canvas) return;
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const lowEnd = isLowEnd({
@@ -119,24 +124,18 @@ export async function startBootLoading(): Promise<void> {
     // WebGL decision. It looks after itself from here (it stops when the splash is removed).
     mountRunner(document);
 
-    // Fit the static art immediately, before anything async: the splash must already be in its
-    // final layout on the first painted frame, or it visibly jumps once the layers decode.
+    // Measure the layout the browser actually produced, before anything async: the canvas needs
+    // this before its first draw, and the web font landing can change the stage box on mobile.
     const applyFit = (): {
         box: { w: number; h: number; left: number; top: number };
-        fit: ReturnType<typeof stageFit>;
+        fit: Fit;
         dpr: number;
     } => {
         const box = stageSize(boot);
-        // ONE dpr for the whole splash — the static <img>, the canvas backing store and uFit all
-        // quantise against the same device-pixel grid, computed with the same rule the canvas
-        // uses (which already carries the mobile cap). Deriving it twice from two places is how
-        // the img and the canvas end up a device pixel apart on a phone.
+        // ONE dpr for the whole splash — the backing store and uFit both quantise against the same
+        // device-pixel grid, computed with the rule the canvas uses (it carries the mobile cap).
         const dpr = capDpr(window.devicePixelRatio, BOOT_LOADING.MAX_DPR, coarsePointer);
-        // Snapped, so the art's edges land on whole device pixels and the handover from the <img>
-        // to the canvas cannot shimmer on a fractional pixel.
-        const fit = snapFit(stageFit(box.w, box.h), dpr);
-        placeArt(art, box, fit);
-        return { box, fit, dpr };
+        return { box, fit: measuredFit(art, canvas), dpr };
     };
     applyFit();
     // The web font landing changes the panel height, which can change dvh on mobile.
@@ -192,10 +191,6 @@ export async function startBootLoading(): Promise<void> {
         return;
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.className = 'forest-gl';
-    canvas.setAttribute('aria-hidden', 'true');
-
     const gl = canvas.getContext('webgl', {
         alpha: false,
         antialias: false,
@@ -231,9 +226,11 @@ export async function startBootLoading(): Promise<void> {
         clearTimeout(resizeTimer);
         clearTimeout(doneTimer);
         for (const off of cleanups) off();
-        // Drop the canvas FIRST: whatever else happens, the static #boot-art is what stays on
-        // screen.
-        canvas.remove();
+        // Hand the screen back to the static art FIRST. The canvas is never removed from the DOM
+        // (it has been there since the first paint), so the only way to un-hide the <img> is to
+        // put its opacity back — otherwise a context loss would leave the splash showing nothing.
+        canvas.style.opacity = '0';
+        art.style.opacity = '1';
         releaseContext();
     };
 
@@ -273,7 +270,8 @@ export async function startBootLoading(): Promise<void> {
         }
         const fgl = created;
 
-        art.insertAdjacentElement('afterend', canvas);
+        // The canvas is already in the markup, sitting over the <img> at opacity 0 — no DOM work
+        // here, by design (see docs/BOOT-LOADING.md).
 
         /** Uploaded texture scale per layer, so growing the window restores the originals. */
         const uploaded: Record<LayerName, number> = { bg: 1, chars: 1, fg: 1, title: 1 };
@@ -305,13 +303,9 @@ export async function startBootLoading(): Promise<void> {
             if (disposed) return;
             const { box, fit, dpr } = applyFit();
 
-            // The canvas CSS box IS the stage box, so the backing store below can use the same
-            // numbers: one box for the img, the CSS box and uFit means no stretch.
-            canvas.style.inset = 'auto';
-            canvas.style.left = `${box.left}px`;
-            canvas.style.top = `${box.top}px`;
-            canvas.style.width = `${box.w}px`;
-            canvas.style.height = `${box.h}px`;
+            // The canvas CSS box is owned by the stylesheet (`inset: 0` inside the shared stage),
+            // so `box` — the same stage box — sizes the backing store, and `fit` was measured from
+            // the <img> the browser laid out in that very box. Nothing is positioned here.
 
             // Rounding the backing store to whole device pixels means the real CSS-px → device-px
             // scale is not exactly dpr, and not even the same on both axes. uFit has to be fed
@@ -321,10 +315,10 @@ export async function startBootLoading(): Promise<void> {
             const { w, h, sx, sy } = backingSize(box, dpr);
             if (canvas.width !== w) canvas.width = w;
             if (canvas.height !== h) canvas.height = h;
-            // The canvas CSS box is the stage box (set above), so the art's own offset travels in
-            // uFit — exactly what the <img> gets from placeArt(). y rides sy and the scale rides
-            // sx: uFit takes one scalar, and the two differ by well under a device pixel over
-            // the whole box.
+            // `fit` came from the <img>'s own measured box, so scaling it by the store's real
+            // sx/sy puts the art back at `fit * dpr` on the device grid — the exact pixel the <img>
+            // is rasterised at. y rides sy and the scale rides sx: uFit takes one scalar, and the
+            // two differ by well under a device pixel over the whole box.
             fgl.resize(w, h, fit.ox * sx, fit.oy * sy, fit.s * sx);
 
             const deviceScale = fit.s * sx;
@@ -372,7 +366,14 @@ export async function startBootLoading(): Promise<void> {
             });
             frames++;
             if (frames === 3 && !visibleAt) {
+                // The handover, in ONE task: the canvas has been drawing invisibly over the <img>
+                // since it mounted, and every deformation term is still multiplied by k = 0, so
+                // this frame is the image itself. Opacity, never visibility — `visibility`
+                // would drop the <img>'s raster and leave nothing on screen until JS arrives,
+                // which in a production build is after the whole game bundle has landed. No
+                // transition on either, so there is no frame with both or neither showing.
                 canvas.style.opacity = '1';
+                art.style.opacity = '0';
                 visibleAt = now;
             }
         };

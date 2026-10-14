@@ -23,69 +23,20 @@ export const LOADING_ASSETS = {
     maskChars: 'forest-loading-mask-chars.webp',
 } as const;
 
+/** Where the art lands in a box: its (0,0) relative to the box, and CSS px per art px. */
+export type Fit = { ox: number; oy: number; s: number };
+
 /**
- * Same math as CSS `object-fit: cover; object-position: 50% 50%`.
- * Returns where the art's (0,0) lands in the viewport (CSS px) and the scale (CSS px per art px).
+ * Same math as CSS `object-fit: cover; object-position: 50% 50%`: where the art's (0,0) lands
+ * inside the box, and the scale (CSS px per art px).
+ *
+ * This is the single source of truth for the splash layout. The stylesheet runs it on #boot-art,
+ * and start.ts runs the same arithmetic on the box the browser produced — so the static <img> and
+ * the WebGL canvas cannot disagree about where the art is.
  */
 export function coverFit(viewW: number, viewH: number): { ox: number; oy: number; s: number } {
     const s = Math.max(viewW / ART_W, viewH / ART_H);
     return { ox: (viewW - ART_W * s) / 2, oy: (viewH - ART_H * s) / 2, s };
-}
-
-/**
- * Art-space point to keep on screen when the viewport crops the art: the middle of the four
- * characters and the title, so a narrow crop still frames the group instead of the empty sky.
- */
-export const FOCAL_POINT = { x: 972, y: 560 } as const;
-
-export type Fit = { ox: number; oy: number; s: number };
-
-const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
-
-/**
- * Where the art lands inside the splash stage. ALWAYS plain `cover` — the placed box is at
- * least as large as the stage on both axes, so no side is ever left as an empty band. The only
- * freedom left is which slice of the art is cropped, and that is spent on the focal point: a
- * narrow screen keeps the characters and the title centred instead of the empty sky. Where
- * centring the focal point would open a gap, the offsets clamp back — which is exactly what
- * keeps the coverage guarantee.
- *
- * The art is never scaled below cover to make room for the progress panel: the panel is
- * positioned and width-constrained in CSS instead.
- *
- * The same result drives the static `<img>` (via left/top/width/height) and the WebGL `uFit`,
- * so the animated frame and the no-WebGL fallback always agree.
- */
-export function stageFit(viewW: number, viewH: number): Fit {
-    const w = Math.max(1, viewW);
-    const h = Math.max(1, viewH);
-    const s = Math.max(w / ART_W, h / ART_H);
-    return {
-        ox: clamp(w / 2 - FOCAL_POINT.x * s, w - ART_W * s, 0),
-        oy: clamp(h / 2 - FOCAL_POINT.y * s, h - ART_H * s, 0),
-        s,
-    };
-}
-
-/**
- * `stageFit` snapped so every art edge lands exactly on a device pixel. Without this the art
- * can land on a fractional device pixel and the browser resamples the static `<img>` one way
- * while the GPU samples the canvas another — the handover between them is a sub-pixel shimmer
- * that reads as a twitch on a high-DPR screen.
- *
- * Snapping is one-directional on purpose: `ox`/`oy` go DOWN (floor) and the right/bottom edge
- * go UP (ceil), so the fit can only ever grow. It still covers the box on both axes, which is
- * the property `stageFit` guarantees — a naive round() could pull an edge inwards by up to half
- * a device pixel and open a gap along it.
- */
-export function snapFit(fit: Fit, dpr: number): Fit {
-    const d = dpr > 0 && Number.isFinite(dpr) ? dpr : 1;
-    const ox = Math.floor(fit.ox * d) / d;
-    const oy = Math.floor(fit.oy * d) / d;
-    // The scale comes from the width only. The height follows from the art aspect ratio, and
-    // lands >= fit.oy + ART_H * fit.s because s grows by at least what oy lost.
-    const s = (Math.ceil((fit.ox + ART_W * fit.s) * d) / d - ox) / ART_W;
-    return { ox, oy, s };
 }
 
 /**

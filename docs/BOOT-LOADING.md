@@ -44,20 +44,20 @@ round of requests:
 
 ## Files
 
-| File                                    | Role                                                                           |
-| --------------------------------------- | ------------------------------------------------------------------------------ |
-| `index.html`                            | `#boot` markup + all splash CSS (scoped inside `#boot`), loads `/src/boot.ts`. |
-| `src/boot.ts`                           | Entry point: `void startBootLoading()`.                                        |
-| `src/lib/boot-loading/layout.ts`        | Pure, DOM-free math: fit, DPR cap, progress, breath curve.                     |
-| `src/lib/boot-loading/gl.ts`            | WebGL core: one program, 4 quads, textures, `draw(t, k, fx)`.                  |
-| `src/lib/boot-loading/start.ts`         | DOM glue: canvas, image loading, rAF loop, mouse, lifecycle, dispose.          |
-| `src/lib/boot-loading/runner.ts`        | The bar runner: 20×24 pixel sprite data + the canvas that walks it.            |
-| `src/lib/boot-loading/progress.ts`      | `setBootProgress(r)` — Phaser loader progress into the `#boot` bar.            |
-| `src/lib/constants.ts`                  | `BOOT_LOADING` — every tunable in this document.                               |
-| `src/PhaserGame.tsx`                    | Adds `boot-done` and removes `#boot`.                                          |
-| `src/game/scenes/scene.ts`              | One line in `preload()` feeds `load.on('progress')` into `setBootProgress`.    |
-| `tests/lib/boot-loading/layout.test.ts` | Unit tests for every pure helper.                                              |
-| `tests/lib/boot-loading/runner.test.ts` | Unit tests for the runner sprite data and its walk cadence.                    |
+| File                                    | Role                                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------------------- |
+| `index.html`                            | `#boot` markup + all splash CSS (scoped inside `#boot`), loads `/src/boot.ts`.      |
+| `src/boot.ts`                           | Entry point: `void startBootLoading()`.                                             |
+| `src/lib/boot-loading/layout.ts`        | Pure, DOM-free math: fit, DPR cap, progress, breath curve.                          |
+| `src/lib/boot-loading/gl.ts`            | WebGL core: one program, 4 quads, textures, `draw(t, k, fx)`.                       |
+| `src/lib/boot-loading/start.ts`         | DOM glue: measures the CSS layout, drives the canvas, rAF loop, lifecycle, dispose. |
+| `src/lib/boot-loading/runner.ts`        | The bar runner: 20×24 pixel sprite data + the canvas that walks it.                 |
+| `src/lib/boot-loading/progress.ts`      | `setBootProgress(r)` — Phaser loader progress into the `#boot` bar.                 |
+| `src/lib/constants.ts`                  | `BOOT_LOADING` — every tunable in this document.                                    |
+| `src/PhaserGame.tsx`                    | Adds `boot-done` and removes `#boot`.                                               |
+| `src/game/scenes/scene.ts`              | One line in `preload()` feeds `load.on('progress')` into `setBootProgress`.         |
+| `tests/lib/boot-loading/layout.test.ts` | Unit tests for every pure helper.                                                   |
+| `tests/lib/boot-loading/runner.test.ts` | Unit tests for the runner sprite data and its walk cadence.                         |
 
 ## Assets
 
@@ -87,33 +87,19 @@ lose RGB where alpha is 0 in some browsers.
 - **One program, four quads.** A single unit quad (`TRIANGLE_STRIP`, 4 verts) is drawn once per
   layer with `uQuad` / `uRect` / `uMode` / `uOff`. Quads are padded in art px (`PAD`: bg 0, chars
   24, fg 0, title 8) so displaced pixels are never clipped.
-- **Cover fit, focal point.** `stageFit(viewW, viewH)` is always plain `cover`: the placed box is
-  at least as big as the stage on both axes, so no side of the viewport is ever an empty band. The
-  only freedom left is which slice gets cropped, and it is spent on `FOCAL_POINT` (972, 560) — the
-  middle of the four characters and the title — so a narrow crop frames the group instead of the
-  empty sky. The offsets are clamped so centring the focal point can never open a gap. **The art
-  is never scaled below cover to make room for the panel**; the panel is positioned and
-  width-constrained in CSS instead. The same `Fit` drives the `<img>` (via left/top/width/height),
-  the canvas CSS box and the shader's `uFit`, so the animated frame and the static fallback can
-  never disagree.
-    - `#boot` itself has **no padding**, so the stage is the whole viewport. The safe-area insets
-      live on `.boot-content` instead of eating into the art.
-    - Consequence worth knowing: at 390 × 844 the art is scaled to 844/1072 ≈ 0.79, so only ~495 art
-      px of the 1920 px width are visible — the middle two characters. Cover-with-no-bars and
-      "all four characters at once" cannot both hold on a 0.46-aspect viewport.
-- **Inverse warp.** Effects displace the _sample point_, not the geometry — `p` starts at `vArt`
-  and each effect shifts it before the texture is sampled. Masks are always sampled with the
-  **undisplaced** `vArt`, otherwise they would swim with the content.
-- **Blending.** Layer textures upload with `UNPACK_PREMULTIPLY_ALPHA_WEBGL = true` and blend
-  `ONE, ONE_MINUS_SRC_ALPHA`. Masks upload with premultiply **off**. Mixing this up gives dark
-  fringes or black masks. Any added constant colour must be multiplied by `c.a`.
-- **NPOT safety.** WebGL1 cannot mipmap NPOT textures: `LINEAR` + `CLAMP_TO_EDGE`, no mipmaps.
-- **DPR cap.** `capDpr()` caps the backing store at `MAX_DPR`, and at 2 on coarse pointers.
-- **Texture size.** Layers are pre-downscaled when the on-screen scale drops below
-  `DOWNSCALE_AT` (0.75) — restored to the originals when the window grows — and clamped to the
-  GPU's `MAX_TEXTURE_SIZE` _before the first upload_, not only on resize.
-- **`uK` ease.** Every effect term is multiplied by `uK = k²(3−2k)`, so frame 3 is bit-identical
-  to the static image and the effects fade in over `RAMP_MS`.
+- **One layout, owned by CSS.** `.forest-bg` fills the stage with `object-fit: cover` — that IS
+  the layout, and nothing in JS moves it. `start.ts` MEASURES the box the browser produced, runs
+  the same `coverFit` arithmetic on it, and hands the result to `uFit`. There is no second opinion
+  to keep in step with the first, which is what used to make the `<img>` jump when JS took over.
+  The `<img>` and the canvas are siblings inside `.forest-stage` and are never repositioned
+  individually; an inline script in `index.html` snaps that wrapper to whole device pixels before
+  the first paint, so both rasterise at the same phase.
+- **The handover is an opacity flip.** The canvas draws invisibly over the `<img>` from the frame
+  it mounts; once it has one, ONE task sets `canvas` opacity `1` and `<img>` opacity `0`. Until
+  then `uK` is 0, so that frame is the image itself. `opacity`, never `visibility` — `visibility`
+  drops the `<img>`'s raster, and in a production build the boot code lands with the whole game
+  bundle, which would leave the splash blank for as long as that takes. `dispose()` (and any error
+  path) puts both opacities back: the static image is the permanent fallback.
 
 ## Effects
 
@@ -285,7 +271,7 @@ below the bar, lifting it slightly off the bottom edge. On `max-width: 560px` or
 text under the bar at all — the `LOADING THE FOREST…` line is visually hidden and only reaches
 screen readers (`role="status" aria-live="polite"`), exactly like the `<h1>`.
 
-Re-measure the panel against the feet line after changing any size in it; `stageFit` will not
+Re-measure the panel against the feet line after changing any size in it; `coverFit` will not
 do it for you.
 
 ## Fallbacks

@@ -1,7 +1,7 @@
 {
     "name": "the-11th-forest",
     "description": "The 11th Forest — a top-down, anime-styled pixel art shooter built on Phaser 4 + React + Vite + TypeScript.",
-    "version": "1.2.4",
+    "version": "1.2.5",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/FireTable/the-11th-forest.git"

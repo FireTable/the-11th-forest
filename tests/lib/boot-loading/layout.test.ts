@@ -11,15 +11,12 @@ import {
     shouldAnimate,
     nextProgress,
     mapRealProgress,
-    FOCAL_POINT,
-    stageFit,
     stageBox,
     capDpr,
     isLowEnd,
     effectScale,
     MOBILE_EFFECT_SCALE,
     smoothTowards,
-    snapFit,
     backingSize,
     shouldUseStaticFallback,
     textureUploadScale,
@@ -248,36 +245,37 @@ describe('asset table', () => {
     });
 });
 
-/** Where an art-space point lands on screen under this fit. */
-function toScreen(
-    fit: ReturnType<typeof stageFit>,
-    x: number,
-    y: number,
-): { x: number; y: number } {
-    return { x: fit.ox + x * fit.s, y: fit.oy + y * fit.s };
-}
-
 /**
- * The coverage guarantee, checked on every viewport that matters: the placed art box is at least
- * as big as the stage on both axes and never starts past an edge, so no side can be an empty band.
+ * The coverage guarantee, checked on every viewport that matters: the placed art is at least as
+ * big as the stage on both axes and never starts past an edge, so no side can be an empty band.
+ *
+ * This is plain `coverFit` — the same arithmetic the stylesheet's `object-fit: cover` does to
+ * #boot-art, which is now the single source of truth for where the art lands. start.ts reads the
+ * browser's layout rather than computing a fit of its own, so there is no second opinion to keep
+ * in step with this one.
  */
-function checkNoGap(viewW: number, viewH: number) {
-    const fit = stageFit(viewW, viewH);
-    const w = ART_W * fit.s;
-    const h = ART_H * fit.s;
-    expect(fit.s).toBeCloseTo(Math.max(viewW / ART_W, viewH / ART_H), 9);
-    expect(w).toBeGreaterThanOrEqual(viewW - 0.5);
-    expect(h).toBeGreaterThanOrEqual(viewH - 0.5);
-    expect(fit.ox).toBeLessThanOrEqual(0.5);
-    expect(fit.oy).toBeLessThanOrEqual(0.5);
-    expect(fit.ox + w).toBeGreaterThanOrEqual(viewW - 0.5);
-    expect(fit.oy + h).toBeGreaterThanOrEqual(viewH - 0.5);
-    // Never distorted: one uniform scale, so the x and y scales are identical.
-    expect(w / ART_W).toBeCloseTo(h / ART_H, 9);
-    return fit;
-}
+describe('cover fit never letterboxes', () => {
+    const onScreen = (fit: { ox: number; oy: number; s: number }, x: number, y: number) => ({
+        x: fit.ox + x * fit.s,
+        y: fit.oy + y * fit.s,
+    });
 
-describe('stageFit', () => {
+    const checkNoGap = (viewW: number, viewH: number) => {
+        const fit = coverFit(viewW, viewH);
+        const w = ART_W * fit.s;
+        const h = ART_H * fit.s;
+        expect(fit.s).toBeCloseTo(Math.max(viewW / ART_W, viewH / ART_H), 9);
+        expect(w).toBeGreaterThanOrEqual(viewW - 0.5);
+        expect(h).toBeGreaterThanOrEqual(viewH - 0.5);
+        expect(fit.ox).toBeLessThanOrEqual(0.5);
+        expect(fit.oy).toBeLessThanOrEqual(0.5);
+        expect(fit.ox + w).toBeGreaterThanOrEqual(viewW - 0.5);
+        expect(fit.oy + h).toBeGreaterThanOrEqual(viewH - 0.5);
+        // Never distorted: one uniform scale, so the x and y scales are identical.
+        expect(w / ART_W).toBeCloseTo(h / ART_H, 9);
+        return fit;
+    };
+
     it.each([
         ['portrait phone', 390, 844],
         ['small portrait phone', 360, 640],
@@ -304,46 +302,6 @@ describe('stageFit', () => {
         }
     });
 
-    it('never scales the art below plain cover (no shrinking to clear the panel)', () => {
-        for (const [w, h] of [
-            [390, 844],
-            [360, 640],
-            [1920, 1080],
-            [844, 390],
-            [3440, 1440],
-        ]) {
-            expect(stageFit(w, h).s).toBeGreaterThanOrEqual(coverFit(w, h).s - 1e-9);
-        }
-    });
-
-    it('keeps the characters centred instead of cropping the empty sky', () => {
-        // Portrait: the crop is horizontal, and the focal point — the middle of the group —
-        // is what stays centred. (A tall stage always crops vertically-to-fit, so there is no
-        // freedom left to spend on a vertical offset; the panel is placed by CSS instead.)
-        const fit = checkNoGap(390, 844);
-        expect(toScreen(fit, FOCAL_POINT.x, FOCAL_POINT.y).x).toBeCloseTo(195, 6);
-
-        // Ultrawide: the crop is vertical, and the focal point is centred on it.
-        const wide = checkNoGap(3440, 1440);
-        expect(toScreen(wide, FOCAL_POINT.x, FOCAL_POINT.y).y).toBeCloseTo(720, 6);
-    });
-
-    it('keeps the focal point on screen wherever there is crop freedom', () => {
-        for (const [w, h] of [
-            [390, 844],
-            [360, 640],
-            [1920, 1080],
-            [844, 390],
-            [3440, 1440],
-        ]) {
-            const p = toScreen(stageFit(w, h), FOCAL_POINT.x, FOCAL_POINT.y);
-            expect(p.x).toBeGreaterThanOrEqual(-0.5);
-            expect(p.x).toBeLessThanOrEqual(w + 0.5);
-            expect(p.y).toBeGreaterThanOrEqual(-0.5);
-            expect(p.y).toBeLessThanOrEqual(h + 0.5);
-        }
-    });
-
     it('still shows the title and the characters on a landscape desktop', () => {
         const fit = checkNoGap(1920, 1080);
         // Title (art 618,100 → 1306,369) and the character band (487,481 → 1457,976).
@@ -353,7 +311,7 @@ describe('stageFit', () => {
             [487, 481],
             [1457, 976],
         ]) {
-            const p = toScreen(fit, x, y);
+            const p = onScreen(fit, x, y);
             expect(p.x).toBeGreaterThanOrEqual(-0.5);
             expect(p.x).toBeLessThanOrEqual(1920 + 0.5);
             expect(p.y).toBeGreaterThanOrEqual(-0.5);
@@ -362,7 +320,7 @@ describe('stageFit', () => {
     });
 
     it('survives a degenerate viewport instead of producing NaN', () => {
-        const fit = stageFit(0, 0);
+        const fit = coverFit(0, 0);
         expect(Number.isFinite(fit.ox)).toBe(true);
         expect(Number.isFinite(fit.oy)).toBe(true);
         expect(Number.isFinite(fit.s)).toBe(true);
@@ -512,62 +470,6 @@ const L07_BOXES: Array<[number, number]> = [
 const L07_DPRS = [1, 1.25, 1.5, 2, 3];
 const L07_EPS = 1e-6;
 
-describe('snapFit', () => {
-    it('lands the width edges on whole device pixels', () => {
-        for (const [w, h] of L07_BOXES) {
-            for (const raw of L07_DPRS) {
-                for (const coarsePointer of [false, true]) {
-                    const dpr = capDpr(raw, BOOT_LOADING.MAX_DPR, coarsePointer);
-                    const fit = snapFit(stageFit(w, h), dpr);
-                    // The height rides the width-derived scale, so only these three are on-grid —
-                    // and those are exactly the edges that decide where the art sits.
-                    for (const edge of [
-                        fit.ox * dpr,
-                        fit.oy * dpr,
-                        (fit.ox + ART_W * fit.s) * dpr,
-                    ]) {
-                        expect(Math.abs(edge - Math.round(edge))).toBeLessThan(L07_EPS);
-                    }
-                }
-            }
-        }
-    });
-
-    it('still covers the box on both axes', () => {
-        for (const [w, h] of L07_BOXES) {
-            for (const raw of L07_DPRS) {
-                for (const coarsePointer of [false, true]) {
-                    const dpr = capDpr(raw, BOOT_LOADING.MAX_DPR, coarsePointer);
-                    const fit = snapFit(stageFit(w, h), dpr);
-                    expect(fit.ox).toBeLessThanOrEqual(0);
-                    expect(fit.oy).toBeLessThanOrEqual(0);
-                    expect(fit.ox + ART_W * fit.s).toBeGreaterThanOrEqual(w - L07_EPS);
-                    expect(fit.oy + ART_H * fit.s).toBeGreaterThanOrEqual(h - L07_EPS);
-                }
-            }
-        }
-    });
-
-    it('can only ever grow the fit — it must never open a gap', () => {
-        for (const [w, h] of L07_BOXES) {
-            for (const raw of L07_DPRS) {
-                const base = stageFit(w, h);
-                const snapped = snapFit(base, capDpr(raw, BOOT_LOADING.MAX_DPR, false));
-                expect(snapped.ox).toBeLessThanOrEqual(base.ox + L07_EPS);
-                expect(snapped.oy).toBeLessThanOrEqual(base.oy + L07_EPS);
-                expect(snapped.s).toBeGreaterThanOrEqual(base.s - L07_EPS);
-            }
-        }
-    });
-
-    it('reads a nonsense dpr as 1 instead of snapping onto nothing', () => {
-        const want = snapFit(stageFit(1280, 720), 1);
-        for (const bad of [0, -2, Number.NaN, Number.POSITIVE_INFINITY]) {
-            expect(snapFit(stageFit(1280, 720), bad)).toEqual(want);
-        }
-    });
-});
-
 describe('backingSize', () => {
     it('rounds the store to whole device pixels and reports the real per-axis scale', () => {
         // 390 × 1.25 = 487.5 — the fractional case a phone actually hits.
@@ -599,88 +501,78 @@ describe('backingSize', () => {
 });
 
 describe('static <img> vs the WebGL uFit', () => {
-    /** Exactly what start.ts does: one fit, one dpr, two rects. */
+    /**
+     * The two renderers, exactly as they work:
+     *   - the stylesheet places #boot-art with `object-fit: cover`, so the image sits at
+     *     coverFit(box) — CSS owns this and nothing in JS moves it;
+     *   - start.ts MEASURES that same box, runs the same coverFit, and hands the result to uFit,
+     *     scaled by the backing store's real sx/sy.
+     *
+     * uFit is in backing-store pixels and a backing pixel is 1/sx CSS px, so dividing uFit back
+     * by the scale the store actually got has to land exactly on the image's rect. That is the
+     * whole invariant: the factor that used to put the art ~1.9 device px out at a fractional
+     * DPR is sx itself, and using the store's real sx instead of the nominal dpr cancels it.
+     */
     const place = (w: number, h: number, rawDpr: number, coarsePointer: boolean) => {
         const dpr = capDpr(rawDpr, BOOT_LOADING.MAX_DPR, coarsePointer);
-        const fit = snapFit(stageFit(w, h), dpr);
+        const fit = coverFit(w, h); // what `object-fit: cover` does to the element box
         const { sx, sy } = backingSize({ w, h }, dpr);
+        const ufit = [
+            fit.ox * sx,
+            fit.oy * sy,
+            (fit.ox + ART_W * fit.s) * sx,
+            (fit.oy + ART_H * fit.s) * sx, // uFit carries ONE scale — the art's height rides sx
+        ];
         return {
             dpr,
             sx,
             sy,
-            /** What placeArt() writes to the <img>, in CSS px. */
+            /** The <img>'s image rect, CSS px. */
             img: [fit.ox, fit.oy, fit.ox + ART_W * fit.s, fit.oy + ART_H * fit.s] as const,
-            /** What fgl.resize() gets, already in device px. */
-            ufit: [
-                fit.ox * sx,
-                fit.oy * sy,
-                (fit.ox + ART_W * fit.s) * sx,
-                (fit.oy + ART_H * fit.s) * sx,
-            ] as const,
+            /** The canvas' art rect back in CSS px: uFit / (backing px per CSS px). */
+            canvas: [ufit[0] / sx, ufit[1] / sy, ufit[2] / sx, ufit[3] / sx] as const,
         };
     };
 
-    it('are exactly equal wherever the backing store is a whole multiple of the dpr', () => {
+    it('land on exactly the same rect on every viewport and DPR', () => {
         let checked = 0;
         for (const [w, h] of L07_BOXES) {
             for (const raw of L07_DPRS) {
                 for (const coarsePointer of [false, true]) {
-                    const { dpr, sx, sy, img, ufit } = place(w, h, raw, coarsePointer);
-                    // Only the fractional-DPR cases quantise; every integer-DPR device (which is
-                    // every real phone and desktop) must agree to the last bit.
-                    if (Math.abs(sx - dpr) < L07_EPS && Math.abs(sy - dpr) < L07_EPS) {
-                        checked++;
-                        expect(ufit[0]).toBeCloseTo(img[0] * dpr, 9);
-                        expect(ufit[1]).toBeCloseTo(img[1] * dpr, 9);
-                        expect(ufit[2]).toBeCloseTo(img[2] * dpr, 9);
-                        expect(ufit[3]).toBeCloseTo(img[3] * dpr, 9);
+                    const { img, canvas } = place(w, h, raw, coarsePointer);
+                    for (let i = 0; i < 4; i++) {
+                        expect(canvas[i]).toBeCloseTo(img[i], 6);
                     }
+                    checked++;
                 }
             }
         }
-        expect(checked).toBeGreaterThan(40);
+        expect(checked).toBe(70);
     });
 
-    it('stay inside the backing-store quantisation bound on the fractional devices', () => {
-        // Rounding the store to whole device pixels leaves up to half a device px of residual per
-        // CSS px, and that residual is multiplied by how far the art edge sits from the origin.
-        // On a portrait phone the art is ~3.9 box-widths wide, so the far edge can be ~1.9 device
-        // px from the nominal-dpr position no matter how the fit is computed — this is the store,
-        // not the fit. Using sx/sy is what makes it correct rather than merely close.
+    it('the fractional-DPR cases really do quantise the store (otherwise the test is vacuous)', () => {
+        // 390 x 1.25 = 487.5 device px, which no integer backing store can hold exactly.
+        const { dpr, sx, sy } = place(390, 844, 1.25, false);
+        expect(dpr).toBe(1.25);
+        expect(backingSize({ w: 390, h: 844 }, 1.25).w).toBe(488);
+        expect(Math.abs(sx - dpr)).toBeGreaterThan(1e-4); // 488/390 = 1.251282
+        expect(sy).toBeCloseTo(dpr, 9); // 844 x 1.25 happens to be whole
+    });
+
+    it('still covers the stage on both axes, so no edge letterboxes', () => {
         for (const [w, h] of L07_BOXES) {
             for (const raw of L07_DPRS) {
-                for (const coarsePointer of [false, true]) {
-                    const { dpr, img, ufit } = place(w, h, raw, coarsePointer);
-                    const boundX = 0.5 / w;
-                    const boundY = 0.5 / h;
-                    // uFit is one scalar, so the ART's height rides sx like its width does; only
-                    // the y OFFSET is measured with sy. Getting this wrong is what would stretch
-                    // the frame vertically by the sx/sy mismatch.
-                    expect(Math.abs(ufit[0] - img[0] * dpr)).toBeLessThanOrEqual(
-                        Math.abs(img[0] * dpr) * boundX + L07_EPS,
-                    );
-                    expect(Math.abs(ufit[2] - img[2] * dpr)).toBeLessThanOrEqual(
-                        Math.abs(img[2] * dpr) * boundX + L07_EPS,
-                    );
-                    expect(Math.abs(ufit[1] - img[1] * dpr)).toBeLessThanOrEqual(
-                        Math.abs(img[1] * dpr) * boundY + L07_EPS,
-                    );
-                    expect(Math.abs(ufit[3] - img[3] * dpr)).toBeLessThanOrEqual(
-                        Math.abs(img[3] * dpr) * boundX + L07_EPS,
-                    );
+                const { img, canvas } = place(w, h, raw, false);
+                for (const edge of [img[0], img[1], canvas[0], canvas[1]]) {
+                    expect(edge).toBeLessThanOrEqual(0.5);
+                }
+                for (const edge of [img[2], canvas[2]]) {
+                    expect(edge).toBeGreaterThanOrEqual(w - 0.5);
+                }
+                for (const edge of [img[3], canvas[3]]) {
+                    expect(edge).toBeGreaterThanOrEqual(h - 0.5);
                 }
             }
         }
-    });
-
-    it('pin the worst measured case: a 390-wide phone at DPR 1.25', () => {
-        const { img, ufit } = place(390, 844, 1.25, false);
-        const worst = Math.max(...[0, 1, 2, 3].map((i) => Math.abs(ufit[i] - img[i] * 1.25)));
-        // 1.207 device px ≈ 0.97 CSS px. It is the floor for this geometry: the far edge is
-        // 3.9 box-widths from the origin and the store quantises to half a device px per CSS px.
-        expect(worst).toBeGreaterThan(1.2);
-        expect(worst).toBeLessThan(1.21);
-        // …which is still sub-pixel in CSS terms: no visible twitch at the handover.
-        expect(worst / 1.251282).toBeLessThan(1);
     });
 });

@@ -160,34 +160,41 @@
                 pointer-events: none;
             }
 
-            /* Ambient Forest Artwork Background */
+            /* Shared stage for the artwork. The <img> and the WebGL canvas are SIBLINGS inside
+               it and are never repositioned individually: CSS owns the layout, start.ts reads where
+               the browser put things and follows. The inline script after the markup snaps this
+               wrapper to whole device pixels before the first paint. */
+            #boot .forest-stage {
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                z-index: 1;
+            }
+
+            /* Ambient Forest Artwork Background. This box IS the layout — `object-fit: cover` here
+               is the single source of truth for where the art lands, and nothing in JS moves it.
+               Beats Tailwind preflight's `img { max-width: 100% }`, which would squash the box. */
             #boot .forest-bg {
                 position: absolute;
                 inset: 0;
                 width: 100%;
                 height: 100%;
-                /* Beats Tailwind preflight's `img { max-width: 100% }`, which would squash the
-                   JS-fitted art box and distort the image. */
                 max-width: none;
                 object-fit: cover;
                 object-position: 50% 50%;
                 opacity: 1;
                 pointer-events: none;
-                z-index: 1;
             }
 
-            /* WebGL layer canvas, drawn over the static art. No filter / background / mask here:
-               Chrome paints such canvases as a white box while loading.
-               Its box is owned by JS (start.ts): left/top/width/height are set to the same stage
-               box the backing store and uFit are computed from, so the GL frame can never be
-               stretched relative to the static <img>. The 100% below is only the pre-JS default. */
+            /* WebGL layer canvas: in the markup from the first paint, over the <img> at opacity 0.
+               No filter / background / mask here — Chrome paints such canvases as a white box while
+               loading. start.ts never inserts or removes it; it only flips the two opacities in one
+               task once the canvas has a frame, and puts them back on dispose. */
             #boot .forest-gl {
                 position: absolute;
-                left: 0;
-                top: 0;
+                inset: 0;
                 width: 100%;
                 height: 100%;
-                z-index: 1;
                 opacity: 0;
                 pointer-events: none;
             }
@@ -530,18 +537,62 @@
 
     <body>
         <div id="boot">
-            <!-- Key Art Background (static fallback + animation source) -->
-            <img
-                src="/assets/image/ui/loading/forest-loading-key.webp"
-                class="forest-bg"
-                id="boot-art"
-                width="1920"
-                height="1072"
-                alt=""
-                aria-hidden="true"
-                fetchpriority="high"
-                decoding="async"
-            />
+            <!-- Artwork stage. The <img> and the WebGL canvas are siblings and stay siblings:
+                 start.ts only ever writes their `opacity`, never their box, and never adds or
+                 removes either of them. -->
+            <div class="forest-stage" id="forest-stage">
+                <!-- Key Art Background (static fallback + animation source) -->
+                <img
+                    src="/assets/image/ui/loading/forest-loading-key.webp"
+                    class="forest-bg"
+                    id="boot-art"
+                    width="1920"
+                    height="1072"
+                    alt=""
+                    aria-hidden="true"
+                    fetchpriority="high"
+                    decoding="async"
+                />
+                <!-- WebGL layer canvas, present from the first paint. -->
+                <canvas class="forest-gl" id="boot-gl" aria-hidden="true"></canvas>
+            </div>
+            <script>
+                /*
+                 * Pixel-snap the stage BEFORE the first paint. The cover image lands on a
+                 * fractional device pixel (the art is 1920x1072, the box rarely is), and Chrome
+                 * rasterises an <img> at that phase — a canvas texture is drawn at whatever uFit
+                 * says, so moving the shared wrapper by minus its sub-pixel offset puts both on
+                 * the same whole pixel and there is nothing left to re-raster at the handover.
+                 * Deliberately a classic inline script: a module is deferred and would land long
+                 * after the image painted. If it fails to run nothing breaks — the CSS cover is
+                 * still a correct layout, just a sub-pixel one.
+                 */
+                (function () {
+                    var stage = document.getElementById('forest-stage');
+                    var img = document.getElementById('boot-art');
+                    function snap() {
+                        if (!stage || !img) return;
+                        stage.style.translate = '';
+                        var iw = img.naturalWidth || img.width;
+                        var ih = img.naturalHeight || img.height;
+                        if (!iw || !ih) return;
+                        var r = img.getBoundingClientRect();
+                        var s = Math.max(r.width / iw, r.height / ih);
+                        var x = r.left + (r.width - iw * s) / 2;
+                        var y = r.top + (r.height - ih * s) / 2;
+                        var d = window.devicePixelRatio || 1;
+                        var fx = x * d - Math.round(x * d);
+                        var fy = y * d - Math.round(y * d);
+                        stage.style.translate =
+                            Math.abs(fx) + Math.abs(fy) > 0.01
+                                ? -fx / d + 'px ' + -fy / d + 'px'
+                                : '';
+                    }
+                    snap();
+                    img.addEventListener('load', snap);
+                    window.addEventListener('resize', snap);
+                })();
+            </script>
             <div class="forest-overlay"></div>
 
             <!-- Central Content Container -->
