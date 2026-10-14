@@ -41,6 +41,7 @@ import {
 } from '@/game/monsters/path-debug-overlay';
 import { DEPTH, MUSIC_EVENT, MUSIC_STOP, PIXEL_LIGHTING_CONFIG, SFX_EVENT } from '@/lib/constants';
 import { EventBus } from '@/lib/events/bus';
+import { setBootProgress } from '@/lib/boot-loading/progress';
 import { setCurrentLevel } from '@/lib/levels/current-level';
 import { fetchLevelIndex } from '@/lib/levels/loader';
 import { useGameStore } from '@/store/game-store';
@@ -127,6 +128,9 @@ export class LoadScene extends Phaser.Scene {
     }
 
     preload(): void {
+        // Real asset progress into the #boot loading bar (no-op once the splash is gone).
+        this.load.on('progress', (v: number) => setBootProgress(v));
+
         // Per-scene texture key — `background` alone collides with the
         // texture cache: Phaser reuses the first loaded image under
         // that key, so every subsequent scene would render the first

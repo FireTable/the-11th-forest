@@ -33,6 +33,11 @@
 ## 🖼️ 游戏与编辑器截图 (Screenshots)
 
 <p align="center">
+  <img src="screenshots/loading-v1.png" width="100%" alt="动态加载界面" /><br/>
+  <i>加载界面 — 分层 WebGL 主视觉与进度条上的像素小人</i>
+</p>
+
+<p align="center">
   <img src="screenshots/tavern-v1.png" width="100%" alt="酒馆选角界面" /><br/>
   <i>酒馆 — 多角色选角与属性雷达</i>
 </p>
@@ -66,6 +71,7 @@
 - **物理碰撞与怪物理性 AI**：基于 **Matter.js** 物理刚体碰撞，怪物具备僵直/受击状态机、脚底 BodyBox A* 寻路算法以及波次刷怪 Trigger 机制。
 - **无缝传送门 (Teleporters)**：关卡间通过配置化的传送门碰撞点实现平滑数据传递与场景流转。
 - **弹道与 Z 轴深度**：支持弹道重力/轨迹、武器 Swing / Orbit 轨迹与动态 Depth 层级管理。
+- **动态加载界面**：分层 WebGL 主视觉（角色呼吸、草叶摇摆、拱门发光），进度条上有像素小人奔跑；不支持 WebGL 时退回静态图，竖屏手机自动横屏显示。
 
 ### 🛠️ 内置可视化关卡编辑器 (In-Browser Level Editor)
 
@@ -155,7 +161,7 @@ the-11th-forest/
 ├── public/
 │   ├── assets/              # 静态资源 (图片、音效、像素字体)
 │   └── data/                # 全量 YAML 游戏配置文件 (关卡/怪物/武器/角色/音效)
-├── screenshots/             # 项目展示截图 (战斗、酒馆选角、关卡编辑器)
+├── screenshots/             # 项目展示截图 (加载界面、战斗、酒馆选角、关卡编辑器)
 ├── src/
 │   ├── components/hud/      # React HUD 渲染组件 (血条、酒馆、选角)
 │   ├── editor/              # 可视化网页编辑器 React 组件
@@ -173,6 +179,7 @@ the-11th-forest/
 项目拥有极为完善的模块化技术文档，存放在 [`docs/`](./docs) 目录下：
 
 - 📘 [`docs/SCENES.md`](./docs/SCENES.md) — 场景加载流程、传送门关卡流转与酒馆控制。
+- 📘 [`docs/BOOT-LOADING.md`](./docs/BOOT-LOADING.md) — 动态加载界面：分层、遮罩、动效、进度条与像素小人。
 - 📘 [`docs/EDITOR.md`](./docs/EDITOR.md) — 可视化关卡编辑器功能划分与 Vite 本地持久化 API。
 - 📘 [`docs/MODULES.md`](./docs/MODULES.md) — YAML → Schema → Parser → Loader → Logic 统一设计模式。
 - 📘 [`docs/SKILL.md`](./docs/SKILL.md) — 关卡数据维护规范、数值平衡计算与 AI 生成管线。

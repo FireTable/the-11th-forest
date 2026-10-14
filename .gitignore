@@ -36,3 +36,6 @@ dist-ssr
 .claude
 # Public backup (created before editor changes for safe rollback)
 public-bk/
+
+grok
+.grok

@@ -1,0 +1,140 @@
+{
+  "canvas": [
+    1920,
+    1072
+  ],
+  "bg": [
+    0,
+    0,
+    1920,
+    1072
+  ],
+  "chars": [
+    487,
+    481,
+    970,
+    495
+  ],
+  "title": [
+    618,
+    100,
+    688,
+    269
+  ],
+  "fg": [
+    0,
+    739,
+    1920,
+    333
+  ],
+  "maskBg": "RGB = aurora/sky, stars, mushroom glow (1/4 res, full canvas)",
+  "maskDepth": "RGB = parallax depth, sway, unused (1/4 res, full canvas)",
+  "maskChars": "RGB = belly, ears(cat+bunny)+cat tail (tail = y>740 & x<830), hair+bow (1/2 res, chars rect)",
+  "regions(px, source 1920x1072)": {
+    "belly": [
+      633,
+      795,
+      95,
+      55
+    ],
+    "catEarL": [
+      775,
+      638,
+      38
+    ],
+    "catEarR": [
+      877,
+      612,
+      38
+    ],
+    "catHeadPivot": [
+      826,
+      700
+    ],
+    "bunnyEars": [
+      1100,
+      551,
+      80,
+      70
+    ],
+    "bunnyEarPivot": [
+      1140,
+      622
+    ],
+    "catTail": [
+      775,
+      825,
+      50,
+      72
+    ],
+    "catTailPivot": [
+      831,
+      866
+    ],
+    "blondeHair": [
+      1354,
+      795,
+      110,
+      115
+    ],
+    "blondeHairPivot": [
+      1360,
+      640
+    ],
+    "bow": [
+      1384,
+      653,
+      62,
+      52
+    ],
+    "bunnyHairL": [
+      1034,
+      765,
+      32,
+      80
+    ],
+    "bunnyHairR": [
+      1186,
+      754,
+      32,
+      80
+    ],
+    "bunnyHairPivot": [
+      1110,
+      640
+    ],
+    "mushrooms": [
+      [
+        230,
+        880,
+        80,
+        55
+      ],
+      [
+        285,
+        955,
+        35,
+        30
+      ],
+      [
+        1820,
+        860,
+        95,
+        60
+      ],
+      [
+        1705,
+        955,
+        40,
+        35
+      ],
+      [
+        497,
+        962,
+        16,
+        14
+      ]
+    ]
+  },
+  "fgNote": "fg is a fully transparent placeholder (66 B) since v2: mushrooms stay in bg; glow via maskBg.B"
+}

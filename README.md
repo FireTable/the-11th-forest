@@ -33,6 +33,11 @@ Beyond the core combat systems, the project features an **in-browser visual leve
 ## 🖼️ Screenshots
 
 <p align="center">
+  <img src="screenshots/loading-v1.png" width="100%" alt="Animated Loading Screen" /><br/>
+  <i>Loading screen — layered WebGL key art with a pixel runner on the progress bar</i>
+</p>
+
+<p align="center">
   <img src="screenshots/tavern-v1.png" width="100%" alt="Tavern Character Selection" /><br/>
   <i>Tavern — multi-character selection & radar stats</i>
 </p>
@@ -66,6 +71,7 @@ The project integrates native AI generation pipelines for graphics, sound, and s
 - **Physics & Monster AI State Machine**: Integrated **Matter.js** rigid body physics, monster knockback/stagger state machine, foot-based BodyBox A* pathfinding, and wave-triggered monster queue.
 - **Seamless Teleporter System**: Inter-scene travel via configurable Teleporter trigger zones.
 - **Projectile Dynamics & Z-Depth Layering**: Trajectory gravity, weapon swing/orbit paths, and dynamic Z-depth sorting.
+- **Animated Loading Screen**: Layered WebGL key art (breathing characters, swaying grass, glowing arch) with a pixel-art runner on the progress bar; falls back to a static image without WebGL, and turns to landscape on portrait phones.
 
 ### 🛠️ In-Browser Visual Level Editor
 
@@ -155,7 +161,7 @@ the-11th-forest/
 ├── public/
 │   ├── assets/              # Static assets (sprites, audio, pixel fonts)
 │   └── data/                # YAML game data (levels, monsters, weapons, characters, audios)
-├── screenshots/             # Showcase screenshots (combat, tavern, level editor)
+├── screenshots/             # Showcase screenshots (loading, combat, tavern, level editor)
 ├── src/
 │   ├── components/hud/      # React HUD overlay components
 │   ├── editor/              # In-browser visual level editor React components
@@ -172,6 +178,7 @@ the-11th-forest/
 Deep-dive documentation lives under [`docs/`](./docs):
 
 - 📘 [`docs/SCENES.md`](./docs/SCENES.md) — Scene loading pipeline, teleporter transitions & tavern hub.
+- 📘 [`docs/BOOT-LOADING.md`](./docs/BOOT-LOADING.md) — Animated loading screen: layers, masks, effects, progress bar & runner.
 - 📘 [`docs/EDITOR.md`](./docs/EDITOR.md) — Visual level editor sections & Vite local persistence API.
 - 📘 [`docs/MODULES.md`](./docs/MODULES.md) — YAML → Schema → Parser → Loader → Logic design pattern.
 - 📘 [`docs/SKILL.md`](./docs/SKILL.md) — Data maintenance, balance math & AI asset pipeline.
