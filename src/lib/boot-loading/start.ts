@@ -2,11 +2,13 @@ import { BOOT_LOADING } from '@/lib/boot-loading/config';
 import {
     ART_W,
     ART_H,
+    backingSize,
     capDpr,
     effectScale,
     fitTextureSize,
     isLowEnd,
     smoothTowards,
+    snapFit,
     stageBox,
     stageFit,
     shouldUseStaticFallback,
@@ -122,11 +124,19 @@ export async function startBootLoading(): Promise<void> {
     const applyFit = (): {
         box: { w: number; h: number; left: number; top: number };
         fit: ReturnType<typeof stageFit>;
+        dpr: number;
     } => {
         const box = stageSize(boot);
-        const fit = stageFit(box.w, box.h);
+        // ONE dpr for the whole splash — the static <img>, the canvas backing store and uFit all
+        // quantise against the same device-pixel grid, computed with the same rule the canvas
+        // uses (which already carries the mobile cap). Deriving it twice from two places is how
+        // the img and the canvas end up a device pixel apart on a phone.
+        const dpr = capDpr(window.devicePixelRatio, BOOT_LOADING.MAX_DPR, coarsePointer);
+        // Snapped, so the art's edges land on whole device pixels and the handover from the <img>
+        // to the canvas cannot shimmer on a fractional pixel.
+        const fit = snapFit(stageFit(box.w, box.h), dpr);
         placeArt(art, box, fit);
-        return { box, fit };
+        return { box, fit, dpr };
     };
     applyFit();
     // The web font landing changes the panel height, which can change dvh on mobile.
@@ -293,7 +303,7 @@ export async function startBootLoading(): Promise<void> {
 
         const resize = (): void => {
             if (disposed) return;
-            const { box, fit } = applyFit();
+            const { box, fit, dpr } = applyFit();
 
             // The canvas CSS box IS the stage box, so the backing store below can use the same
             // numbers: one box for the img, the CSS box and uFit means no stretch.
@@ -303,16 +313,21 @@ export async function startBootLoading(): Promise<void> {
             canvas.style.width = `${box.w}px`;
             canvas.style.height = `${box.h}px`;
 
-            const dpr = capDpr(window.devicePixelRatio, BOOT_LOADING.MAX_DPR, coarsePointer);
-            const w = Math.max(1, Math.round(box.w * dpr));
-            const h = Math.max(1, Math.round(box.h * dpr));
+            // Rounding the backing store to whole device pixels means the real CSS-px → device-px
+            // scale is not exactly dpr, and not even the same on both axes. uFit has to be fed
+            // the scales the canvas ACTUALLY ended up with, or the art lands off by the rounding
+            // error times its distance from the origin — most visible at the far edge of a
+            // 2× phone, which is exactly where the title sits.
+            const { w, h, sx, sy } = backingSize(box, dpr);
             if (canvas.width !== w) canvas.width = w;
             if (canvas.height !== h) canvas.height = h;
             // The canvas CSS box is the stage box (set above), so the art's own offset travels in
-            // uFit — exactly what the <img> gets from placeArt().
-            fgl.resize(w, h, fit.ox * dpr, fit.oy * dpr, fit.s * dpr);
+            // uFit — exactly what the <img> gets from placeArt(). y rides sy and the scale rides
+            // sx: uFit takes one scalar, and the two differ by well under a device pixel over
+            // the whole box.
+            fgl.resize(w, h, fit.ox * sx, fit.oy * sy, fit.s * sx);
 
-            const deviceScale = fit.s * dpr;
+            const deviceScale = fit.s * sx;
             for (const n of LAYER_ORDER) uploadIfChanged(n, deviceScale);
         };
 

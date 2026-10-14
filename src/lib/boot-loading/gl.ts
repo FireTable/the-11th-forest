@@ -151,6 +151,47 @@ export interface ForestGL {
     draw(t: number, k: number, fx: FrameFx): void;
 }
 
+export type FrameUniforms = {
+    /** The reveal ease, smoothstepped — the multiplier every animated term carries. */
+    ke: number;
+    /** Arch-glow tint strength. Gated by ke, so it is 0 on the very first frame. */
+    done: number;
+    /** Whole-layer offset in art px, one entry per drawn layer. */
+    offsets: Record<LayerName, [number, number]>;
+};
+
+/**
+ * Every number that moves the picture this frame, as plain arithmetic with no GL in it — so
+ * "nothing moves before the splash is visible" is a unit test rather than a promise. `draw`
+ * does nothing but hand the result to the GPU.
+ *
+ * The contract this exists to protect: at `k = 0` EVERY offset is [0,0] and `done` is 0, so
+ * frame one is the static `<img>` composited again — no arch glow, no title float, nothing that
+ * would make the handover to the canvas a visible jump.
+ */
+export function frameUniforms(fx: FrameFx, t: number, k: number, effect = 1): FrameUniforms {
+    const P = BOOT_LOADING;
+    const ke = k * k * (3 - 2 * k);
+    const archIdle = P.ARCH_GLOW_IDLE * effect;
+    const archPeak = P.ARCH_GLOW * effect;
+    const parTitle = P.PARALLAX_TITLE * effect;
+    const titleFloat = P.TITLE_FLOAT_PX * effect;
+    return {
+        ke,
+        done: (archIdle + (archPeak - archIdle) * fx.done) * ke,
+        offsets: {
+            // No parallax below the title: the characters stay locked to their bg shadows.
+            bg: [0, 0],
+            chars: [0, 0],
+            fg: [0, 0],
+            title: [
+                fx.mx * parTitle * ke,
+                (fx.my * parTitle + (1 - 2 * breath(t, P.BREATH_W)) * titleFloat) * ke,
+            ],
+        },
+    };
+}
+
 /**
  * `effect` scales every effect amplitude (1 = full, see `effectScale()`): phones get the same
  * effects, softer. Layer positions and the cover fit are never scaled by it.
@@ -252,29 +293,10 @@ export function createForestGL(gl: WebGLRenderingContext, img: ForestImages, eff
     gl.uniform1f(loc('uEarB'), P.EAR_BUNNY_RAD * effect);
     gl.uniform1f(loc('uTailR'), P.TAIL_RAD * effect);
     gl.uniform1f(loc('uHair'), P.HAIR_PX * effect);
-    gl.uniform1f(uDone, P.ARCH_GLOW_IDLE * effect);
-    // The arch never sits dark: it holds a low tint through loading
-    // and rides up to the 100 % peak as fx.done goes 0 → 1.
-    const archIdle = P.ARCH_GLOW_IDLE * effect;
-    const archPeak = P.ARCH_GLOW * effect;
-    const parTitle = P.PARALLAX_TITLE * effect;
-    const titleFloat = P.TITLE_FLOAT_PX * effect;
-
-    /** Whole-layer offset in art px: geometry only, sampling is untouched. */
-    const layerOffset = (name: LayerName, fx: FrameFx, t: number, ke: number): [number, number] => {
-        switch (name) {
-            case 'bg':
-            case 'chars':
-            case 'fg':
-                // No parallax below the title: characters stay locked to their bg shadows.
-                return [0, 0];
-            case 'title':
-                return [
-                    fx.mx * parTitle * ke,
-                    (fx.my * parTitle + (1 - 2 * breath(t, P.BREATH_W)) * titleFloat) * ke,
-                ];
-        }
-    };
+    // Zero, not ARCH_GLOW_IDLE: the arch tint has to ride the same k ramp as every other effect,
+    // or frame one shows a warm arch the static <img> does not have — a visible pop exactly at the
+    // handover. draw() sets the real value from there.
+    gl.uniform1f(uDone, 0);
 
     return {
         resize(w, h, ox, oy, s) {
@@ -297,15 +319,15 @@ export function createForestGL(gl: WebGLRenderingContext, img: ForestImages, eff
             gl.bindBuffer(gl.ARRAY_BUFFER, buf);
             gl.enableVertexAttribArray(0);
             gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-            const ke = k * k * (3 - 2 * k);
+            const u = frameUniforms(fx, t, k, effect);
             gl.uniform1f(uT, t);
-            gl.uniform1f(uK, ke);
+            gl.uniform1f(uK, u.ke);
             gl.uniform2f(uMouse, fx.mx, fx.my);
-            gl.uniform1f(uDone, archIdle + (archPeak - archIdle) * fx.done);
+            gl.uniform1f(uDone, u.done);
             for (const name of ORDER) {
                 const r: Rect = LAYER_RECT[name];
                 const pad = PAD[name];
-                const off = layerOffset(name, fx, t, ke);
+                const off = u.offsets[name];
                 gl.uniform4f(uQuad, r.x - pad, r.y - pad, r.w + 2 * pad, r.h + 2 * pad);
                 gl.uniform4f(uRect, r.x, r.y, r.w, r.h);
                 gl.uniform1i(uMode, MODE[name]);

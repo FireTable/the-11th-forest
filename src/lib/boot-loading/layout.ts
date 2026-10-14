@@ -67,6 +67,45 @@ export function stageFit(viewW: number, viewH: number): Fit {
     };
 }
 
+/**
+ * `stageFit` snapped so every art edge lands exactly on a device pixel. Without this the art
+ * can land on a fractional device pixel and the browser resamples the static `<img>` one way
+ * while the GPU samples the canvas another — the handover between them is a sub-pixel shimmer
+ * that reads as a twitch on a high-DPR screen.
+ *
+ * Snapping is one-directional on purpose: `ox`/`oy` go DOWN (floor) and the right/bottom edge
+ * go UP (ceil), so the fit can only ever grow. It still covers the box on both axes, which is
+ * the property `stageFit` guarantees — a naive round() could pull an edge inwards by up to half
+ * a device pixel and open a gap along it.
+ */
+export function snapFit(fit: Fit, dpr: number): Fit {
+    const d = dpr > 0 && Number.isFinite(dpr) ? dpr : 1;
+    const ox = Math.floor(fit.ox * d) / d;
+    const oy = Math.floor(fit.oy * d) / d;
+    // The scale comes from the width only. The height follows from the art aspect ratio, and
+    // lands >= fit.oy + ART_H * fit.s because s grows by at least what oy lost.
+    const s = (Math.ceil((fit.ox + ART_W * fit.s) * d) / d - ox) / ART_W;
+    return { ox, oy, s };
+}
+
+/**
+ * Canvas backing store for a CSS box at `dpr`, and the scale each axis actually ended up with.
+ * Rounding the backing store is unavoidable, so the two axes rarely come out at exactly `dpr` —
+ * the caller has to place the art with sx/sy, never with the raw dpr, or the canvas and the
+ * `<img>` disagree by the rounding error multiplied by the distance from the origin.
+ */
+export function backingSize(
+    box: { w: number; h: number },
+    dpr: number,
+): { w: number; h: number; sx: number; sy: number } {
+    const d = dpr > 0 && Number.isFinite(dpr) ? dpr : 1;
+    const bw = Math.max(1, box.w);
+    const bh = Math.max(1, box.h);
+    const w = Math.max(1, Math.round(bw * d));
+    const h = Math.max(1, Math.round(bh * d));
+    return { w, h, sx: w / bw, sy: h / bh };
+}
+
 /** Content (padding) box of the splash container — the stage the art is fitted into. */
 export function stageBox(
     w: number,

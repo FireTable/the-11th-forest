@@ -19,6 +19,8 @@ import {
     effectScale,
     MOBILE_EFFECT_SCALE,
     smoothTowards,
+    snapFit,
+    backingSize,
     shouldUseStaticFallback,
     textureUploadScale,
     fitTextureSize,
@@ -491,5 +493,194 @@ describe('texture sizing', () => {
         const r = fitTextureSize(100, 100, 0.001, 4096);
         expect(r.w).toBe(1);
         expect(r.h).toBe(1);
+    });
+});
+
+// ─── loading-07: the first frame must land where the static <img> already is ──
+
+/** Realistic stage (content-box) sizes: two phones, a rotated phone, three desktops. */
+const L07_BOXES: Array<[number, number]> = [
+    [320, 568],
+    [390, 844],
+    [844, 390],
+    [1280, 720],
+    [1366, 768],
+    [1916, 1070],
+    [2560, 1440],
+];
+/** 1.25 and 1.5 are the fractional ones (Android/iOS fractional DPR); 3 gets capped by MAX_DPR. */
+const L07_DPRS = [1, 1.25, 1.5, 2, 3];
+const L07_EPS = 1e-6;
+
+describe('snapFit', () => {
+    it('lands the width edges on whole device pixels', () => {
+        for (const [w, h] of L07_BOXES) {
+            for (const raw of L07_DPRS) {
+                for (const coarsePointer of [false, true]) {
+                    const dpr = capDpr(raw, BOOT_LOADING.MAX_DPR, coarsePointer);
+                    const fit = snapFit(stageFit(w, h), dpr);
+                    // The height rides the width-derived scale, so only these three are on-grid —
+                    // and those are exactly the edges that decide where the art sits.
+                    for (const edge of [
+                        fit.ox * dpr,
+                        fit.oy * dpr,
+                        (fit.ox + ART_W * fit.s) * dpr,
+                    ]) {
+                        expect(Math.abs(edge - Math.round(edge))).toBeLessThan(L07_EPS);
+                    }
+                }
+            }
+        }
+    });
+
+    it('still covers the box on both axes', () => {
+        for (const [w, h] of L07_BOXES) {
+            for (const raw of L07_DPRS) {
+                for (const coarsePointer of [false, true]) {
+                    const dpr = capDpr(raw, BOOT_LOADING.MAX_DPR, coarsePointer);
+                    const fit = snapFit(stageFit(w, h), dpr);
+                    expect(fit.ox).toBeLessThanOrEqual(0);
+                    expect(fit.oy).toBeLessThanOrEqual(0);
+                    expect(fit.ox + ART_W * fit.s).toBeGreaterThanOrEqual(w - L07_EPS);
+                    expect(fit.oy + ART_H * fit.s).toBeGreaterThanOrEqual(h - L07_EPS);
+                }
+            }
+        }
+    });
+
+    it('can only ever grow the fit — it must never open a gap', () => {
+        for (const [w, h] of L07_BOXES) {
+            for (const raw of L07_DPRS) {
+                const base = stageFit(w, h);
+                const snapped = snapFit(base, capDpr(raw, BOOT_LOADING.MAX_DPR, false));
+                expect(snapped.ox).toBeLessThanOrEqual(base.ox + L07_EPS);
+                expect(snapped.oy).toBeLessThanOrEqual(base.oy + L07_EPS);
+                expect(snapped.s).toBeGreaterThanOrEqual(base.s - L07_EPS);
+            }
+        }
+    });
+
+    it('reads a nonsense dpr as 1 instead of snapping onto nothing', () => {
+        const want = snapFit(stageFit(1280, 720), 1);
+        for (const bad of [0, -2, Number.NaN, Number.POSITIVE_INFINITY]) {
+            expect(snapFit(stageFit(1280, 720), bad)).toEqual(want);
+        }
+    });
+});
+
+describe('backingSize', () => {
+    it('rounds the store to whole device pixels and reports the real per-axis scale', () => {
+        // 390 × 1.25 = 487.5 — the fractional case a phone actually hits.
+        const b = backingSize({ w: 390, h: 844 }, 1.25);
+        expect(b.w).toBe(488);
+        expect(b.sx).toBeCloseTo(488 / 390, 12);
+        expect(b.h).toBe(1055);
+        expect(b.sy).toBeCloseTo(1055 / 844, 12);
+        // …and that is NOT the dpr: using the nominal dpr for uFit is the off-by-0.96-CSS-px bug.
+        expect(b.sx).not.toBeCloseTo(1.25, 4);
+    });
+
+    it('stays within half a device pixel of the requested dpr on each axis', () => {
+        for (const [w, h] of L07_BOXES) {
+            for (const raw of L07_DPRS) {
+                for (const coarsePointer of [false, true]) {
+                    const dpr = capDpr(raw, BOOT_LOADING.MAX_DPR, coarsePointer);
+                    const b = backingSize({ w, h }, dpr);
+                    expect(Math.abs(b.sx - dpr) * w).toBeLessThanOrEqual(0.5 + L07_EPS);
+                    expect(Math.abs(b.sy - dpr) * h).toBeLessThanOrEqual(0.5 + L07_EPS);
+                }
+            }
+        }
+    });
+
+    it('never allocates a zero-sized backing store', () => {
+        expect(backingSize({ w: 0, h: 0 }, 1)).toEqual({ w: 1, h: 1, sx: 1, sy: 1 });
+    });
+});
+
+describe('static <img> vs the WebGL uFit', () => {
+    /** Exactly what start.ts does: one fit, one dpr, two rects. */
+    const place = (w: number, h: number, rawDpr: number, coarsePointer: boolean) => {
+        const dpr = capDpr(rawDpr, BOOT_LOADING.MAX_DPR, coarsePointer);
+        const fit = snapFit(stageFit(w, h), dpr);
+        const { sx, sy } = backingSize({ w, h }, dpr);
+        return {
+            dpr,
+            sx,
+            sy,
+            /** What placeArt() writes to the <img>, in CSS px. */
+            img: [fit.ox, fit.oy, fit.ox + ART_W * fit.s, fit.oy + ART_H * fit.s] as const,
+            /** What fgl.resize() gets, already in device px. */
+            ufit: [
+                fit.ox * sx,
+                fit.oy * sy,
+                (fit.ox + ART_W * fit.s) * sx,
+                (fit.oy + ART_H * fit.s) * sx,
+            ] as const,
+        };
+    };
+
+    it('are exactly equal wherever the backing store is a whole multiple of the dpr', () => {
+        let checked = 0;
+        for (const [w, h] of L07_BOXES) {
+            for (const raw of L07_DPRS) {
+                for (const coarsePointer of [false, true]) {
+                    const { dpr, sx, sy, img, ufit } = place(w, h, raw, coarsePointer);
+                    // Only the fractional-DPR cases quantise; every integer-DPR device (which is
+                    // every real phone and desktop) must agree to the last bit.
+                    if (Math.abs(sx - dpr) < L07_EPS && Math.abs(sy - dpr) < L07_EPS) {
+                        checked++;
+                        expect(ufit[0]).toBeCloseTo(img[0] * dpr, 9);
+                        expect(ufit[1]).toBeCloseTo(img[1] * dpr, 9);
+                        expect(ufit[2]).toBeCloseTo(img[2] * dpr, 9);
+                        expect(ufit[3]).toBeCloseTo(img[3] * dpr, 9);
+                    }
+                }
+            }
+        }
+        expect(checked).toBeGreaterThan(40);
+    });
+
+    it('stay inside the backing-store quantisation bound on the fractional devices', () => {
+        // Rounding the store to whole device pixels leaves up to half a device px of residual per
+        // CSS px, and that residual is multiplied by how far the art edge sits from the origin.
+        // On a portrait phone the art is ~3.9 box-widths wide, so the far edge can be ~1.9 device
+        // px from the nominal-dpr position no matter how the fit is computed — this is the store,
+        // not the fit. Using sx/sy is what makes it correct rather than merely close.
+        for (const [w, h] of L07_BOXES) {
+            for (const raw of L07_DPRS) {
+                for (const coarsePointer of [false, true]) {
+                    const { dpr, img, ufit } = place(w, h, raw, coarsePointer);
+                    const boundX = 0.5 / w;
+                    const boundY = 0.5 / h;
+                    // uFit is one scalar, so the ART's height rides sx like its width does; only
+                    // the y OFFSET is measured with sy. Getting this wrong is what would stretch
+                    // the frame vertically by the sx/sy mismatch.
+                    expect(Math.abs(ufit[0] - img[0] * dpr)).toBeLessThanOrEqual(
+                        Math.abs(img[0] * dpr) * boundX + L07_EPS,
+                    );
+                    expect(Math.abs(ufit[2] - img[2] * dpr)).toBeLessThanOrEqual(
+                        Math.abs(img[2] * dpr) * boundX + L07_EPS,
+                    );
+                    expect(Math.abs(ufit[1] - img[1] * dpr)).toBeLessThanOrEqual(
+                        Math.abs(img[1] * dpr) * boundY + L07_EPS,
+                    );
+                    expect(Math.abs(ufit[3] - img[3] * dpr)).toBeLessThanOrEqual(
+                        Math.abs(img[3] * dpr) * boundX + L07_EPS,
+                    );
+                }
+            }
+        }
+    });
+
+    it('pin the worst measured case: a 390-wide phone at DPR 1.25', () => {
+        const { img, ufit } = place(390, 844, 1.25, false);
+        const worst = Math.max(...[0, 1, 2, 3].map((i) => Math.abs(ufit[i] - img[i] * 1.25)));
+        // 1.207 device px ≈ 0.97 CSS px. It is the floor for this geometry: the far edge is
+        // 3.9 box-widths from the origin and the store quantises to half a device px per CSS px.
+        expect(worst).toBeGreaterThan(1.2);
+        expect(worst).toBeLessThan(1.21);
+        // …which is still sub-pixel in CSS terms: no visible twitch at the handover.
+        expect(worst / 1.251282).toBeLessThan(1);
     });
 });
