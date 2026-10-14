@@ -172,15 +172,6 @@
                 object-fit: cover;
                 object-position: 50% 50%;
                 opacity: 1;
-                /* Hidden until placeArt() has put it in the focal-point box it is actually drawn
-                   in. The two are NOT the same rect: this CSS is a CENTRED cover (image left
-                   ≈ -76.4px on a 1280 stage) while placeArt() fits around FOCAL_POINT, 12 art px
-                   right of centre (image left = -85.5px). Painting this state first means the art
-                   jumps ~9 CSS px sideways the moment JS runs — a visible twitch on a warm cache,
-                   where the image decodes before the boot module does. placeArt() sets this back
-                   to 'visible' in the same task it sets the rect, so the art only ever appears
-                   where it will stay. */
-                visibility: hidden;
                 pointer-events: none;
                 z-index: 1;
             }

@@ -90,11 +90,6 @@ function withinMaxTextureSize(img: HTMLImageElement, maxTextureSize: number): Te
  * Pin the static `<img>` to the art rect the shader will use, so the no-WebGL fallback and the
  * animated frame always agree. This is `object-fit: cover` with a focal point: the box is always
  * at least as big as the stage, so no side of the viewport is ever left as an empty band.
- *
- * The reveal lives here too: the stylesheet keeps the image `visibility: hidden` because its own
- * centred cover is a DIFFERENT rect from this focal-point one, and painting that first costs a
- * visible sideways jump. Both happen in the same task, so the art only ever appears where it
- * stays.
  */
 function placeArt(
     art: HTMLElement,
@@ -106,7 +101,6 @@ function placeArt(
     art.style.top = `${box.top + fit.oy}px`;
     art.style.width = `${ART_W * fit.s}px`;
     art.style.height = `${ART_H * fit.s}px`;
-    art.style.visibility = 'visible';
 }
 
 export async function startBootLoading(): Promise<void> {
@@ -121,11 +115,12 @@ export async function startBootLoading(): Promise<void> {
     });
     const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
 
-    // Fit the static art immediately, before anything async and before the runner: the stylesheet
-    // keeps the image hidden until this runs (its centred CSS cover is a different rect from the
-    // focal-point one, and painting that first costs a visible sideways jump), so the art must not
-    // wait behind anything that could throw. The splash is then already in its final layout on
-    // the first painted frame, and stays there once the layers decode.
+    // The runner walks on every path, including the static one below, so it is mounted before the
+    // WebGL decision. It looks after itself from here (it stops when the splash is removed).
+    mountRunner(document);
+
+    // Fit the static art immediately, before anything async: the splash must already be in its
+    // final layout on the first painted frame, or it visibly jumps once the layers decode.
     const applyFit = (): {
         box: { w: number; h: number; left: number; top: number };
         fit: ReturnType<typeof stageFit>;
@@ -146,10 +141,6 @@ export async function startBootLoading(): Promise<void> {
     applyFit();
     // The web font landing changes the panel height, which can change dvh on mobile.
     void document.fonts?.ready.then(applyFit);
-
-    // The runner walks on every path, including the static one below, so it is mounted before the
-    // WebGL decision. It looks after itself from here (it stops when the splash is removed).
-    mountRunner(document);
 
     // Re-fit listeners, registered BEFORE the fallback gate so both paths get them: the cover fit
     // is a pure function of the stage box, so a static splash that never re-fits is exactly how a
