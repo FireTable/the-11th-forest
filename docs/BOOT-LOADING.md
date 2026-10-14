@@ -1,24 +1,30 @@
 # Boot Loading Screen
 
-The animated splash the player sees before the game appears. A static key art paints immediately
-from `index.html`, then a WebGL canvas fades in **over** it and takes over: a title that floats and follows the mouse, mushroom
+The animated splash the player sees before the game appears. The static key art is placed by
+`src/boot.ts` and revealed there, then a WebGL canvas fades in **over** it and takes over: a title
+that floats and follows the mouse, mushroom
 glow, swaying grass, characters breathing, and a warm glowing arch that brightens when loading
 completes. A pixel-art runner walks the progress bar the whole time. The sky stays frozen
 throughout, and there is not a single particle. If WebGL is unavailable the static image is the
 whole experience — every effect is optional, none of them is load-bearing.
 
+The art stays `visibility: hidden` until it is placed on purpose: the stylesheet's own centred
+`object-fit: cover` is a **different rect** from the focal-point cover `placeArt()` writes (about
+9 CSS px apart at 1280 wide), so painting the CSS one first costs a visible sideways jump
+whenever the image decodes before the boot module does.
+
 ## Timeline
 
-| #   | Moment             | What happens                                                                                           |
-| --- | ------------------ | ------------------------------------------------------------------------------------------------------ |
-| 1   | HTML paint         | `#boot` renders: static `<img id="boot-art">` (cover-fitted) + the CSS progress bar.                   |
-| 2   | `src/boot.ts` runs | Fits the art synchronously, then loads the 7 images and builds the WebGL program.                      |
-| 3   | Canvas inserted    | Still `opacity: 0` — invisible underneath the static art, so nothing can flash.                        |
-| 4   | 3rd frame drawn    | `opacity` flips to `1` once; `uK` starts ramping `0 → 1` over `RAMP_MS` (1200 ms).                     |
-| 5   | Loading            | `setBootProgress` drives the bar and the runner; effects animate; the arch glows.                      |
-| 6   | `boot-done`        | Bar snaps to 100 %, the arch brightens to its peak (`ARCH_GLOW_MS` 400 ms), `#boot` fades over 450 ms. |
-| 7   | `#boot` removed    | ~400 ms after `boot-done` (`PhaserGame.tsx`). A `MutationObserver` notices and disposes the canvas.    |
-| 8   | Dispose            | rAF cancelled, listeners removed, canvas removed from the DOM, WebGL context released.                 |
+| #   | Moment             | What happens                                                                                             |
+| --- | ------------------ | -------------------------------------------------------------------------------------------------------- |
+| 1   | HTML paint         | `#boot` renders: the CSS progress bar, plus the static `<img id="boot-art">` still `visibility: hidden`. |
+| 2   | `src/boot.ts` runs | Fits the art synchronously and reveals it, then loads the 7 images and builds the WebGL program.         |
+| 3   | Canvas inserted    | Still `opacity: 0` — invisible underneath the static art, so nothing can flash.                          |
+| 4   | 3rd frame drawn    | `opacity` flips to `1` once; `uK` starts ramping `0 → 1` over `RAMP_MS` (300 ms).                        |
+| 5   | Loading            | `setBootProgress` drives the bar and the runner; effects animate; the arch glows.                        |
+| 6   | `boot-done`        | Bar snaps to 100 %, the arch brightens to its peak (`ARCH_GLOW_MS` 400 ms), `#boot` fades over 450 ms.   |
+| 7   | `#boot` removed    | ~400 ms after `boot-done` (`PhaserGame.tsx`). A `MutationObserver` notices and disposes the canvas.      |
+| 8   | Dispose            | rAF cancelled, listeners removed, canvas removed from the DOM, WebGL context released.                   |
 
 ### First paint
 

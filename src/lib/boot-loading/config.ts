@@ -5,8 +5,8 @@
 export const BOOT_LOADING = {
     ENABLED: true, // false = always the static image
     MAX_DPR: 2, // canvas backing store cap
-    RAMP_MS: 1200, // ease every deformation in from 0 after the canvas becomes visible
-    BREATH_W: 2.0, // master breath angular speed → period 2π/2 ≈ 3.14 s
+    RAMP_MS: 300, // ease every deformation in from 0 after the canvas becomes visible
+    BREATH_W: 3.2, // master breath angular speed → period 2π/3.2 ≈ 1.96 s
     // Mouse parallax (art px at full deflection; mouse is normalised to -1..1).
     // Only the title has parallax; bg, chars and fg stay locked together so feet meet their shadows.
     PARALLAX_TITLE: -4, // negative = moves against the others (floats "in front of" the sky)
